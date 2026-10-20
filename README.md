@@ -9,6 +9,30 @@
 
 ---
 
+## 下载与安装
+
+**方式一：安装包（推荐，不需要 Python）**
+
+到 [Releases](https://github.com/Hourai-chiyo/mcroute/releases/latest) 下载 `mcroute-setup.exe`，
+双击安装即可：
+
+- 安装位置：`%LOCALAPPDATA%\mcroute`（**不需要管理员权限**）
+- 自动创建开始菜单和桌面快捷方式
+- 「设置 → 应用」里可以正常卸载
+- 建议**先把它拷到纯英文路径**（如 `D:\`）再运行
+
+> 安装包只有 13 MB，**不含任何游戏文件**——游戏文件在首次下载时从官方源获取。
+
+**方式二：源码运行**
+
+需要 Windows + Python 3.10 以上（只用标准库，**不需要 pip install 任何东西**）：
+
+```bash
+git clone https://github.com/Hourai-chiyo/mcroute.git
+cd mcroute
+run_gui.bat          # 图形界面
+```
+
 ## 它解决什么问题
 
 2026 年 10 月，Minecraft 在国内的下载入口大面积收紧，主流启动器陆续移除了「下载游戏本体」的功能。本项目把「拿到游戏文件」这件事重新做了一遍，并且刻意避开两个坑：
@@ -32,6 +56,7 @@
 | 本地缓存 | 内容寻址（`assets/objects/<h2>/<hash>`），天然去重 |
 | 图形界面 | tkinter，零依赖，下载 / 启动 / 登录状态 / 日志 |
 | 微软登录 | OAuth 设备码流程（需自备 client_id，见下） |
+| 源加速 | 大学镜像优先 + 官方兜底；Forge/NeoForge 的 maven 库走镜像快 5~12 倍（见下） |
 | 源体检 | 一条命令测出所有下载源当前的真实速度 |
 
 ---
@@ -68,6 +93,11 @@ mcroute/
 ├── mcroute_gui.py      图形界面（复用上面的逻辑，不重写）
 ├── run.bat             命令行入口（菜单式）
 ├── run_gui.bat         图形界面入口（双击即可）
+├── build_exe.bat       打包成 exe（PyInstaller）
+├── build_installer.bat 打包成安装包（csc，Windows 自带编译器）
+├── installer/
+│   └── McrouteSetup.cs 安装器源码（解压 / 快捷方式 / 卸载项）
+├── ROADMAP.md          下一步计划与「明确不做」的平台
 ├── docs/
 │   ├── 路由表-v1.md          下载源分级、实测数据、兜底顺序
 │   ├── 下载源实测报告.md      BMCLAPI 故障定位与各源测速原始数据
@@ -80,9 +110,27 @@ mcroute/
     └── auth.json       登录凭据（明文，仅本机使用）
 ```
 
-**代码约 60 KB，数据约 900 MB。** `mcdata/` 可以整个删除、迁移、备份，删了重新 `fetch` 即可。
+**代码约 150 KB（2700 行），数据约 900 MB。** `mcdata/` 可以整个删除、迁移、备份，删了重新 `fetch` 即可。
 
 ---
+
+## 下载源与加速
+
+**候选集合由合规决定，组内顺序由实测决定。** 2026-10-20 实测：
+
+| 用途 | 优先 | 兜底 | 实测速度 |
+|---|---|---|---|
+| 版本清单 | Mojang | Modrinth → Minecraft Wiki | — |
+| client.jar | Mojang 官方 | — | 6.3 MB/s |
+| maven 库（Forge/NeoForge/Fabric） | **哈工大 BMCLAPI 镜像** | 官方 maven / forgecdn | **7~8 MB/s**（官方 0.65~1.7） |
+| assets 对象 | Mojang 官方 | — | 正常 |
+| 整合包 mod | 包内 URL | — | 视源而定 |
+
+其中**大学镜像只作加速层**：命中就快 10 倍，没命中（返回 404）自动回落官方地址，
+且所有文件都用官方 json 里的 sha1 校验——镜像要是被换过内容，会直接判定失败并重试官方。
+
+> 为什么可以用 BMCLAPI 的镜像：`mirrors.hit.edu.cn/bmclapi/` 是**高校托管的 maven 镜像**，
+> 内容仍然是 Forge / NeoForge 官方发布的构件，不是自造文件；而且它只是候选之一，不是唯一来源。
 
 ## 设计原则
 
