@@ -357,6 +357,59 @@ def write_argfile(path, args):
                 f.write(arg + "\n")
 
 
+def merge_version(parent, child):
+    """
+    把「子版本 json」合并到「父版本 json」上（Minecraft 的 inheritsFrom 语义）：
+      - libraries：父的在前，子版本的同名库覆盖父版本
+      - arguments.jvm / arguments.game：父的在前，子的追加
+      - 其它字段：子版本有就用子的
+    """
+    merged = dict(parent)
+
+    for key, value in child.items():
+        if key == "libraries":
+            libs = {}
+            for lib in parent.get("libraries") or []:
+                libs[lib.get("name", "")] = lib
+            for lib in value:
+                libs[lib.get("name", "")] = lib
+            merged["libraries"] = list(libs.values())
+
+        elif key == "arguments":
+            base_args = parent.get("arguments") or {}
+            merged["arguments"] = {
+                "jvm": list(base_args.get("jvm") or []) + list(value.get("jvm") or []),
+                "game": list(base_args.get("game") or []) + list(value.get("game") or []),
+            }
+
+        else:
+            merged[key] = value
+
+    return merged
+
+
+def load_version_json(base, ver, depth=0):
+    """
+    读取版本 json，并自动处理 inheritsFrom（递归合并父版本）。
+    加载器（NeoForge/Forge）生成的 json 通常只是「补丁」，必须和原版 json 合体才能用。
+    """
+    path = os.path.join(base, "versions", ver, ver + ".json")
+    if not os.path.isfile(path) or depth > 5:
+        return None
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    parent_id = data.get("inheritsFrom")
+    if not parent_id:
+        return data
+
+    parent = load_version_json(base, parent_id, depth + 1)
+    if not parent:
+        return data
+    return merge_version(parent, data)
+
+
 def plan_launch(args):
     base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
     ver = args.version
@@ -374,8 +427,10 @@ def plan_launch(args):
         print("\n提示：--dir 要指向包含 versions/ libraries/ assets/ 的目录")
         return
 
-    with open(vjson, "r", encoding="utf-8") as f:
-        vj = json.load(f)
+    vj = load_version_json(base, ver)
+    if vj is None:
+        print("[错误] 版本 json 读取失败：" + vjson)
+        return
 
     lib_root = os.path.join(base, "libraries")
     assets_root = os.path.join(base, "assets")
@@ -431,8 +486,12 @@ def plan_launch(args):
                 if not os.path.isfile(full):
                     missing.append(("库", full))
 
-    # 1c) 客户端 jar：优先用本地实例里那个（可能已被加载器改过）
+    # 1c) 客户端 jar：先找本版本目录，没有就用 inheritsFrom 的父版本目录
     client_jar = os.path.join(vdir, ver + ".jar")
+    if not os.path.isfile(client_jar):
+        parent_id = vj.get("inheritsFrom")
+        if parent_id:
+            client_jar = os.path.join(base, "versions", parent_id, parent_id + ".jar")
     if os.path.isfile(client_jar):
         classpath.append(client_jar)
     else:
@@ -669,6 +728,23 @@ def file_sha1(path):
     return digest.hexdigest()
 
 
+# ---------------------------------------------------------------------------
+# URL 路由改写：官方域名被污染时，换成同路径的官方 CDN
+# ---------------------------------------------------------------------------
+URL_REWRITES = [
+    # NeoForge 官方的 maven 域名在国内被 DNS 污染，官方 CDN 路径完全一致
+    ("https://maven.neoforged.net/", "https://neoforged.forgecdn.net/"),
+]
+
+
+def rewrite_url(url):
+    """按路由表把 URL 换到可用的镜像/CDN（路径保持不变）"""
+    for old, new in URL_REWRITES:
+        if url.startswith(old):
+            return new + url[len(old):]
+    return url
+
+
 def download_one(job):
     """
     下载单个文件。任务格式：(url, 本地路径, 期望sha1)
@@ -682,7 +758,7 @@ def download_one(job):
             return ("skip", dest, 0)
 
     try:
-        data, _dt = fetch_bytes(url, timeout=90)
+        data, _dt = fetch_bytes(rewrite_url(url), timeout=90)
     except Exception as exc:
         return ("fail", dest, str(exc))
 
@@ -703,25 +779,33 @@ def cmd_fetch(args):
     print(f"版本：{ver}")
     print(f"目标目录：{base}\n")
 
-    # ---- 1. 找版本 json ----
-    manifest, used, _dt, _nbytes, _errs = get_manifest()
-    entry = None
-    for item in manifest.get("versions", []):
-        if item.get("id") == ver:
-            entry = item
-            break
-    if not entry:
-        print(f"[错误] manifest 里没有版本 {ver}")
-        return
-    print(f"[1/5] manifest 来自 {used}")
-
-    vj, _dt2, _n2 = fetch_json(entry["url"])
+    # ---- 1. 找版本 json（本地已有就直接用，能处理加载器生成的 inheritsFrom 版本）----
     vdir = os.path.join(base, "versions", ver)
-    os.makedirs(vdir, exist_ok=True)
     vjson_path = os.path.join(vdir, ver + ".json")
-    with open(vjson_path, "w", encoding="utf-8") as f:
-        json.dump(vj, f, ensure_ascii=False, indent=2)
-    print(f"      版本 json 已保存")
+
+    if os.path.isfile(vjson_path):
+        vj = load_version_json(base, ver)
+        if vj is None:
+            print("[错误] 本地版本 json 读取失败：" + vjson_path)
+            return
+        print("[1/5] 使用本地版本 json（已合并 inheritsFrom）")
+    else:
+        manifest, used, _dt, _nbytes, _errs = get_manifest()
+        entry = None
+        for item in manifest.get("versions", []):
+            if item.get("id") == ver:
+                entry = item
+                break
+        if not entry:
+            print("[错误] manifest 里没有版本 " + ver)
+            return
+        print("[1/5] manifest 来自 " + str(used))
+
+        vj, _dt2, _n2 = fetch_json(entry["url"])
+        os.makedirs(vdir, exist_ok=True)
+        with open(vjson_path, "w", encoding="utf-8") as f:
+            json.dump(vj, f, ensure_ascii=False, indent=2)
+        print("      版本 json 已保存")
 
     lib_root = os.path.join(base, "libraries")
     assets_root = os.path.join(base, "assets")

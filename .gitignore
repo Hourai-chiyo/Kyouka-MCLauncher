@@ -21,3 +21,7 @@ desktop.ini
 
 # 运行时生成物
 launch-*.txt
+
+# 抓取的进程命令行（含令牌，绝不入库）
+_*_cmd.txt
+_tmp/

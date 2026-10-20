@@ -26,7 +26,7 @@
 |---|---|
 | 版本清单 | Mojang 官方 → Modrinth → Minecraft Wiki 三级兜底 |
 | 下载 | 客户端 / 库 / natives / assets，全部 sha1 校验、可断点续传、并发下载 |
-| 启动 | 按 version JSON 拼 classpath 与参数，直接拉起 JVM |
+| 启动 | 原版与 **NeoForge**；加载器版本自动合并 `inheritsFrom` 后启动 |
 | 本地缓存 | 内容寻址（`assets/objects/<h2>/<hash>`），天然去重 |
 | 图形界面 | tkinter，零依赖，下载 / 启动 / 登录状态 / 日志 |
 | 微软登录 | OAuth 设备码流程（需自备 client_id，见下） |
@@ -125,9 +125,24 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ---
 
+## 加载器支持（NeoForge）
+
+NeoForge 不做手工拼装，而是**用官方安装器生成实例**，再由本工具合并启动：
+
+1. 下载官方 installer（`neoforged.forgecdn.net` 上路径与官方 maven 完全一致）
+2. 用一个最小的 `launcher_profiles.json` 让它认为目录是合法的启动器目录
+3. 运行 `java -jar neoforge-<版本>-installer.jar --installClient mcdata`
+   —— 它会生成 `versions/neoforge-<版本>/neoforge-<版本>.json`（带 `inheritsFrom`）和补丁后的客户端 jar
+4. `python mcroute.py fetch neoforge-<版本>` 补齐依赖，`python mcroute.py launch neoforge-<版本>` 启动
+
+三个必须知道的前提（都已在本项目中处理）：
+
+- **`inheritsFrom` 必须合并**：加载器的 json 只是「补丁」，`libraries`、`arguments.jvm/game` 都要和原版 json 合体
+- **安装器的处理器依赖会从 `maven.neoforged.net` 下载**，该域名在国内被 DNS 污染，必须先本地备好，否则安装器中途失败、只留下不完整的 json
+- **库地址改写**：`maven.neoforged.net/...` → `neoforged.forgecdn.net/...`（路径完全一致）
+
 ## 已知限制
 
-- NeoForge 启动尚未接通（module/classpath 布局需进一步对齐）
 - 令牌不会自动续期（需通过审核的 client_id 才能验证续期链路）
 - 下载只有日志进度，没有图形进度条
 - 前端目录目前是命令行 + tkinter，没有安装器
