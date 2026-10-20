@@ -252,7 +252,16 @@ namespace Mcroute
                 using (var dlg = new OpenFileDialog())
                 {
                     dlg.Filter = "整合包|*.mrpack;*.zip|所有文件|*.*";
-                    if (dlg.ShowDialog() == DialogResult.OK) path.Text = dlg.FileName;
+                    dlg.FilterIndex = 1;
+                    dlg.Title = "选择整合包";
+                    string lastDir = Config.LoadPackDir();
+                    if (!string.IsNullOrEmpty(lastDir) && Directory.Exists(lastDir))
+                        dlg.InitialDirectory = lastDir;
+                    if (dlg.ShowDialog() == DialogResult.OK)
+                    {
+                        path.Text = dlg.FileName;
+                        Config.SavePackDir(Path.GetDirectoryName(dlg.FileName));
+                    }
                 }
             };
             pathRow.Controls.Add(browse, 2, 0);
@@ -474,8 +483,22 @@ namespace Mcroute
             string name = sel.ToString().Split(' ')[0];
             string dir = Path.Combine(_baseDir, "versions", name);
             if (!Directory.Exists(dir)) dir = Path.Combine(_baseDir, "instances", name);
-            if (Directory.Exists(dir)) Process.Start("explorer.exe", "\"" + dir + "\"");
-            else MessageBox.Show("目录不存在：" + dir, "提示");
+            if (!Directory.Exists(dir)) { MessageBox.Show("目录不存在：" + dir, "提示"); return; }
+            // 不要 Process.Start("explorer.exe", ...)：某些环境下二次启动 explorer 会
+            // 0xc0000142（DLL 初始化失败）。交给 ShellExecute 直接打开文件夹最稳。
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = dir,
+                    UseShellExecute = true,
+                    Verb = "open",
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("打开目录失败：" + ex.Message, "提示");
+            }
         }
 
         private string SelectedJava()
@@ -599,6 +622,32 @@ namespace Mcroute
                 return string.IsNullOrEmpty(dir) ? null : dir;
             }
             catch { return null; }
+        }
+
+        public static string LoadPackDir()
+        {
+            try
+            {
+                string f = PathFile();
+                if (!File.Exists(f)) return null;
+                var data = J.Obj(J.ParseFile(f));
+                string dir = J.Str(data, "pack_dir");
+                return string.IsNullOrEmpty(dir) ? null : dir;
+            }
+            catch { return null; }
+        }
+
+        public static void SavePackDir(string dir)
+        {
+            try
+            {
+                string f = PathFile();
+                var data = File.Exists(f) ? J.Obj(J.ParseFile(f)) : new Dictionary<string, object>();
+                if (data == null) data = new Dictionary<string, object>();
+                data["pack_dir"] = dir;
+                J.SaveFile(f, data);
+            }
+            catch { }
         }
 
         public static void SaveDataDir(string dir)
