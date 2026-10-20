@@ -1656,6 +1656,73 @@ def install_meta_loader(base, kind, ver):
     print("  python mcroute.py launch " + pkg_id)
 
 
+# NeoForge 的版本号通常等于「MC 版本去掉 1.」前缀（1.21.1 -> 21.1.x），
+# 但 1.20.1 是个例外，它的 NeoForge 版本走的是 47.1.x
+NEOFORGE_PREFIX_OVERRIDES = {
+    "1.20.0": "47.1",
+    "1.20.1": "47.1",
+}
+
+
+def maven_version_list(url):
+    """从 maven-metadata.xml 里读出所有版本号（失败返回空列表）"""
+    import re
+
+    try:
+        raw, _dt = fetch_bytes(url, timeout=30)
+    except Exception:
+        return []
+    text = raw.decode("utf-8", "replace")
+    versions = re.findall(r"<version>([^<]+)</version>", text)
+    release = re.search(r"<release>([^<]+)</release>", text)
+    if release:
+        versions.append(release.group(1))
+    return versions
+
+
+def _version_key(text):
+    return tuple(int(p) if p.isdigit() else 0 for p in text.split("."))
+
+
+def resolve_forge_version(ver):
+    """
+    Forge 的正式写法是 <MC版本>-<Forge版本>（如 1.12.2-14.23.5.2860），
+    但用户经常只写 1.12.2。这时从官方 maven 版本列表里挑一个最新的匹配项。
+    """
+    if "-" in ver:
+        return ver
+
+    versions = maven_version_list(
+        "https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml")
+    matches = [v for v in versions if v.startswith(ver + "-")]
+    if not matches:
+        return ver
+    matches.sort(key=lambda v: _version_key(v[len(ver) + 1:]))
+    return matches[-1]
+
+
+def resolve_neoforge_version(ver):
+    """
+    NeoForge 版本号隐含 MC 版本（1.21.1 -> 21.1.x，但 1.20.1 -> 47.1.x）。
+    用户写 1.21.1 时，映射出前缀再挑最新的。
+    """
+    parts = ver.split(".")
+    if not (len(parts) >= 2 and parts[0] == "1" and parts[1].isdigit()):
+        return ver
+
+    prefix = NEOFORGE_PREFIX_OVERRIDES.get(ver)
+    if not prefix:
+        prefix = "%s.%s" % (parts[1], parts[2] if len(parts) > 2 else "0")
+
+    versions = maven_version_list(
+        "https://neoforged.forgecdn.net/releases/net/neoforged/neoforge/maven-metadata.xml")
+    matches = [v for v in versions if v.startswith(prefix + ".")]
+    if not matches:
+        return ver
+    matches.sort(key=_version_key)
+    return matches[-1]
+
+
 def cmd_loader(args):
     """
     安装加载器（neoforge / forge）。
@@ -1687,6 +1754,18 @@ def cmd_loader(args):
         install_meta_loader(base, kind, ver)
         return
 
+    # 智能补全版本号：用户通常只写 MC 版本（1.12.2 / 1.21.1）
+    if kind == "forge":
+        resolved = resolve_forge_version(ver)
+        if resolved != ver:
+            print("[提示] Forge 版本自动补全：" + ver + " -> " + resolved)
+            ver = resolved
+    elif kind == "neoforge":
+        resolved = resolve_neoforge_version(ver)
+        if resolved != ver:
+            print("[提示] NeoForge 版本自动补全：" + ver + " -> " + resolved)
+            ver = resolved
+
     url = installer_url(kind, ver)
     tmp_dir = os.path.join(base, "_tmp")
     os.makedirs(tmp_dir, exist_ok=True)
@@ -1709,6 +1788,12 @@ def cmd_loader(args):
         data, dt = fetch_bytes(url, timeout=180)
     except Exception as exc:
         print("      失败：" + str(exc))
+        if "404" in str(exc):
+            if kind == "forge":
+                print("      提示：Forge 版本应写成 <MC版本>-<Forge版本>，例如 1.12.2-14.23.5.2860")
+                print("            直接写 1.12.2 也可以，本工具会自动补全 Forge 部分")
+            elif kind == "neoforge":
+                print("      提示：NeoForge 版本形如 21.1.264（对应 MC 1.21.1）")
         return
     with open(installer, "wb") as f:
         f.write(data)
