@@ -241,9 +241,9 @@ class App:
     # ---- 标签页 4：实例 ----
     def _tab_instances(self):
         page = ttk.Frame(self.nb, padding=10)
-        self.nb.add(page, text="  实例  ")
+        self.nb.add(page, text="  管理  ")
 
-        ttk.Label(page, text="已安装的整合包实例（每个实例有独立的 mods/config/saves）").pack(anchor="w")
+        ttk.Label(page, text="所有本地版本：原版 / 整合包 / 外部导入，都能在这里体检、测试、生成启动器").pack(anchor="w")
 
         self.inst_list = tk.Listbox(page, height=14, exportselection=False)
         self.inst_list.pack(fill="both", expand=True, pady=(6, 6))
@@ -313,43 +313,38 @@ class App:
             self._last_ver_log = msg
 
     def refresh_instances(self):
+        """列出所有本地版本：有 instance.json 的是整合包，只有 mods 的是外部导入，其余是原版"""
         self.inst_list.delete(0, "end")
         self.inst_meta = []
 
-        # 新布局：versions/<名字>/instance.json —— 和 PCL2 / HMCL 一致，别的启动器也认
-        # 旧布局：instances/<名字>/instance.json —— 保留兼容，免得老实例消失
-        for root in (os.path.join(DATA_DIR, "versions"),
-                     os.path.join(DATA_DIR, "instances")):
-            if not os.path.isdir(root):
-                continue
-            for name in sorted(os.listdir(root)):
-                meta_path = os.path.join(root, name, "instance.json")
-                if not os.path.isfile(meta_path):
-                    # 没有 instance.json，但有 mods 目录 -> 也当成实例
-                    # （别的启动器装的包、或者我们旧版本装的包都能被认出来）
-                    if not os.path.isdir(os.path.join(root, name, "mods")):
-                        continue
-                    self.inst_meta.append({
-                        "id": name,
-                        "name": name,
-                        "version_id": name,
-                        "game_dir": os.path.join(root, name),
-                    })
-                    self.inst_list.insert("end", "{}   [外部]".format(name))
+        vroot = os.path.join(DATA_DIR, "versions")
+        if os.path.isdir(vroot):
+            for name in sorted(os.listdir(vroot)):
+                vdir = os.path.join(vroot, name)
+                if not os.path.isdir(vdir):
                     continue
-                try:
-                    with open(meta_path, "r", encoding="utf-8") as f:
-                        meta = json.load(f)
-                except Exception:
-                    continue
-                meta.setdefault("game_dir", os.path.join(root, name))
-                meta.setdefault("id", name)
+                meta_path = os.path.join(vdir, "instance.json")
+                meta = None
+                if os.path.isfile(meta_path):
+                    try:
+                        with open(meta_path, "r", encoding="utf-8") as f:
+                            meta = json.load(f)
+                    except Exception:
+                        meta = None
+                if meta:
+                    tag = "[整合包]"
+                    meta.setdefault("id", name)
+                    meta.setdefault("game_dir", vdir)
+                elif os.path.isdir(os.path.join(vdir, "mods")):
+                    tag = "[外部]"
+                    meta = {"id": name, "name": name, "version_id": name, "game_dir": vdir}
+                else:
+                    tag = "[原版]"
+                    meta = {"id": name, "name": name, "version_id": name, "game_dir": vdir}
                 self.inst_meta.append(meta)
-                self.inst_list.insert(
-                    "end",
-                    "{}   [{}]".format(meta.get("name") or name, meta.get("version_id", "?")),
-                )
-        msg = "找到 {} 个整合包实例".format(len(self.inst_meta))
+                self.inst_list.insert("end", "{}   {}".format(name, tag))
+
+        msg = "找到 {} 个本地版本".format(len(self.inst_meta))
         if getattr(self, "_last_inst_log", None) != msg:
             self.log(msg)
             self._last_inst_log = msg

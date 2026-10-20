@@ -505,14 +505,30 @@ def merge_version(parent, child):
 
     for key, value in child.items():
         if key == "libraries":
-            # 键带上“是否有 natives”，理由同 plan_launch 里的注释：
-            # 同一库可能一条是普通 jar、一条只提供 natives，两条都要留。
-            libs = {}
+            # 去重键 = (groupId, artifactId, classifier, 是否有 natives)，**不含版本号**。
+            # 这样 Forge/NeoForge 的 guava 17.0 能覆盖原版的 guava 15.0；
+            # 如果按完整 name 去重，两个版本都会留在 classpath 里，
+            # Java 取先出现的那个 -> 经典的 Forge 1.7.10 "NoSuchMethodError: com.google.common"。
+            def _lib_key(lib):
+                parts = (lib.get("name") or "").split(":")
+                group = parts[0] if len(parts) > 0 else ""
+                artifact = parts[1] if len(parts) > 1 else ""
+                classifier = parts[3] if len(parts) > 3 else ""
+                return (group, artifact, classifier, bool(lib.get("natives")))
+
+            order = []
+            table = {}
             for lib in parent.get("libraries") or []:
-                libs[(lib.get("name", ""), bool(lib.get("natives")))] = lib
+                k = _lib_key(lib)
+                if k not in table:
+                    order.append(k)
+                table[k] = lib
             for lib in value:
-                libs[(lib.get("name", ""), bool(lib.get("natives")))] = lib
-            merged["libraries"] = list(libs.values())
+                k = _lib_key(lib)
+                if k not in table:
+                    order.append(k)
+                table[k] = lib          # 子版本覆盖父版本，保留原位置
+            merged["libraries"] = [table[k] for k in order]
 
         elif key == "arguments":
             base_args = parent.get("arguments") or {}
@@ -1016,6 +1032,19 @@ def download_candidates(url):
     fallback = rewrite_url(url)
     if fallback not in out:
         out.append(fallback)
+
+    # 跨官方 maven 兜底：老的 Forge json 里很多库只写了空 url 或写错仓库，
+    # 两个官方 maven 之间互相兜一次，能救回 launchwrapper / asm 这类
+    CROSS = {
+        "https://libraries.minecraft.net/": "https://maven.minecraftforge.net/",
+        "https://maven.minecraftforge.net/": "https://libraries.minecraft.net/",
+    }
+    for prefix, alt in CROSS.items():
+        if url.startswith(prefix):
+            other = alt + url[len(prefix):]
+            if other not in out:
+                out.append(other)
+            break
     return out
 
 
@@ -1759,7 +1788,18 @@ def maven_version_list(url):
 
 
 def _version_key(text):
-    return tuple(int(p) if p.isdigit() else 0 for p in text.split("."))
+    """
+    "10.13.4.1614-1.7.10" 这种版本号，按数字前缀排序。
+    不能直接用 isdigit()：带后缀的那段（1445-1.7.10）会被当成 0，
+    导致 1445 排在 1614 后面。
+    """
+    import re as _re
+
+    out = []
+    for part in text.split("."):
+        m = _re.match(r"\d+", part)
+        out.append(int(m.group()) if m else 0)
+    return tuple(out)
 
 
 def resolve_forge_version(ver):
@@ -1817,6 +1857,51 @@ def minecraft_of_loader(kind, ver):
                 return "1." + major          # 21.0.x -> 1.21
             return "1.%s.%s" % (major, minor)  # 21.1.x -> 1.21.1
     return None
+
+
+def install_legacy_loader(base, profile):
+    """
+    老版本 Forge（1.7.10 及更早）的安装方式：**不跑安装器**。
+
+    这类安装器的 install_profile.json 里自带 versionInfo（完整版本 json），
+    也没有 processors / --installClient 参数（那是 1.8+ 才有的）。
+    所以直接：
+        1. 把 versionInfo 里的 forge 库加上 :universal 分类器
+           （maven 上发布的文件名就是 forge-<ver>-universal.jar）
+        2. 写出 versions/<id>/<id>.json
+        3. 剩下的交给 fetch 下载依赖
+    """
+    vi = profile.get("versionInfo") or {}
+    vid = vi.get("id")
+    if not vid:
+        print("[错误] install_profile.json 里没有 versionInfo.id")
+        return None
+
+    libs = vi.get("libraries") or []
+    fixed = 0
+    for lib in libs:
+        name = lib.get("name", "")
+        parts = name.split(":")
+        # net.minecraftforge:forge:<ver>  -> 加上 :universal
+        if (len(parts) == 3 and parts[0] == "net.minecraftforge" and parts[1] == "forge"):
+            lib["name"] = name + ":universal"
+            lib.setdefault("url", "https://maven.minecraftforge.net/")
+            fixed += 1
+        # 老 json 里 url 为空或缺省：补成 Mojang 官方 maven
+        # （launchwrapper / asm-all / guava 这些都在上面）
+        if not (lib.get("url") or "").strip():
+            lib["url"] = "https://libraries.minecraft.net/"
+            fixed += 1
+
+    vdir = os.path.join(base, "versions", vid)
+    os.makedirs(vdir, exist_ok=True)
+    vjson = os.path.join(vdir, vid + ".json")
+    with open(vjson, "w", encoding="utf-8") as f:
+        json.dump(vi, f, ensure_ascii=False, indent=2)
+
+    print("[legacy] 已写出 " + vid + "（修正了 %d 条 forge 库）" % fixed)
+    print("         版本 json: " + vjson)
+    return vid
 
 
 def cmd_loader(args):
@@ -1939,6 +2024,17 @@ def cmd_loader(args):
 
     all_libs = list(profile.get("libraries") or []) + template_libs
     print("      处理器依赖 %d 个 + 运行时库 %d 个" % (len(profile.get("libraries") or []), len(template_libs)))
+
+    # 老版本 Forge 走 legacy 安装（不跑安装器）
+    if profile.get("versionInfo") and not (profile.get("processors") or []):
+        vid = install_legacy_loader(base, profile)
+        if not vid:
+            return
+        print("")
+        print("下一步：")
+        print("  python mcroute.py fetch  " + vid)
+        print("  python mcroute.py launch " + vid)
+        return
 
     ok = skip = fail = 0
     for lib in all_libs:

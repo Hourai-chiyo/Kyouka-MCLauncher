@@ -73,7 +73,7 @@ class McrouteSetup
         try
         {
             Directory.CreateDirectory(target);
-            string probe = Path.Combine(target, ".mcroute_write_test");
+            string probe = Path.Combine(target, "mcroute_write_test.tmp");
             File.WriteAllText(probe, "ok");
             File.Delete(probe);
         }
@@ -105,7 +105,7 @@ class McrouteSetup
             try
             {
                 Directory.CreateDirectory(target);
-                string probe2 = Path.Combine(target, ".mcroute_write_test");
+                string probe2 = Path.Combine(target, "mcroute_write_test.tmp");
                 File.WriteAllText(probe2, "ok");
                 File.Delete(probe2);
             }
