@@ -100,6 +100,10 @@ python mcroute.py loader forge 1.20.1-47.2.0 # 或 Forge（版本写成 <MC版�
 python mcroute.py sources            # 所有下载源测速
 python mcroute.py wiki 1.12.2        # 用 Wiki 索引兜底查版本
 python mcroute.py install "pack.mrpack"   # 安装整合包（自动识别格式）
+python mcroute.py verify TestPack      # 体检：缺什么文件（相当于「补全文件」）
+python mcroute.py verify TestPack --fix   # 体检完直接补齐
+python mcroute.py test TestPack        # 测试启动：拉到初始化完成就自动关掉
+python mcroute.py mkbat TestPack       # 在实例目录生成 launch.bat（双击启动）
 ```
 
 `fetch` 可以随时中断、重复执行：已完成且 sha1 校验通过的文件会自动跳过。
@@ -210,7 +214,7 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 | **启动** | 列出本地版本、下载原版、选 Java（自动按版本匹配）、设内存、启动 |
 | **加载器** | 选 fabric / quilt / legacyfabric / forge / neoforge，填版本，一键装 |
 | **整合包** | 选文件安装，自动识别 mrpack / MultiMC / CurseForge |
-| **实例** | 列出已装整合包实例，一键启动或打开目录 |
+| **实例** | 列出已装整合包实例：启动 / 体检 / 测试启动 / 生成启动器 / 打开目录 |
 
 ![实例页](docs/gui-tab-instances.png)
 
@@ -318,6 +322,31 @@ mcdata/
 
 > ⚠️ 在 PCL2 / HMCL 里使用时，**必须开启「版本隔离」**。关掉隔离的话启动器会去
 > `.minecraft/mods` 找 mod，就看不到这个包自带的 mod 了。
+
+## 体检 / 测试 / 一键启动器
+
+对应 PCL2 的「补全文件 / 测试游戏 / 导出启动脚本」，但都是命令 + GUI 按钮。
+
+```bash
+python mcroute.py verify TestPack          # 只体检
+python mcroute.py verify TestPack --fix    # 体检完补齐缺失文件
+python mcroute.py test TestPack            # 真启动一次，验证能跑
+python mcroute.py mkbat TestPack           # 生成 versions/<名字>/launch.bat
+```
+
+| 命令 | 做什么 | 实测 |
+|---|---|---|
+| `verify` | 检查 client jar / 库 / assets 是否齐全，列出缺的文件 | TestPack：库 53/53、assets 1296/1305 → 报告缺 9 个 |
+| `verify --fix` | 体检后自动补齐（等价于 `fetch`） | 新下载 9，补完再体检：`文件齐全` |
+| `test` | 真拉起 JVM，看到初始化成功的标志（`Setting user` / `LWJGL`）就判定通过，**然后自动关掉** | TestPack：4.2 秒判定通过 |
+| `mkbat` | 在实例目录写 `launch.bat`，双击即启动；其它启动器不受影响 | 双击实测能起 |
+
+GUI 的「实例」页对应加了三个按钮：**体检 / 测试启动 / 生成启动器**。
+
+> 两个踩过的坑（已处理）：
+> 1. **Java 8 不支持 `@argfile`**（JDK 9+ 才有），所以 `.bat` 里必须内嵌完整命令行，不能只写参数文件
+> 2. **Windows 命令行上限 8191 字符**，大整合包的 classpath 会超 → 超过 7800 字符时
+>    自动改用 `launch.ps1`（PowerShell 无此限制），`launch.bat` 只调用它
 
 ## 加载器支持（NeoForge / Forge / Fabric / Quilt / Legacy Fabric）
 

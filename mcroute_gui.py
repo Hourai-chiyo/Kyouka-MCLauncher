@@ -252,7 +252,10 @@ class App:
         row.pack(fill="x")
         ttk.Button(row, text="刷新", command=self.refresh_instances).pack(side="left")
         ttk.Button(row, text="▶ 启动选中实例", command=self.do_launch_instance).pack(side="left", padx=6)
-        ttk.Button(row, text="打开实例目录", command=self.open_instance_dir).pack(side="left")
+        ttk.Button(row, text="体检", command=self.do_verify).pack(side="left")
+        ttk.Button(row, text="测试启动", command=self.do_test).pack(side="left", padx=6)
+        ttk.Button(row, text="生成启动器", command=self.do_mkbat).pack(side="left")
+        ttk.Button(row, text="打开实例目录", command=self.open_instance_dir).pack(side="left", padx=6)
 
         self.inst_meta = []
 
@@ -321,6 +324,7 @@ class App:
                 except Exception:
                     continue
                 meta.setdefault("game_dir", os.path.join(root, name))
+                meta.setdefault("id", name)
                 self.inst_meta.append(meta)
                 self.inst_list.insert(
                     "end",
@@ -443,6 +447,42 @@ class App:
             return
         meta = self.inst_meta[picked[0]]
         self._launch(meta.get("version_id"), meta.get("game_dir"))
+
+    def _picked_instance(self):
+        picked = self.inst_list.curselection()
+        if not picked:
+            messagebox.showinfo("提示", "先选一个实例")
+            return None
+        return self.inst_meta[picked[0]]
+
+    def do_verify(self):
+        meta = self._picked_instance()
+        if not meta:
+            return
+        target = meta.get("id") or meta.get("name")
+        self.log("体检：" + str(target))
+        ns = argparse.Namespace(version=target, dir=DATA_DIR,
+                                java=self._java(), fix=False, deep=False)
+        self._run(mcroute.cmd_verify, ns)
+
+    def do_test(self):
+        meta = self._picked_instance()
+        if not meta:
+            return
+        target = meta.get("id") or meta.get("name")
+        self.log("测试启动：" + str(target) + "（最长等 90 秒）")
+        ns = argparse.Namespace(version=target, dir=DATA_DIR,
+                                java=self._java(), timeout=90)
+        self._run(mcroute.cmd_test, ns)
+
+    def do_mkbat(self):
+        meta = self._picked_instance()
+        if not meta:
+            return
+        target = meta.get("id") or meta.get("name")
+        self.log("生成启动器：" + str(target))
+        ns = argparse.Namespace(version=target, dir=DATA_DIR, java=self._java())
+        self._run(mcroute.cmd_mkbat, ns)
 
     def open_instance_dir(self):
         picked = self.inst_list.curselection()

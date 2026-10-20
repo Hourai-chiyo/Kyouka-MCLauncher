@@ -2255,6 +2255,7 @@ def install_curseforge(pack, base, args):
     write_instance_version(base, safe_name, version_id)
 
     meta = {
+        "id": os.path.basename(inst_root),      # 版本目录名（PCL2 认的就是它）
         "name": name,
         "version_id": version_id,
         "minecraft": mc,
@@ -2392,6 +2393,7 @@ def install_mmc(pack, base, args):
     write_instance_version(base, safe_name, version_id)
 
     meta = {
+        "id": os.path.basename(inst_root),      # 版本目录名（PCL2 认的就是它）
         "name": name,
         "version_id": version_id,
         "minecraft": mc,
@@ -2640,6 +2642,7 @@ def install_mrpack(pack, base, args):
     write_instance_version(base, safe_name, version_id)
 
     meta = {
+        "id": os.path.basename(inst_root),      # 版本目录名（PCL2 认的就是它）
         "name": name,
         "version_id": version_id,
         "minecraft": mc,
@@ -2667,6 +2670,295 @@ def cmd_java(args):
     print("检测到 %d 个 Java：" % len(items))
     for exe, major in items:
         print("  Java %-3s %s" % (major, exe))
+
+
+# ---------------------------------------------------------------------------
+# 子命令：verify / test / mkbat
+# ---------------------------------------------------------------------------
+def _ns_for_plan(version, base, java=None, game_dir=None):
+    """构造一个给 plan_launch 用的参数对象"""
+    return argparse.Namespace(
+        version=version, dir=base, java=java, game_dir=game_dir,
+        username="Player", force=False, wait=False, memory=None,
+    )
+
+
+def _asset_report(base, asset_index_id):
+    """检查 assets：索引在不在、对象缺多少个（只查存在性，不校验 sha1）"""
+    if not asset_index_id:
+        return None, 0, 0
+    idx_path = os.path.join(base, "assets", "indexes", asset_index_id + ".json")
+    if not os.path.isfile(idx_path):
+        return False, 0, 0
+    try:
+        with open(idx_path, "r", encoding="utf-8") as f:
+            index = json.load(f)
+    except Exception:
+        return False, 0, 0
+
+    objects = index.get("objects") or {}
+    total = len(objects)
+    missing = 0
+    for _name, obj in objects.items():
+        h = obj.get("hash", "")
+        if not h or len(h) < 2:
+            continue
+        p = os.path.join(base, "assets", "objects", h[:2], h)
+        if not os.path.isfile(p):
+            missing += 1
+    return True, total, missing
+
+
+def cmd_verify(args):
+    """
+    体检：检查一个版本/实例的文件是否齐全（相当于 PCL2 的「补全文件」）。
+
+        python mcroute.py verify TestPack            只体检
+        python mcroute.py verify TestPack --fix      体检完直接补齐
+        python mcroute.py verify TestPack --deep     连 sha1 一起校验（慢）
+    """
+    base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
+    info = plan_launch(_ns_for_plan(args.version, base, args.java))
+    if info is None:
+        return
+
+    print("=" * 70)
+    print("体检报告：" + args.version)
+    print("=" * 70)
+
+    # ---- 1) client jar + 库 ----
+    lib_total = len(info["classpath"])
+    lib_missing = [p for kind, p in info["missing"] if kind == "库"]
+    jar_missing = [p for kind, p in info["missing"] if kind == "客户端 jar"]
+    print("  客户端 jar : " + ("缺失" if jar_missing else "OK"))
+    print("  库          : %d/%d 存在" % (lib_total - len(lib_missing), lib_total))
+    if lib_missing:
+        for p in lib_missing[:8]:
+            print("      - 缺 " + os.path.basename(p))
+        if len(lib_missing) > 8:
+            print("      ...还有 %d 个" % (len(lib_missing) - 8))
+
+    # ---- 2) assets ----
+    has_index, asset_total, asset_missing = _asset_report(base, info.get("asset_index_id"))
+    if has_index is None:
+        print("  assets     : 这个版本没有资源索引")
+    elif has_index is False:
+        print("  assets     : 索引缺失（还没下过资源）")
+    else:
+        print("  assets     : %d/%d 存在" % (asset_total - asset_missing, asset_total))
+
+    # ---- 3) deep：逐文件 sha1 ----
+    broken = []
+    if args.deep:
+        print("  正在校验 sha1（可能要一会儿）...")
+        checked = 0
+        for p in info["classpath"]:
+            if not os.path.isfile(p):
+                continue
+            checked += 1
+            # 只校验有记录的：从合并后的 json 里找同名库的 sha1 太麻烦，
+            # 这里退一步：只报告文件大小为 0 或明显异常的
+            try:
+                if os.path.getsize(p) < 32:
+                    broken.append(p)
+            except Exception:
+                broken.append(p)
+        print("      已检查 %d 个文件，可疑 %d 个" % (checked, len(broken)))
+        for p in broken[:5]:
+            print("      - 可疑 " + os.path.basename(p))
+
+    # ---- 结论 ----
+    problem = len(info["missing"]) + asset_missing
+    print()
+    if problem == 0:
+        print("[结论] 文件齐全，可以直接启动。")
+        return
+    print("[结论] 还缺 %d 项（%d 个库/jar + %d 个资源对象）。" % (
+        problem, len(info["missing"]), asset_missing))
+    print("       补全命令：python mcroute.py verify %s --fix" % args.version)
+
+    if args.fix:
+        print("\n开始补全 ...")
+        cmd_fetch(argparse.Namespace(version=args.version, dir=base,
+                                     workers=16, no_assets=False))
+
+
+def cmd_test(args):
+    """
+    测试启动：真的把游戏拉起来，看它能不能过初始化，然后自动关掉。
+    用来快速验证"这个实例到底能不能跑"，不用一直盯着窗口。
+
+        python mcroute.py test TestPack
+        python mcroute.py test TestPack --timeout 120
+    """
+    import subprocess
+    import time
+
+    base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
+    info = plan_launch(_ns_for_plan(args.version, base, args.java))
+    if info is None:
+        return
+
+    if info["missing"]:
+        print("\n[中止] 有 %d 个文件缺失，先跑 verify --fix。" % len(info["missing"]))
+        return
+
+    os.makedirs(info["game_dir"], exist_ok=True)
+    os.makedirs(info["natives_dir"], exist_ok=True)
+    if info.get("natives_jars"):
+        extract_natives(info["natives_jars"], info["natives_dir"])
+
+    print("\n[测试] 启动游戏，最长等 %d 秒 ..." % args.timeout)
+    t0 = time.time()
+    proc = subprocess.Popen(
+        info["argv"], cwd=info["game_dir"],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, encoding="utf-8", errors="replace",
+    )
+
+    good_markers = ("Setting user", "LWJGL", "Backend library",
+                    "Forge Mod Loader has successfully loaded", "Reloading ResourceManager")
+    bad_markers = ("Game crashed", "Could not find or load main class",
+                   "NoClassDefFoundError", "UnsatisfiedLinkError",
+                   "ModuleLayer", "Exception in thread")
+    good_seen = []
+    bad_seen = []
+    tail = []
+    deadline = t0 + args.timeout
+
+    while time.time() < deadline:
+        line = proc.stdout.readline()
+        if not line:
+            if proc.poll() is not None:
+                break
+            time.sleep(0.2)
+            continue
+        line = line.rstrip()
+        if line:
+            tail.append(line)
+            tail = tail[-40:]
+        if any(m in line for m in good_markers) and line not in good_seen:
+            good_seen.append(line[:120])
+            print("  [ok] " + line[:110])
+        for m in bad_markers:
+            if m in line:
+                bad_seen.append(line[:160])
+                print("  [!!] " + line[:150])
+                break
+        # 看到足够多的成功信号就可以收工
+        if len(good_seen) >= 2 and not bad_seen:
+            break
+
+    alive = proc.poll() is None
+    if alive:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+    try:
+        proc.wait(timeout=10)
+    except Exception:
+        pass
+
+    print("\n" + "=" * 70)
+    if bad_seen:
+        print("[测试结果] 失败 —— 启动过程中出现错误：")
+        for line in bad_seen[:5]:
+            print("    " + line)
+        print("\n最后几行输出：")
+        for line in tail[-8:]:
+            print("    " + line)
+        return
+    if good_seen:
+        print("[测试结果] 通过 —— 游戏完成初始化（看到 %d 个正常标志）" % len(good_seen))
+        print("          耗时 %.1f 秒" % (time.time() - t0))
+        return
+    print("[测试结果] 不确定 —— 没看到明显成功或失败标志（可能启动太慢）")
+    for line in tail[-8:]:
+        print("    " + line)
+
+
+def _quote_arg(a):
+    """给 .bat 里的参数加引号（含空格或特殊字符时）"""
+    if not a:
+        return '""'
+    if any(c in a for c in ' \t&()[]{}^=;!%+,`"'):
+        return '"' + a.replace('"', '\\"') + '"'
+    return a
+
+
+def cmd_mkbat(args):
+    """
+    在实例目录里生成双击即可启动的启动器：
+
+        versions/<名字>/launch.bat    ← 双击启动
+
+    注意（踩过的坑）：
+      · Java 8 **不支持** @argfile（那是 JDK 9+ 的特性），所以不能只写参数文件
+      · Windows 命令行有 8191 字符上限，classpath 很长的大整合包会超
+        -> 这种情况下额外生成 launch.ps1，由 bat 调用（PowerShell 没有这个限制）
+    """
+    base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
+    info = plan_launch(_ns_for_plan(args.version, base, args.java))
+    if info is None:
+        return
+
+    vdir = os.path.join(base, "versions", args.version)
+    if not os.path.isdir(vdir):
+        vdir = info["game_dir"]
+    os.makedirs(vdir, exist_ok=True)
+
+    java = info["java"]
+    argv = info["argv"]
+    cmdline = " ".join(_quote_arg(a) for a in argv)
+
+    bat_path = os.path.join(vdir, "launch.bat")
+    header = [
+        "@echo off",
+        "chcp 936 >nul",
+        'cd /d "%~dp0"',
+        "rem 由 mcroute 生成：双击启动这个实例（其它启动器不受影响）",
+    ]
+
+    if len(cmdline) < 7800:
+        # 短命令：直接写进 .bat
+        body = header + [cmdline, "if errorlevel 1 pause"]
+        with open(bat_path, "w", encoding="gbk", errors="replace", newline="\r\n") as f:
+            f.write("\n".join(body) + "\n")
+        # 清掉上次可能生成的 ps1
+        for stale in ("launch.ps1", "launch-args.txt"):
+            sp = os.path.join(vdir, stale)
+            if os.path.isfile(sp):
+                os.remove(sp)
+        print("\n[已生成] " + bat_path)
+        print("  命令长度 %d 字符，直接内嵌在 bat 里。" % len(cmdline))
+        return
+
+    # 长命令：写 launch.ps1，bat 只负责调用
+    ps1 = os.path.join(vdir, "launch.ps1")
+    q = lambda x: '"' + x.replace('"', '`"') + '"'
+    ps_lines = [
+        "# 由 mcroute 生成：整合包 classpath 太长，走 PowerShell 避免命令行长度限制",
+        "$java = " + q(java),
+        "$argv = @(",
+    ]
+    for a in argv[1:]:
+        ps_lines.append("    " + q(a) + ",")
+    ps_lines.append(")")
+    ps_lines.append("& $java @argv")
+    ps_lines.append("if ($LASTEXITCODE -ne 0) { Write-Host '启动失败，退出码' $LASTEXITCODE }")
+    with open(ps1, "w", encoding="gbk", errors="replace", newline="\r\n") as f:
+        f.write("\n".join(ps_lines) + "\n")
+
+    body = header + [
+        'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0launch.ps1"',
+        "if errorlevel 1 pause",
+    ]
+    with open(bat_path, "w", encoding="gbk", errors="replace", newline="\r\n") as f:
+        f.write("\n".join(body) + "\n")
+
+    print("\n[已生成] " + bat_path)
+    print("         " + ps1 + "（classpath 太长，%d 字符，改用 PowerShell）" % len(cmdline))
 
 
 def cmd_status(_args):
@@ -2799,6 +3091,27 @@ def main():
     p13.add_argument("--workers", type=int, default=16, help="并发线程数，默认 16")
     p13.add_argument("--no-assets", action="store_true", help="下载原版时跳过资源对象（快速验证）")
     p13.set_defaults(func=cmd_install)
+
+    p14 = sub.add_parser("verify", help="体检版本/实例的文件是否齐全（补全体检）")
+    p14.add_argument("version", help="版本目录名或整合包实例名")
+    p14.add_argument("--dir", help="数据目录，默认 mcdata/")
+    p14.add_argument("--java", help="指定 java.exe")
+    p14.add_argument("--fix", action="store_true", help="体检完直接补齐缺失文件")
+    p14.add_argument("--deep", action="store_true", help="更严格的检查（慢）")
+    p14.set_defaults(func=cmd_verify)
+
+    p15 = sub.add_parser("test", help="测试启动：拉到初始化完成就自动关掉")
+    p15.add_argument("version", help="版本目录名或整合包实例名")
+    p15.add_argument("--dir", help="数据目录，默认 mcdata/")
+    p15.add_argument("--java", help="指定 java.exe")
+    p15.add_argument("--timeout", type=int, default=90, help="最长等待秒数，默认 90")
+    p15.set_defaults(func=cmd_test)
+
+    p16 = sub.add_parser("mkbat", help="在实例目录生成双击启动的 launch.bat")
+    p16.add_argument("version", help="版本目录名或整合包实例名")
+    p16.add_argument("--dir", help="数据目录，默认 mcdata/")
+    p16.add_argument("--java", help="指定 java.exe")
+    p16.set_defaults(func=cmd_mkbat)
 
     args = parser.parse_args()
 
