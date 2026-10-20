@@ -50,21 +50,19 @@ namespace Mcroute
             var top = new Panel { Dock = DockStyle.Top, Height = 30, Padding = new Padding(10, 7, 10, 0) };
             top.Controls.Add(new Label { Text = "未登录 · 离线模式（可单机游玩）", AutoSize = true, ForeColor = Color.DimGray });
 
-            var dataRow = new Panel { Dock = DockStyle.Top, Height = 34, Padding = new Padding(10, 2, 10, 0) };
-            var dataLabel = new Label { Text = "数据目录", AutoSize = true, Location = new Point(0, 8) };
-            _dataDirBox = new TextBox
-            {
-                Left = 76,
-                Top = 5,
-                Width = 560,
-                ReadOnly = true,
-                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right,
-            };
-            var pickDir = new Button { Text = "选择...", Width = 78, Height = 26, Top = 3, Anchor = AnchorStyles.Top | AnchorStyles.Right };
-            pickDir.Left = 640;
-            dataRow.Resize += (s, e) => pickDir.Left = dataRow.ClientSize.Width - pickDir.Width - 14;
-            pickDir.Click += (s, e) => PickDataDir();
-            dataRow.Controls.AddRange(new Control[] { dataLabel, _dataDirBox, pickDir });
+            // 数据目录行（TableLayout：标签 | 输入框(填满) | 按钮）
+            var dataRow = new Panel { Dock = DockStyle.Top, Height = 38, Padding = new Padding(10, 4, 10, 0) };
+            var dataGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
+            dataGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            dataGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            dataGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90f));
+            dataGrid.Controls.Add(new Label { Text = "数据目录", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) }, 0, 0);
+            _dataDirBox = new TextBox { Dock = DockStyle.Fill, ReadOnly = true, Margin = new Padding(0, 3, 6, 0) };
+            dataGrid.Controls.Add(_dataDirBox, 1, 0);
+            var pickDir = new Button { Text = "选择...", Dock = DockStyle.Fill, Margin = new Padding(0, 2, 0, 0) };
+            pickDir.Click += (s2, e2) => PickDataDir();
+            dataGrid.Controls.Add(pickDir, 2, 0);
+            dataRow.Controls.Add(dataGrid);
 
             var bottom = new Panel { Dock = DockStyle.Bottom, Height = 180 };
             _status = new Label { Dock = DockStyle.Top, Height = 22, Text = "就绪", ForeColor = Color.DimGray, Padding = new Padding(10, 4, 0, 0) };
@@ -233,13 +231,22 @@ namespace Mcroute
             }, 0, 0);
 
             var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3 };
-            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 66f));
+            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90f));
-            pathRow.Controls.Add(new Label { Text = "包文件", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
-            var path = new TextBox { Dock = DockStyle.Top };
+            pathRow.Controls.Add(new Label { Text = "包文件", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) }, 0, 0);
+            var path = new TextBox { Dock = DockStyle.Top, AllowDrop = true };
+            path.DragEnter += (s2, e2) =>
+            {
+                if (e2.Data.GetDataPresent(DataFormats.FileDrop)) e2.Effect = DragDropEffects.Copy;
+            };
+            path.DragDrop += (s2, e2) =>
+            {
+                var files = (string[])e2.Data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length > 0) path.Text = files[0];
+            };
             pathRow.Controls.Add(path, 1, 0);
-            var browse = new Button { Text = "浏览...", Dock = DockStyle.Top };
+            var browse = new Button { Text = "浏览...", Dock = DockStyle.Fill };
             browse.Click += (s, e) =>
             {
                 using (var dlg = new OpenFileDialog())
@@ -268,6 +275,7 @@ namespace Mcroute
                 Dock = DockStyle.Fill,
                 ForeColor = Color.DimGray,
                 Text = "说明：\n" +
+                       "· 也可以把整合包文件直接拖到上面的输入框里\n" +
                        "· 装成标准 versions/<包名>/ 布局，其它启动器也认\n" +
                        "· CurseForge 包需要 API key：环境变量 CF_API_KEY，或 mcdata\\cf_api_key.txt\n" +
                        "· 装完到「管理」页体检 / 测试启动",
