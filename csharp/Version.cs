@@ -69,18 +69,23 @@ namespace Mcroute
                 {
                     var order = new List<string>();
                     var table = new Dictionary<string, object>();
-                    foreach (var lib in AsList(parent.ContainsKey("libraries") ? parent["libraries"] : null))
+
+                    // 同 artifact 的两条记录怎么选：
+                    //   有可下载 jar 的优先（1.12.2 里 lwjgl 2.9.4 有 jar、2.9.2 只有 natives，
+                    //   盲目"后者覆盖"会把 lwjgl 整个弄丢）
+                    void Put(object lib)
                     {
                         string key = LibKey(lib);
                         if (!table.ContainsKey(key)) order.Add(key);
+                        if (table.ContainsKey(key) && !HasArtifact(lib) && HasArtifact(table[key]))
+                            return;
                         table[key] = lib;
                     }
+
+                    foreach (var lib in AsList(parent.ContainsKey("libraries") ? parent["libraries"] : null))
+                        Put(lib);
                     foreach (var lib in AsList(kv.Value))
-                    {
-                        string key = LibKey(lib);
-                        if (!table.ContainsKey(key)) order.Add(key);
-                        table[key] = lib;      // 子版本覆盖父版本，位置保持不变
-                    }
+                        Put(lib);      // 子版本优先（在都能下载的前提下）
                     var list = new List<object>();
                     foreach (string k in order) list.Add(table[k]);
                     merged["libraries"] = list.ToArray();
@@ -108,6 +113,20 @@ namespace Mcroute
             return merged;
         }
 
+        /// <summary>这条库有没有真正可下载的 jar（而不是只有 natives 分类器）。</summary>
+        private static bool HasArtifact(object lib)
+        {
+            var downloads = J.Dict(lib, "downloads");
+            var artifact = downloads == null ? null : J.Dict(downloads, "artifact");
+            if (artifact != null)
+            {
+                if (!string.IsNullOrEmpty(J.Str(artifact, "path"))) return true;
+                if (!string.IsNullOrEmpty(J.Str(artifact, "url"))) return true;
+            }
+            // Fabric 风格：name + 仓库根地址
+            return !string.IsNullOrEmpty(J.Str(lib, "url")) && !string.IsNullOrEmpty(J.Str(lib, "name"));
+        }
+
         /// <summary>库去重键：groupId:artifactId:classifier:有无natives（不含版本号）</summary>
         private static string LibKey(object lib)
         {
@@ -116,7 +135,11 @@ namespace Mcroute
             string artifact = parts.Length > 1 ? parts[1] : "";
             string classifier = parts.Length > 3 ? parts[3] : "";
             bool natives = J.Dict(lib, "natives") != null;
-            return group + ":" + artifact + ":" + classifier + ":" + (natives ? "1" : "0");
+            // rules 不同说明是互斥条目（比如 1.12.2 的 lwjgl：2.9.4 给 Windows、2.9.2 只给 osx），
+            // 必须都保留，否则按 rules 过滤后会整条消失
+            var rules = J.Get(lib, "rules");
+            string rulesSig = rules == null ? "" : J.Serialize(rules);
+            return group + ":" + artifact + ":" + classifier + ":" + (natives ? "1" : "0") + ":" + rulesSig;
         }
 
         public static List<object> AsList(object o)

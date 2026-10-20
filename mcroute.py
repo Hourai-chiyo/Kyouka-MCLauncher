@@ -514,20 +514,35 @@ def merge_version(parent, child):
                 group = parts[0] if len(parts) > 0 else ""
                 artifact = parts[1] if len(parts) > 1 else ""
                 classifier = parts[3] if len(parts) > 3 else ""
-                return (group, artifact, classifier, bool(lib.get("natives")))
+                # rules 不同 = 互斥条目（1.12.2 的 lwjgl：2.9.4 给 Windows、2.9.2 只给 osx），
+                # 必须都保留，否则按 rules 过滤后整条消失
+                rules = lib.get("rules")
+                rules_sig = json.dumps(rules, sort_keys=True, ensure_ascii=False) if rules else ""
+                return (group, artifact, classifier, bool(lib.get("natives")), rules_sig)
+
+            def _has_artifact(lib):
+                """这条库有没有真正可下载的 jar（而不是只有 natives 分类器）"""
+                downloads = lib.get("downloads") or {}
+                artifact = downloads.get("artifact") or {}
+                if artifact.get("path") or artifact.get("url"):
+                    return True
+                return bool(lib.get("url") and lib.get("name"))
 
             order = []
             table = {}
-            for lib in parent.get("libraries") or []:
+
+            def put(lib):
                 k = _lib_key(lib)
                 if k not in table:
                     order.append(k)
+                elif not _has_artifact(lib) and _has_artifact(table[k]):
+                    return      # 新的不能下载、旧的能 -> 保留旧的（lwjgl 2.9.4 vs 2.9.2 就是这么救回来的）
                 table[k] = lib
+
+            for lib in parent.get("libraries") or []:
+                put(lib)
             for lib in value:
-                k = _lib_key(lib)
-                if k not in table:
-                    order.append(k)
-                table[k] = lib          # 子版本覆盖父版本，保留原位置
+                put(lib)
             merged["libraries"] = [table[k] for k in order]
 
         elif key == "arguments":
