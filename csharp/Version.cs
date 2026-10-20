@@ -11,24 +11,27 @@ namespace Mcroute
         public static string BaseDir(string argBase)
         {
             if (!string.IsNullOrEmpty(argBase)) return Path.GetFullPath(argBase);
-            // 默认：exe 同级的 mcdata（便携版）；只读目录时退到 %LOCALAPPDATA%\mcroute\mcdata
+
+            // 1) 便携版：exe 旁边已经有 mcdata\versions 就用它
             string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-            string candidate = Path.Combine(exeDir, "mcdata");
-            try
+            string beside = Path.Combine(exeDir, "mcdata");
+            if (Directory.Exists(Path.Combine(beside, "versions")))
             {
-                Directory.CreateDirectory(candidate);
-                string probe = Path.Combine(candidate, "write_test.tmp");
-                File.WriteAllText(probe, "ok");
-                File.Delete(probe);
-                return candidate;
+                try
+                {
+                    string probe = Path.Combine(beside, "write_test.tmp");
+                    File.WriteAllText(probe, "ok");
+                    File.Delete(probe);
+                    return beside;
+                }
+                catch { }
             }
-            catch
-            {
-                string fallback = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute", "mcdata");
-                Directory.CreateDirectory(fallback);
-                return fallback;
-            }
+
+            // 2) 否则用用户目录（安装版 / 只读目录都适用）
+            string user = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute", "mcdata");
+            Directory.CreateDirectory(user);
+            return user;
         }
 
         public static string VersionJsonPath(string baseDir, string ver)

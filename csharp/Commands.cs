@@ -418,6 +418,14 @@ namespace Mcroute
             Directory.CreateDirectory(plan.NativesDir);
             ExtractNatives(plan);
 
+            // --memory 6G 覆盖默认堆大小
+            string mem = Commands.Arg(a, "--memory");
+            if (!string.IsNullOrEmpty(mem))
+            {
+                for (int i = 0; i < plan.JvmArgs.Count; i++)
+                    if (plan.JvmArgs[i].StartsWith("-Xmx")) plan.JvmArgs[i] = "-Xmx" + mem;
+            }
+
             var argv = new List<string>();
             argv.Add(plan.Java);
             argv.AddRange(plan.JvmArgs);
@@ -441,6 +449,8 @@ namespace Mcroute
             if (Has(a, "--wait")) proc.WaitForExit();
             return 0;
         }
+
+        public static void ExtractNativesPublic(Plan plan) { ExtractNatives(plan); }
 
         private static void ExtractNatives(Plan plan)
         {
