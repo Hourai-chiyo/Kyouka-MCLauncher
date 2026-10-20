@@ -59,7 +59,12 @@ class McrouteSetup
                     fbd.ShowNewFolderButton = true;
                     fbd.SelectedPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                     if (fbd.ShowDialog() != DialogResult.OK) return;
-                    target = Path.Combine(fbd.SelectedPath, "mcroute");
+                    // 用户选的目录本身就叫 mcroute 时，别再套一层
+                    string picked = fbd.SelectedPath.TrimEnd('\\');
+                    target = string.Equals(Path.GetFileName(picked), "mcroute",
+                                           StringComparison.OrdinalIgnoreCase)
+                             ? picked
+                             : Path.Combine(picked, "mcroute");
                 }
             }
         }
@@ -74,12 +79,42 @@ class McrouteSetup
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
+            string hint =
                 "这个位置没有写入权限：\n" + target + "\n\n" +
-                "请换一个位置 —— 建议选在用户目录下，例如 D:\\ 或 文档 文件夹。\n\n" +
-                "系统提示：" + ex.Message,
-                "mcroute", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+                "系统提示：" + ex.Message + "\n\n" +
+                "要装到默认位置吗？\n" + defaultTarget + "\n\n" +
+                "（默认位置在你的用户目录下，一定不需要管理员权限）";
+            if (silent)
+            {
+                target = defaultTarget;
+            }
+            else
+            {
+                DialogResult fb = MessageBox.Show(hint, "mcroute",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (fb != DialogResult.Yes)
+                {
+                    MessageBox.Show("已取消安装。可以重试并换一个目录，例如 D:\\ 下的新建文件夹。",
+                        "mcroute", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                target = defaultTarget;
+            }
+
+            // 换到默认位置后重新建目录并验证
+            try
+            {
+                Directory.CreateDirectory(target);
+                string probe2 = Path.Combine(target, ".mcroute_write_test");
+                File.WriteAllText(probe2, "ok");
+                File.Delete(probe2);
+            }
+            catch (Exception ex2)
+            {
+                MessageBox.Show("默认位置也写不了，请手动把 mcroute 解压到任意可写目录使用便携版。\n\n" + ex2.Message,
+                    "mcroute", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
         }
 
         string exe = Path.Combine(target, "mcroute.exe");

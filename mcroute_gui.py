@@ -325,6 +325,17 @@ class App:
             for name in sorted(os.listdir(root)):
                 meta_path = os.path.join(root, name, "instance.json")
                 if not os.path.isfile(meta_path):
+                    # 没有 instance.json，但有 mods 目录 -> 也当成实例
+                    # （别的启动器装的包、或者我们旧版本装的包都能被认出来）
+                    if not os.path.isdir(os.path.join(root, name, "mods")):
+                        continue
+                    self.inst_meta.append({
+                        "id": name,
+                        "name": name,
+                        "version_id": name,
+                        "game_dir": os.path.join(root, name),
+                    })
+                    self.inst_list.insert("end", "{}   [外部]".format(name))
                     continue
                 try:
                     with open(meta_path, "r", encoding="utf-8") as f:
