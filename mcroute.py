@@ -965,6 +965,31 @@ def rewrite_url(url):
     return url
 
 
+# 哈工大的 BMCLAPI 镜像：标准 maven 布局，覆盖 Forge / NeoForge / Fabric 的库。
+# 实测 7 MB/s（官方 maven 约 1.7 MB/s），大学生镜像站，比个人域名可信。
+# 注意它只镜像 maven 库，没有 assets / manifest / client jar，那些会 404 自动回落到官方。
+HIT_MIRROR = "https://mirrors.hit.edu.cn/bmclapi/"
+MIRROR_PREFIXES = [
+    "https://maven.minecraftforge.net/",
+    "https://maven.neoforged.net/releases/",
+    "https://maven.fabricmc.net/",
+    "https://maven.quiltmc.org/",
+]
+
+
+def download_candidates(url):
+    """下载候选地址：大学镜像优先，官方地址兜底"""
+    out = []
+    for prefix in MIRROR_PREFIXES:
+        if url.startswith(prefix):
+            out.append(HIT_MIRROR + url[len(prefix):])
+            break
+    fallback = rewrite_url(url)
+    if fallback not in out:
+        out.append(fallback)
+    return out
+
+
 def download_one(job):
     """
     下载单个文件。任务格式：(url, 本地路径, 期望sha1)
@@ -977,10 +1002,23 @@ def download_one(job):
         if not expected or file_sha1(dest) == expected:
             return ("skip", dest, 0)
 
-    try:
-        data, _dt = fetch_bytes(rewrite_url(url), timeout=90)
-    except Exception as exc:
-        return ("fail", dest, str(exc))
+    # 依次尝试：大学镜像 -> 官方（镜像缺文件就自动回落）
+    data = None
+    last_error = None
+    for candidate in download_candidates(url):
+        try:
+            data, _dt = fetch_bytes(candidate, timeout=90)
+        except Exception as exc:
+            last_error = str(exc)
+            continue
+        if expected and sha1_of(data) != expected:
+            last_error = "sha1 不符：" + candidate
+            data = None
+            continue
+        break
+
+    if data is None:
+        return ("fail", dest, last_error or "所有地址都失败")
 
     if expected and sha1_of(data) != expected:
         return ("bad", dest, "sha1 不符（可能被换过内容）")
@@ -1828,7 +1866,16 @@ def cmd_loader(args):
     print("\n[1/4] 下载 installer ...")
     print("      " + url)
     try:
-        data, dt = fetch_bytes(url, timeout=180)
+        data = None
+        last_exc = None
+        for candidate in download_candidates(url):
+            try:
+                data, dt = fetch_bytes(candidate, timeout=180)
+                break
+            except Exception as exc:
+                last_exc = exc
+        if data is None:
+            raise last_exc or RuntimeError("所有地址都失败")
     except Exception as exc:
         print("      失败：" + str(exc))
         if "404" in str(exc):

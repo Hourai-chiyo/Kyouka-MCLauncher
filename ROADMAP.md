@@ -21,6 +21,7 @@
 - **整合包安装（.mrpack）**：解析 `modrinth.index.json` → 自动装对应加载器 → 并发下载并 sha1 校验 → 铺开 `overrides/`
 - **URL 改写补充**：`media.forgecdn.net` 会 403，同路径的 `edge.forgecdn.net` 正常（文件字节一致）
 - **版本 jar 从父版本复制**：Forge/NeoForge 的 `-DignoreList` 期望版本目录里有 `${version_name}.jar`，缺了会把同一个游戏加载成两个模块（`ResolutionException`）
+- **大学镜像加速 maven 库**：`https://mirrors.hit.edu.cn/bmclapi/`（哈工大，BMCLAPI 的镜像，标准 maven 布局）。实测 **7~8 MB/s**，官方 maven 只有 0.65~1.7 MB/s；只覆盖 maven 库（Forge/NeoForge universal、fabric-loader、工具库），assets/manifest/client jar 会 404 自动回落官方
 - **`--memory` 参数**：之前堆内存写死 2G，202 mod 的整合包直接不够用
 - **库的 `url` 为空字符串**：老版本 Forge 的条目 url 是空串（文件由安装器放好），之前会被整个跳过 → `ClassNotFoundException: FMLTweaker`。现在有 `path` 就进 classpath
 - **老版本 Forge 预下载**：1.12.2 及更早的运行时库藏在 `install_profile.versionInfo` 里，不预下载安装器会卡在慢速 maven 上
