@@ -313,8 +313,10 @@ def library_download(lib):
     """
     downloads = lib.get("downloads") or {}
     artifact = downloads.get("artifact")
-    if artifact and artifact.get("url"):
-        return artifact["url"], maven_path(artifact, lib), artifact.get("sha1")
+    if artifact and artifact.get("path"):
+        # 注意：老版本 Forge 的条目 url 是空字符串（文件由安装器放好），
+        # 这时候仍然要按 path 进 classpath，只是不能拿来下载。
+        return (artifact.get("url") or None), artifact["path"], artifact.get("sha1")
 
     name = lib.get("name") or ""
     base_url = lib.get("url")
@@ -713,8 +715,9 @@ def plan_launch(args):
         jvm_args += ["-cp", ctx["classpath"]]
 
     # 内存参数（老板本 json 里没有，新版本由 launcher 自己决定）
+    mem = getattr(args, "memory", None)
     if not any(a.startswith("-Xmx") for a in jvm_args):
-        jvm_args.insert(0, "-Xmx2G")
+        jvm_args.insert(0, "-Xmx" + (mem or "2G"))
     if not any(a.startswith("-Xms") for a in jvm_args):
         jvm_args.insert(0, "-Xms512M")
 
@@ -1038,8 +1041,12 @@ def cmd_fetch(args):
         resolved = library_download(lib)
         if resolved:
             url, rel, sha1 = resolved
-            if rel:
-                jobs.append((url, os.path.join(lib_root, rel.replace("/", os.sep)), sha1))
+            target = os.path.join(lib_root, rel.replace("/", os.sep)) if rel else None
+            if target and url:
+                jobs.append((url, target, sha1))
+            elif target and not os.path.isfile(target):
+                # json 没给下载地址、本地又没有：多半是安装器没跑完
+                print("      [缺少] 没有下载地址且本地不存在：" + os.path.basename(target))
 
         natives = lib.get("natives") or {}
         classifier = natives.get("windows")
@@ -1701,6 +1708,10 @@ def cmd_loader(args):
             if "version.json" in zf.namelist():
                 template = json.loads(zf.read("version.json").decode("utf-8"))
                 template_libs = template.get("libraries") or []
+            elif (profile.get("versionInfo") or {}).get("libraries"):
+                # 老版本 Forge（1.12.2 及更早）把运行时库藏在 install_profile.versionInfo 里，
+                # 不预下载的话安装器会自己去连官方 maven，慢到能卡住
+                template_libs = profile["versionInfo"]["libraries"]
     except Exception as exc:
         print("      读取 install_profile.json 失败：" + str(exc))
         return
@@ -1805,6 +1816,233 @@ def mrpack_loader_of(deps, mc):
         ver = deps["quilt-loader"]
         return "quilt", "%s-%s" % (mc, ver), "quilt-loader-%s-%s" % (ver, mc)
     return None, None, mc
+
+
+CF_API = "https://api.curseforge.com/v1"
+
+
+def cf_api_key(base):
+    """API key 来源：环境变量 CF_API_KEY -> <数据目录>/cf_api_key.txt"""
+    key = os.environ.get("CF_API_KEY")
+    if key and key.strip():
+        return key.strip()
+    path = os.path.join(base, "cf_api_key.txt")
+    if os.path.isfile(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    return None
+
+
+def cf_get(path, key, retries=4):
+    """
+    调 CurseForge API。Cloudflare 偶尔会对正常请求回 403（空 body），
+    所以这里做几次退避重试，而不是直接判失败。
+    """
+    import time
+    import urllib.request
+
+    url = CF_API + path
+    last = None
+    for attempt in range(retries):
+        req = urllib.request.Request(url, headers={
+            "x-api-key": key,
+            "Accept": "application/json",
+            "User-Agent": "curl/8.21.0",
+        })
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as exc:
+            last = exc
+            time.sleep(1.5 * (attempt + 1))
+    raise last
+
+
+def install_curseforge(pack, base, args):
+    """
+    安装 CurseForge 整合包。
+
+    它和 mrpack 最大的区别：manifest 里只有 projectID/fileID，
+    必须调 API 换成真实下载地址（所以需要免费 API key）。
+    """
+    import concurrent.futures
+    import shutil
+    import urllib.parse
+    import zipfile
+
+    key = cf_api_key(base)
+    if not key:
+        print("[错误] 没有 CurseForge API key")
+        print("       方式一：设置环境变量 CF_API_KEY")
+        print("       方式二：把 key 写进 " + os.path.join(base, "cf_api_key.txt"))
+        print("       申请：https://console.curseforge.com/ -> API Keys")
+        return
+
+    with zipfile.ZipFile(pack) as zf:
+        names = zf.namelist()
+        if "manifest.json" not in names:
+            print("[错误] 没有 manifest.json")
+            return
+        manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
+
+    mc_meta = manifest.get("minecraft") or {}
+    mc = mc_meta.get("version")
+    if not mc:
+        print("[错误] manifest 里没有 minecraft.version")
+        return
+
+    loader_id = ""
+    for item in mc_meta.get("modLoaders") or []:
+        if item.get("primary"):
+            loader_id = item.get("id", "")
+            break
+    if not loader_id and mc_meta.get("modLoaders"):
+        loader_id = (mc_meta.get("modLoaders") or [{}])[0].get("id", "")
+
+    # CF 的加载器 id 形如 forge-14.23.5.2860 / neoforge-21.1.264 / fabric-0.15.0
+    deps = {"minecraft": mc}
+    if loader_id.startswith("forge-"):
+        deps["forge"] = loader_id[len("forge-"):]
+    elif loader_id.startswith("neoforge-"):
+        deps["neoforge"] = loader_id[len("neoforge-"):]
+    elif loader_id.startswith("fabric-"):
+        deps["fabric-loader"] = loader_id[len("fabric-"):]
+    elif loader_id.startswith("quilt-"):
+        deps["quilt-loader"] = loader_id[len("quilt-"):]
+
+    kind, loader_full, version_id = mrpack_loader_of(deps, mc)
+
+    name = (manifest.get("name") or os.path.splitext(os.path.basename(pack))[0]).strip()
+    safe_name = "".join(c if c not in '\\/:*?"<>|' else "_" for c in name)
+    inst_root = os.path.join(base, "instances", safe_name)
+    game_dir = os.path.join(inst_root, ".minecraft")
+    mods_dir = os.path.join(game_dir, "mods")
+    os.makedirs(mods_dir, exist_ok=True)
+
+    print("整合包  : " + name + " " + str(manifest.get("version", "")))
+    print("实例目录: " + inst_root)
+    print("MC 版本 : " + str(mc))
+    print("加载器  : " + (("%s %s" % (kind, loader_full)) if kind else "无（原版）"))
+    print("目标版本: " + version_id)
+
+    # ---- 1) 原版 ----
+    mc_json = os.path.join(base, "versions", mc, mc + ".json")
+    if not os.path.isfile(mc_json):
+        print("\n[1/4] 本地没有原版 %s，先下载 ..." % mc)
+        cmd_fetch(argparse.Namespace(version=mc, dir=base, workers=args.workers,
+                                     no_assets=getattr(args, "no_assets", False)))
+        if not os.path.isfile(mc_json):
+            print("[错误] 原版下载失败，安装中止")
+            return
+
+    # ---- 2) 加载器 ----
+    vjson = os.path.join(base, "versions", version_id, version_id + ".json")
+    if not os.path.isfile(vjson) and kind:
+        print("[2/4] 本地没有 %s，先自动安装加载器 ..." % version_id)
+        try:
+            cmd_loader(argparse.Namespace(kind=kind, version=loader_full,
+                                          dir=base, java=None))
+        except Exception as exc:
+            print("      自动安装失败：" + str(exc))
+            return
+    else:
+        print("[2/4] 版本已就绪")
+
+    # ---- 3) 用 API 换地址 ----
+    files = manifest.get("files") or []
+    print("[3/4] 解析 %d 个文件（需要调 CurseForge API）..." % len(files))
+
+    def resolve(entry):
+        project_id = entry.get("projectID")
+        file_id = entry.get("fileID")
+        if not project_id or not file_id:
+            return None, "缺少 projectID/fileID"
+        try:
+            payload = cf_get("/mods/%s/files/%s" % (project_id, file_id), key)
+        except Exception as exc:
+            return None, str(exc)
+        data = payload.get("data") or {}
+        file_name = data.get("fileName")
+        url = data.get("downloadUrl")
+        if not file_name:
+            return None, "API 没返回 fileName"
+        if not url:
+            # 作者关掉了第三方分发时 downloadUrl 为 null，用 CDN 规则拼
+            url = "https://edge.forgecdn.net/files/%d/%d/%s" % (
+                int(file_id) // 1000, int(file_id) % 1000,
+                urllib.parse.quote(file_name))
+        sha1 = None
+        for h in data.get("hashes") or []:
+            if h.get("algo") == 1:
+                sha1 = h.get("value")
+        return (url, file_name, sha1), None
+
+    jobs = []
+    unresolved = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(resolve, e) for e in files]
+        for future in concurrent.futures.as_completed(futures):
+            item, why = future.result()
+            if item:
+                url, file_name, sha1 = item
+                jobs.append((url, os.path.join(mods_dir, file_name), sha1))
+            else:
+                unresolved.append(why)
+
+    if unresolved:
+        print("      有 %d 个没能解析（前 3 条）：%s" % (len(unresolved), unresolved[:3]))
+
+    print("      开始下载 %d 个 mod ..." % len(jobs))
+    ok = skip = fail = 0
+    done = 0
+    failed = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
+        futures = [pool.submit(download_one, job) for job in jobs]
+        for future in concurrent.futures.as_completed(futures):
+            status, p_, info = future.result()
+            done += 1
+            if status == "ok":
+                ok += 1
+            elif status == "skip":
+                skip += 1
+            else:
+                fail += 1
+                failed.append((os.path.basename(p_), info))
+            if done % 25 == 0 or done == len(jobs):
+                print("      进度 %d/%d   新下载 %d  已存在 %d  失败 %d" % (done, len(jobs), ok, skip, fail))
+    if failed:
+        for n, why in failed[:5]:
+            print("        [fail] " + n + " -> " + str(why))
+
+    # ---- 4) 铺 overrides ----
+    prefix = (manifest.get("overrides") or "overrides").rstrip("/") + "/"
+    count = 0
+    with zipfile.ZipFile(pack) as zf:
+        for entry in zf.namelist():
+            if not entry.startswith(prefix) or entry.endswith("/"):
+                continue
+            rel = entry[len(prefix):]
+            dest = os.path.join(game_dir, rel.replace("/", os.sep))
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with zf.open(entry) as src_file, open(dest, "wb") as dst_file:
+                shutil.copyfileobj(src_file, dst_file)
+            count += 1
+    print("[4/4] 已铺开 overrides：%d 个文件" % count)
+
+    meta = {
+        "name": name,
+        "version_id": version_id,
+        "minecraft": mc,
+        "loader": kind,
+        "loader_version": loader_full,
+        "game_dir": game_dir,
+        "source": pack,
+    }
+    with open(os.path.join(inst_root, "instance.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+
+    print("\n完成。启动命令：")
+    print('  python mcroute.py launch %s --game-dir "%s"' % (version_id, game_dir))
 
 
 MMC_LOADER_UIDS = {
@@ -1966,9 +2204,7 @@ def cmd_install(args):
         install_mmc(pack, base, args)
     elif "manifest.json" in names:
         print("格式：CurseForge 整合包")
-        print("[未支持] CurseForge 包只给 projectID/fileID，换直链需要 API key。")
-        print("         免费申请：https://console.curseforge.com/ → API Keys")
-        return
+        install_curseforge(pack, base, args)
     else:
         print("[错误] 认不出的整合包格式（没有 modrinth.index.json / mmc-pack.json / manifest.json）")
 
@@ -2217,6 +2453,7 @@ def main():
     p5.add_argument("--game-dir", help="游戏目录，默认 <实例目录>/instances/<版本>")
     p5.add_argument("--username", default="Player", help="离线占位用户名")
     p5.add_argument("--force", action="store_true", help="缺文件也强行启动（多半会崩）")
+    p5.add_argument("--memory", help="最大堆内存，例如 6G（默认 2G，整合包通常要 4G 以上）")
     p5.add_argument("--wait", action="store_true", help="等游戏退出后再返回")
     p5.set_defaults(func=cmd_launch)
 
