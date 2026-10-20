@@ -29,3 +29,46 @@ _tmp/
 _patch_*.py
 *.bak
 *.err
+dist/
+build/
+_internal/
+*.exe
+*.spec
+gui_*.log
+# 数据目录：体积大（约 900MB）且包含本机凭据，绝不入库
+mcdata/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 日志与临时文件
+*.log
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 系统
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 运行时生成物
+launch-*.txt
+
+# 抓取的进程命令行（含令牌，绝不入库）
+_*_cmd.txt
+_tmp/
+
+# 一次性补丁脚本与备份
+_patch_*.py
+*.bak
+*.err
+dist/
+build/
+_internal/
+*.exe
+*.spec
+gui_*.log

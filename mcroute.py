@@ -920,7 +920,18 @@ def cmd_launch(args):
 # 子命令 6: fetch —— 把某版本的完整闭包下载到本地（sha1 校验 + 跳过已有）
 # ---------------------------------------------------------------------------
 # 默认数据目录：脚本旁边的 mcdata/（和代码分开，避免"工具变胖"）
-DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mcdata")
+def app_dir():
+    """
+    程序所在目录。
+    打包成 exe 后 __file__ 指向 PyInstaller 的临时解压目录，
+    数据必须放在 exe 旁边，否则每次运行都从头下载。
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+DEFAULT_DATA_DIR = os.path.join(app_dir(), "mcdata")
 
 
 def file_sha1(path):
@@ -1723,6 +1734,24 @@ def resolve_neoforge_version(ver):
     return matches[-1]
 
 
+def minecraft_of_loader(kind, ver):
+    """从加载器版本号反推它对应的 MC 版本（用于顺手把原版也下了）"""
+    if kind == "forge":
+        return ver.split("-")[0] if "-" in ver else ver
+    if kind in LOADER_META:
+        return ver.split("-")[0]
+    if kind == "neoforge":
+        if ver.startswith("47."):
+            return "1.20.1"          # NeoForge 的 1.20.1 特例
+        parts = ver.split(".")
+        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+            major, minor = parts[0], parts[1]
+            if minor == "0":
+                return "1." + major          # 21.0.x -> 1.21
+            return "1.%s.%s" % (major, minor)  # 21.1.x -> 1.21.1
+    return None
+
+
 def cmd_loader(args):
     """
     安装加载器（neoforge / forge）。
@@ -1747,14 +1776,7 @@ def cmd_loader(args):
 
     os.makedirs(base, exist_ok=True)
 
-    # Fabric / Quilt / Legacy Fabric 没有安装器，走 meta 合成
-    if kind in LOADER_META:
-        print("加载器  : %s %s" % (kind, ver))
-        print("数据目录: " + base)
-        install_meta_loader(base, kind, ver)
-        return
-
-    # 智能补全版本号：用户通常只写 MC 版本（1.12.2 / 1.21.1）
+    # ---- 版本号智能补全（用户通常只写 MC 版本，如 1.12.2 / 1.21.1）----
     if kind == "forge":
         resolved = resolve_forge_version(ver)
         if resolved != ver:
@@ -1765,6 +1787,27 @@ def cmd_loader(args):
         if resolved != ver:
             print("[提示] NeoForge 版本自动补全：" + ver + " -> " + resolved)
             ver = resolved
+
+    # ---- 顺手把对应的原版也下好（安装器要用它打补丁，启动也要它）----
+    mc_ver = minecraft_of_loader(kind, ver)
+    if mc_ver:
+        mc_json = os.path.join(base, "versions", mc_ver, mc_ver + ".json")
+        if not os.path.isfile(mc_json):
+            print("[准备] 本地没有原版 %s，先下载（装加载器必须要有它）..." % mc_ver)
+            cmd_fetch(argparse.Namespace(version=mc_ver, dir=base, workers=16,
+                                         no_assets=getattr(args, "no_assets", False)))
+            if not os.path.isfile(mc_json):
+                print("[错误] 原版下载失败，安装中止")
+                return
+        else:
+            print("[准备] 原版 %s 已在本地" % mc_ver)
+
+    # Fabric / Quilt / Legacy Fabric 没有安装器，走 meta 合成
+    if kind in LOADER_META:
+        print("加载器  : %s %s" % (kind, ver))
+        print("数据目录: " + base)
+        install_meta_loader(base, kind, ver)
+        return
 
     url = installer_url(kind, ver)
     tmp_dir = os.path.join(base, "_tmp")
@@ -2584,6 +2627,8 @@ def main():
     p11.add_argument("version", help="fabric: 1.20.1 或 1.20.1-0.19.5；forge: 1.20.1-47.2.0；neoforge: 21.1.264")
     p11.add_argument("--dir", help="数据目录，默认 mcdata/")
     p11.add_argument("--java", help="指定 java.exe（安装器需要 Java 21+）")
+    p11.add_argument("--no-assets", action="store_true",
+                     help="顺带下载原版时跳过资源对象（快，但没有音效贴图）")
     p11.set_defaults(func=cmd_loader)
 
     p12 = sub.add_parser("java", help="列出检测到的 Java")

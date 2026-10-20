@@ -13,15 +13,34 @@ mcroute_gui.py —— mcroute 的图形界面（tkinter，零依赖，不用装�
     3. 输出统一进底部日志框
 """
 
+__import__("sys")
+import os
+import sys
+
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 import argparse
 import json
-import os
 import queue
 import re
 import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+
+try:
+    import faulthandler
+
+    _fault_path = os.path.join(
+        os.path.dirname(os.path.abspath(sys.executable if getattr(sys, "frozen", False) else __file__)),
+        "gui_fault.log")
+    _fault_fp = open(_fault_path, "w")
+    faulthandler.enable(_fault_fp)
+except Exception:
+    pass
 
 import mcroute
 
@@ -487,4 +506,17 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        # 打包成 exe 后（--windowed）没有控制台，异常会静默消失。
+        # 这里落一份日志到程序旁边，方便排查。
+        import traceback
+
+        try:
+            here = mcroute.app_dir()
+        except Exception:
+            here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "gui_crash.log"), "w", encoding="utf-8") as fp:
+            fp.write(traceback.format_exc())
+        raise
