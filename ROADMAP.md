@@ -43,10 +43,26 @@ python mcroute.py loader quilt  1.20.1-0.27.0
 
 ### 2. Java 检测与管理（当前是隐性风险）
 
-**现状**：
+**现状（已实测核对）**：
 - `find_java()` 只在 `mcdata/java_versions` 和 Modrinth App 的 java 目录里找，找不到就退回 PATH
-- 本机只有 Java **8** 和 **21**，**缺 17**
-- Forge 1.20.1 声明需要 Java 17，实际是用 **21** 跑起来的——能跑，但不是它要求的版本，属于"侥幸可用"
+- **本机其实装了 Java 8 / 11 / 17 / 21 四个 Adoptium JDK**，但检测器完全没看 `Program Files`
+- 结果：Forge 1.20.1 明明有对应的 JDK 17，却被退回用 **21** 跑——能跑，但不是它声明的版本
+
+**本机实测可用的 Java（2026-10-20 枚举）**：
+
+| 版本 | 路径 |
+|---|---|
+| 8 / 11 / 17 / 21 | `C:\Program Files\Eclipse Adoptium\jdk-*\bin` |
+| 17 | `%APPDATA%\.minecraft\runtime\java-runtime-epsilon\bin`（Mojang 官方 runtime） |
+| 21 / 8 | `%APPDATA%\ModrinthApp\meta\java_versions\*\bin` |
+| 8 | `%USERPROFILE%\curseforge\minecraft\Install\java\jre-legacy\bin` |
+
+**检测优先级建议**：
+1. 注册表 `SOFTWARE\JavaSoft\JDK` / `JRE`（含 WOW6432Node）
+2. 上面这些已知目录（`Program Files\Eclipse Adoptium`、`Program Files\Java`、`%APPDATA%\.minecraft\runtime` 等）
+3. `mcdata/java_versions`（我们自己下载并管理的）
+4. PATH
+5. 全都没有 -> 从 Adoptium 下载到 `mcdata/java_versions`
 
 **要做的**：
 
