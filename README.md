@@ -130,6 +130,24 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ---
 
+## 图形界面
+
+双击 `run_gui.bat`（或 `python mcroute_gui.py`），四个标签页：
+
+![启动页](docs/gui-tabs.png)
+
+| 标签页 | 能干什么 |
+|---|---|
+| **启动** | 列出本地版本、下载原版、选 Java（自动按版本匹配）、设内存、启动 |
+| **加载器** | 选 fabric / quilt / legacyfabric / forge / neoforge，填版本，一键装 |
+| **整合包** | 选文件安装，自动识别 mrpack / MultiMC / CurseForge |
+| **实例** | 列出已装整合包实例，一键启动或打开目录 |
+
+![实例页](docs/gui-tab-instances.png)
+
+界面和命令行调的是**同一批函数**（`cmd_fetch` / `cmd_loader` / `cmd_install` / `cmd_launch`），
+所以两边行为永远一致，不会出现"GUI 能用 CLI 不能"这种偏差。
+
 ## 加载器支持（NeoForge / Forge / Fabric / Quilt / Legacy Fabric）
 
 一条命令完成：
