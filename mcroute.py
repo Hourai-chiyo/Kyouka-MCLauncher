@@ -922,13 +922,36 @@ def cmd_launch(args):
 # 默认数据目录：脚本旁边的 mcdata/（和代码分开，避免"工具变胖"）
 def app_dir():
     """
-    程序所在目录。
-    打包成 exe 后 __file__ 指向 PyInstaller 的临时解压目录，
-    数据必须放在 exe 旁边，否则每次运行都从头下载。
+    数据目录应该放哪。
+
+    三种运行形态不一样：
+      1. 源码运行 / 普通 exe        -> 放程序旁边，方便"绿色版"
+      2. MSIX 安装                 -> 安装目录是只读的（WindowsApps），必须放用户可写位置
+      3. 装在 Program Files 的 exe -> 同样只读，同样的处理
+
+    判断方式是"真的写一下试试"，比猜路径可靠。
     """
     if getattr(sys, "frozen", False):
-        return os.path.dirname(os.path.abspath(sys.executable))
-    return os.path.dirname(os.path.abspath(__file__))
+        base = os.path.dirname(os.path.abspath(sys.executable))
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+
+    try:
+        probe = os.path.join(base, ".mcroute_write_test")
+        with open(probe, "w", encoding="utf-8") as fp:
+            fp.write("ok")
+        os.remove(probe)
+        return base
+    except Exception:
+        # 只读目录（MSIX / Program Files）：退到用户可写位置。
+        # MSIX 下 LOCALAPPDATA 会被系统重定向到包自己的 LocalCache，正好合适。
+        writable = os.path.join(
+            os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "mcroute")
+        try:
+            os.makedirs(writable, exist_ok=True)
+        except Exception:
+            pass
+        return writable
 
 
 DEFAULT_DATA_DIR = os.path.join(app_dir(), "mcdata")
