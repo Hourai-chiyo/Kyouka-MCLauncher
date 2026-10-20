@@ -148,6 +148,29 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 界面和命令行调的是**同一批函数**（`cmd_fetch` / `cmd_loader` / `cmd_install` / `cmd_launch`），
 所以两边行为永远一致，不会出现"GUI 能用 CLI 不能"这种偏差。
 
+## 打包成 exe（不装 Python 也能跑）
+
+```bat
+build_exe.bat
+```
+
+产物在 `dist\mcroute\`（约 30 MB）：
+
+| 文件 | 作用 |
+|---|---|
+| `mcroute.exe` | 主程序 |
+| `_internal\` | 运行库（别删） |
+| **`启动 mcroute.vbs`** | **双击这个启动**，不会弹黑窗口 |
+
+![exe 版界面](docs/gui-exe.png)
+
+整个文件夹拷到任意位置即可，首次运行会在 exe 旁边建 `mcdata\` 放游戏文件。
+
+> 为什么要个 vbs：PyInstaller 的 `--windowed` 模式在本机会**静默退出**（没控制台、没日志，
+> 连崩溃日志都写不出来），`--onefile` 则报 `Could not create temporary directory`。
+> 所以改成 `--console` 打包 + 用 vbs 把控制台窗口隐藏，效果一样但稳定得多。
+> 直接双击 `mcroute.exe` 也能用，只是会多一个黑色控制台窗口（还能顺便看日志）。
+
 ## 加载器支持（NeoForge / Forge / Fabric / Quilt / Legacy Fabric）
 
 一条命令完成：
