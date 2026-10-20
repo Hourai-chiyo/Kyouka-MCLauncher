@@ -4,6 +4,10 @@
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
 > 本项目处于Alpha版本，为主镜像源崩溃时的紧急预案。如有bug，请提交至QQ:3849596108或者邮箱2084619997@qq.com
 
+[![Release](https://img.shields.io/github/v/release/Hourai-chiyo/mcroute?label=release)](https://github.com/Hourai-chiyo/mcroute/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Hourai-chiyo/mcroute/total)](https://github.com/Hourai-chiyo/mcroute/releases)
+[![License](https://img.shields.io/github/license/Hourai-chiyo/mcroute)](LICENSE)
+
 一个面向中国大陆网络环境的 **Minecraft: Java Edition 启动器**，重点是「下载源可靠」和「离线可自持」。
 
 ![界面截图](docs/screenshot.png)
@@ -14,7 +18,13 @@
 
 **方式一：安装包（推荐，不需要 Python）**
 
-到 [Releases](https://github.com/Hourai-chiyo/mcroute/releases/latest) 下载 `mcroute-setup.exe`，
+| 下载 | 大小 | 说明 |
+|---|---|---|
+| **[mcroute-setup.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-setup.exe)** | 13.3 MB | 安装包，双击安装 |
+| **[mcroute-portable.zip](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-portable.zip)** | 13.3 MB | 免安装，解压后双击 `启动 mcroute.vbs` |
+
+（以上是"永远指向最新版"的直链，不需要进 Releases 页面找）
+
 双击安装即可：
 
 - 安装位置：`%LOCALAPPDATA%\mcroute`（**不需要管理员权限**）
