@@ -40,18 +40,31 @@ class McrouteSetup
         try { File.Delete(tracePath); } catch { }
         Trace("start silent=" + silent + " args=" + string.Join("|", args));
 
-        string target = Path.Combine(
+        string defaultTarget = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute");
-        string exe = Path.Combine(target, "mcroute.exe");
-        string vbs = Path.Combine(target, "start-mcroute.vbs");
+        string target = defaultTarget;
 
         if (!silent)
         {
-            DialogResult r = MessageBox.Show(
-                "将把 mcroute 安装到：\n" + target + "\n\n继续安装吗？",
-                "mcroute 安装程序", MessageBoxButtons.OKCancel, MessageBoxIcon.Information);
-            if (r != DialogResult.OK) return;
+            DialogResult ask = MessageBox.Show(
+                "mcroute 安装程序\n\n默认安装位置：\n" + defaultTarget + "\n\n" +
+                "「是」= 装到默认位置\n「否」= 自己选一个目录\n「取消」= 不装了",
+                "mcroute", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+            if (ask == DialogResult.Cancel) return;
+            if (ask == DialogResult.No)
+            {
+                using (FolderBrowserDialog fbd = new FolderBrowserDialog())
+                {
+                    fbd.Description = "选择安装位置（会在这个目录下创建 mcroute 文件夹）";
+                    fbd.ShowNewFolderButton = true;
+                    if (fbd.ShowDialog() != DialogResult.OK) return;
+                    target = Path.Combine(fbd.SelectedPath, "mcroute");
+                }
+            }
         }
+
+        string exe = Path.Combine(target, "mcroute.exe");
+        string vbs = Path.Combine(target, "start-mcroute.vbs");
 
         try
         {
@@ -93,6 +106,25 @@ class McrouteSetup
             if (!File.Exists(exe))
                 throw new Exception("unzip failed: mcroute.exe not found");
             Trace("exe ok, making shortcuts");
+
+            // 自定义目录时重写卸载脚本（内置那份写死 %LOCALAPPDATA%\mcroute）
+            if (!string.Equals(target, defaultTarget, StringComparison.OrdinalIgnoreCase))
+            {
+                string batch =
+                    "@echo off\r\n" +
+                    "chcp 65001 >nul\r\n" +
+                    "echo Removing mcroute ...\r\n" +
+                    "del \"%APPDATA%\\Microsoft\\Windows\\Start Menu\\mcroute.lnk\" >nul 2>&1\r\n" +
+                    "del \"%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\mcroute.lnk\" >nul 2>&1\r\n" +
+                    "reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\mcroute\" /f >nul 2>&1\r\n" +
+                    "powershell -NoProfile -Command \"Remove-Item (Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'mcroute.lnk') -Force -ErrorAction SilentlyContinue\" >nul 2>&1\r\n" +
+                    "cd /d \"%TEMP%\"\r\n" +
+                    "ping -n 2 127.0.0.1 >nul\r\n" +
+                    "rd /s /q \"" + target + "\"\r\n" +
+                    "echo Done.\r\n" +
+                    "timeout /t 2 >nul\r\n";
+                File.WriteAllText(Path.Combine(target, "uninstall.bat"), batch, System.Text.Encoding.ASCII);
+            }
 
             // ---- 3) 快捷方式 ----
             MakeShortcut(Path.Combine(
