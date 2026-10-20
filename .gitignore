@@ -7,7 +7,6 @@ __pycache__/
 
 # 日志与临时文件
 *.log
-gui-*.png
 
 # 编辑器
 .vscode/
@@ -29,3 +28,4 @@ _tmp/
 # 一次性补丁脚本与备份
 _patch_*.py
 *.bak
+*.err
