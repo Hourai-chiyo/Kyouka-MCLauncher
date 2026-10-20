@@ -300,9 +300,17 @@ class App:
             return
         names = [n for n in sorted(os.listdir(vroot))
                  if os.path.isdir(os.path.join(vroot, n))]
+        packs = 0
         for name in names:
-            self.listbox.insert("end", name)
-        self.log("找到 {} 个本地版本".format(len(names)))
+            # 整合包实例也是 versions/<名字>/，这里合并显示，只加个标记
+            is_pack = os.path.isfile(os.path.join(vroot, name, "instance.json"))
+            if is_pack:
+                packs += 1
+            self.listbox.insert("end", name + ("   [整合包]" if is_pack else ""))
+        msg = "找到 {} 个本地版本（其中 {} 个整合包实例）".format(len(names), packs)
+        if getattr(self, "_last_ver_log", None) != msg:
+            self.log(msg)
+            self._last_ver_log = msg
 
     def refresh_instances(self):
         self.inst_list.delete(0, "end")
@@ -330,7 +338,10 @@ class App:
                     "end",
                     "{}   [{}]".format(meta.get("name") or name, meta.get("version_id", "?")),
                 )
-        self.log("找到 {} 个整合包实例".format(len(self.inst_meta)))
+        msg = "找到 {} 个整合包实例".format(len(self.inst_meta))
+        if getattr(self, "_last_inst_log", None) != msg:
+            self.log(msg)
+            self._last_inst_log = msg
 
     def refresh_java(self):
         try:
@@ -438,7 +449,7 @@ class App:
         if not picked:
             messagebox.showinfo("提示", "先在左边选一个版本")
             return
-        self._launch(self.listbox.get(picked[0]))
+        self._launch(self.listbox.get(picked[0]).replace("   [整合包]", "").strip())
 
     def do_launch_instance(self):
         picked = self.inst_list.curselection()
@@ -487,6 +498,10 @@ class App:
     def open_instance_dir(self):
         picked = self.inst_list.curselection()
         if not picked:
+            if not self.inst_meta:
+                messagebox.showinfo("提示", "还没有整合包实例。\n\n先到「整合包」页装一个。")
+            else:
+                messagebox.showinfo("提示", "先在列表里选一个实例")
             return
         meta = self.inst_meta[picked[0]]
         path = meta.get("game_dir") or ""

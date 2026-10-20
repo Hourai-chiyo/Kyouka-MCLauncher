@@ -24,6 +24,11 @@
 
     <SummaryInformation Description="mcroute - Minecraft Java 启动器" />
 
+    <!-- 允许自定义安装目录：
+         msiexec /i mcroute.msi /qn INSTALLFOLDER="D:\mcroute"
+         不指定时默认装到 %LOCALAPPDATA%\mcroute -->
+    <Property Id="INSTALLFOLDER" Secure="yes" />
+
     <MajorUpgrade DowngradeErrorMessage="已经装了更新的版本，先卸载它再装这个。" />
     <MediaTemplate EmbedCab="yes" />
 

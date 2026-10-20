@@ -57,10 +57,29 @@ class McrouteSetup
                 {
                     fbd.Description = "选择安装位置（会在这个目录下创建 mcroute 文件夹）";
                     fbd.ShowNewFolderButton = true;
+                    fbd.SelectedPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                     if (fbd.ShowDialog() != DialogResult.OK) return;
                     target = Path.Combine(fbd.SelectedPath, "mcroute");
                 }
             }
+        }
+
+        // 先确认这个位置真的能写（选到 C:\ 或 Program Files 会没权限）
+        try
+        {
+            Directory.CreateDirectory(target);
+            string probe = Path.Combine(target, ".mcroute_write_test");
+            File.WriteAllText(probe, "ok");
+            File.Delete(probe);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                "这个位置没有写入权限：\n" + target + "\n\n" +
+                "请换一个位置 —— 建议选在用户目录下，例如 D:\\ 或 文档 文件夹。\n\n" +
+                "系统提示：" + ex.Message,
+                "mcroute", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
         }
 
         string exe = Path.Combine(target, "mcroute.exe");
