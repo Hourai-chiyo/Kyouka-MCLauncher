@@ -451,13 +451,10 @@ def plan_launch(args):
     separator = ";" if os.name == "nt" else ":"
 
     # 账号：有登录凭据就用真的，没有就退回离线占位
-    auth = auth_load() or {}
+    auth = ensure_fresh_auth() or {}
     player_name = auth.get("name") or args.username
     player_uuid = (auth.get("uuid") or "0" * 32).replace("-", "")
     player_token = auth.get("mc_access_token") or "0"
-    if auth and int(auth.get("mc_expires_at") or 0) < _now():
-        print("[提示] 登录令牌已过期，联机功能会不可用。")
-        print("       运行  python mcroute.py login  重新授权即可。")
 
     ctx = {
         "natives_directory": natives_dir,
@@ -1018,6 +1015,127 @@ def ms_refresh(auth, client_id):
     return data
 
 
+def mc_auth_from_ms(ms_token):
+    """
+    微软 access token -> Minecraft 令牌 + 玩家档案。
+
+    成功返回 dict：{mc_access_token, mc_expires_at, name, uuid}
+    失败抛 RuntimeError（带人话说明）。
+    cmd_login 和自动续期都要用这段逻辑，所以抽成独立函数。
+    """
+    # 第 1 步：微软令牌 -> Xbox Live 令牌
+    xbl, _dt, ok = http_request(XBL_URL, {
+        "Properties": {
+            "AuthMethod": "RPS",
+            "SiteName": "user.auth.xboxlive.com",
+            "RpsTicket": "d=" + ms_token,
+        },
+        "RelyingParty": "http://auth.xboxlive.com",
+        "TokenType": "JWT",
+    }, headers=JSON_HEADERS)
+    if not ok:
+        raise RuntimeError("Xbox Live 认证失败：" + str(xbl.get("Message") or xbl))
+    xbl_token = xbl.get("Token")
+    claims = (xbl.get("DisplayClaims") or {}).get("xui") or [{}]
+    uhs = claims[0].get("uhs")
+
+    # 第 2 步：Xbox Live -> XSTS
+    xsts, _dt, ok = http_request(XSTS_URL, {
+        "Properties": {"SandboxId": "RETAIL", "UserTokens": [xbl_token]},
+        "RelyingParty": "rp://api.minecraftservices.com/",
+        "TokenType": "JWT",
+    }, headers=JSON_HEADERS)
+    if not ok:
+        hints = {
+            2148916233: "这个微软账号还没有 Xbox 档案，先去 xbox.com 登录一次创建",
+            2148916235: "Xbox 在你所在地区不可用",
+            2148916236: "需要先在 xbox.com 完成成人与地区验证",
+            2148916237: "同上，需要完成成人与地区验证",
+            2148916238: "这是未成年人账号，需要家长加入 Microsoft 家庭组",
+        }
+        message = "XSTS 认证失败：" + str(xsts.get("Message") or xsts)
+        hint = hints.get(xsts.get("XErr"))
+        raise RuntimeError(message + ("（" + hint + "）" if hint else ""))
+    xsts_token = xsts.get("Token")
+    claims = (xsts.get("DisplayClaims") or {}).get("xui") or [{}]
+    uhs = claims[0].get("uhs") or uhs
+
+    # 第 3 步：XSTS -> Minecraft 令牌
+    mc, _dt, ok = http_request(MC_LOGIN_URL, {
+        "identityToken": "XBL3.0 x=" + str(uhs) + ";" + str(xsts_token),
+    }, headers=JSON_HEADERS)
+    if not ok:
+        raise RuntimeError("换 Minecraft 令牌失败：" + str(mc.get("errorMessage") or mc))
+    token = mc.get("access_token")
+    expires_in = int(mc.get("expires_in") or 86400)
+
+    # 第 4 步：读玩家档案（同时验证令牌真的可用）
+    profile, _dt, ok = http_request(
+        MC_PROFILE_URL,
+        headers={"Authorization": "Bearer " + str(token), "Accept": "application/json"},
+    )
+    if not ok:
+        raise RuntimeError("读取玩家档案失败：" + str(profile.get("error") or profile)
+                           + "（常见原因：这个账号没有购买 Minecraft）")
+
+    return {
+        "mc_access_token": token,
+        "mc_expires_at": _now() + expires_in,
+        "name": profile.get("name"),
+        "uuid": profile.get("id"),
+    }
+
+
+def ensure_fresh_auth(verbose=True):
+    """
+    返回一份「当下可用」的登录凭据：
+      1. 没有凭据              -> None
+      2. MC 令牌还剩 5 分钟以上 -> 直接用
+      3. 过期但有 refresh token -> 静默续期并写回文件
+      4. 续期失败              -> 返回旧凭据（由调用方决定怎么提示）
+    """
+    auth = auth_load()
+    if not auth:
+        return None
+
+    if int(auth.get("mc_expires_at") or 0) - _now() > 300:
+        return auth
+
+    client_id = auth.get("client_id") or resolve_client_id()
+    if not client_id or not auth.get("ms_refresh_token"):
+        return auth
+
+    if verbose:
+        print("[登录] Minecraft 令牌已过期，正在静默续期 ...")
+
+    refreshed = ms_refresh(auth, client_id)
+    if not refreshed:
+        if verbose:
+            print("[登录] 续期失败：refresh token 已失效，请重新运行 login")
+        return auth
+
+    try:
+        info = mc_auth_from_ms(refreshed["access_token"])
+    except RuntimeError as exc:
+        if verbose:
+            print("[登录] 续期失败：" + str(exc))
+        return auth
+
+    auth.update({
+        "mc_access_token": info["mc_access_token"],
+        "mc_expires_at": info["mc_expires_at"],
+        "name": info["name"],
+        "uuid": info["uuid"],
+        "ms_access_token": refreshed.get("access_token"),
+        "ms_refresh_token": refreshed.get("refresh_token") or auth.get("ms_refresh_token"),
+        "ms_expires_at": _now() + int(refreshed.get("expires_in") or 3600),
+    })
+    auth_save(auth)
+    if verbose:
+        print("[登录] 续期成功，当前用户：" + str(auth.get("name")))
+    return auth
+
+
 def cmd_login(_args):
     client_id = resolve_client_id()
     if not client_id:
@@ -1077,81 +1195,23 @@ def cmd_login(_args):
         return
 
     ms_token = token_data["access_token"]
-    print("授权成功，正在换取 Xbox Live 令牌 ...")
+    print("授权成功，正在换取 Minecraft 令牌 ...")
 
-    # 第 1 步：微软令牌 -> Xbox Live 令牌
-    xbl, _d, ok = http_request(XBL_URL, {
-        "Properties": {
-            "AuthMethod": "RPS",
-            "SiteName": "user.auth.xboxlive.com",
-            "RpsTicket": "d=" + ms_token,
-        },
-        "RelyingParty": "http://auth.xboxlive.com",
-        "TokenType": "JWT",
-    }, headers=JSON_HEADERS)
-    if not ok:
-        print("[失败] Xbox Live 认证失败：" + str(xbl.get("Message") or xbl))
-        return
-    xbl_token = xbl.get("Token")
-    claims = (xbl.get("DisplayClaims") or {}).get("xui") or [{}]
-    uhs = claims[0].get("uhs")
-
-    # 第 2 步：Xbox Live -> XSTS
-    print("正在换取 XSTS 令牌 ...")
-    xsts, _d, ok = http_request(XSTS_URL, {
-        "Properties": {"SandboxId": "RETAIL", "UserTokens": [xbl_token]},
-        "RelyingParty": "rp://api.minecraftservices.com/",
-        "TokenType": "JWT",
-    }, headers=JSON_HEADERS)
-    if not ok:
-        xerr = xsts.get("XErr")
-        hints = {
-            2148916233: "这个微软账号还没有 Xbox 档案，先去 xbox.com 登录一次创建",
-            2148916235: "Xbox 在你所在地区不可用",
-            2148916236: "需要先在 xbox.com 完成成人与地区验证",
-            2148916237: "同上，需要完成成人与地区验证",
-            2148916238: "这是未成年人账号，需要家长加入 Microsoft 家庭组",
-        }
-        hint = hints.get(xerr, "")
-        print("[失败] XSTS 认证失败：" + str(xsts.get("Message") or xsts))
-        if hint:
-            print("        提示：" + hint)
-        return
-    xsts_token = xsts.get("Token")
-    claims = (xsts.get("DisplayClaims") or {}).get("xui") or [{}]
-    uhs = claims[0].get("uhs") or uhs
-
-    # 第 3 步：XSTS -> Minecraft 令牌
-    print("正在换取 Minecraft 令牌 ...")
-    mc, _d, ok = http_request(MC_LOGIN_URL, {
-        "identityToken": "XBL3.0 x=" + str(uhs) + ";" + str(xsts_token),
-    }, headers=JSON_HEADERS)
-    if not ok:
-        print("[失败] 换 Minecraft 令牌失败：" + str(mc.get("errorMessage") or mc))
-        return
-
-    mc_token = mc.get("access_token")
-    mc_expires = int(mc.get("expires_in") or 86400)
-
-    # 第 4 步：读玩家档案（uuid / 名字），顺便验证令牌真的能用
-    profile, _d, ok = http_request(
-        MC_PROFILE_URL,
-        headers={"Authorization": "Bearer " + str(mc_token), "Accept": "application/json"},
-    )
-    if not ok:
-        print("[失败] 读取玩家档案失败：" + str(profile.get("error") or profile))
-        print("       常见原因：这个账号没有购买 Minecraft（或 Game Pass 已过期）")
+    try:
+        info = mc_auth_from_ms(ms_token)
+    except RuntimeError as exc:
+        print("[失败] " + str(exc))
         return
 
     auth = {
-        "name": profile.get("name"),
-        "uuid": profile.get("id"),
+        "name": info["name"],
+        "uuid": info["uuid"],
         "client_id": client_id,
         "ms_refresh_token": token_data.get("refresh_token"),
         "ms_access_token": ms_token,
         "ms_expires_at": _now() + int(token_data.get("expires_in") or 3600),
-        "mc_access_token": mc_token,
-        "mc_expires_at": _now() + mc_expires,
+        "mc_access_token": info["mc_access_token"],
+        "mc_expires_at": info["mc_expires_at"],
     }
     auth_save(auth)
 
@@ -1159,7 +1219,7 @@ def cmd_login(_args):
     print("  用户名 : " + str(auth.get("name")))
     print("  UUID   : " + str(auth.get("uuid")))
     print("  凭据   : " + AUTH_FILE)
-    print("\n以后启动会自动带上这个账号；令牌过期会自动用 refresh token 续期。")
+    print("\n以后启动会自动带上这个账号；令牌过期会自动续期。")
 
 
 def cmd_status(_args):

@@ -15,6 +15,7 @@ mcroute_gui.py —— mcroute 的图形界面（tkinter，零依赖，不用装�
 import argparse
 import os
 import queue
+import re
 import sys
 import threading
 import tkinter as tk
@@ -136,13 +137,24 @@ class App:
         ttk.Separator(self.root, orient="horizontal").pack(fill="x")
         bottom = ttk.Frame(self.root, padding=(10, 6))
         bottom.pack(fill="both")
+
+        # ---- 进度条：下载时显示 x/y ----
+        prog_row = ttk.Frame(bottom)
+        prog_row.pack(fill="x", pady=(0, 4))
+        self.progress = ttk.Progressbar(prog_row, mode="determinate", maximum=100, value=0)
+        self.progress.pack(side="left", fill="x", expand=True)
+        self.progress_label = ttk.Label(prog_row, text="", width=22)
+        self.progress_label.pack(side="left", padx=(8, 0))
+
         ttk.Label(bottom, text="日志").pack(anchor="w")
-        self.log_box = tk.Text(bottom, height=11, wrap="word")
+        self.log_box = tk.Text(bottom, height=9, wrap="word")
         self.log_box.pack(fill="both", expand=True, pady=(4, 0))
 
     # ------------------------------------------------------------------ 日志
     def log(self, text):
         self.q.put(text)
+
+    PROGRESS_RE = re.compile(r"进度\s+(\d+)/(\d+)")
 
     def _poll(self):
         while True:
@@ -152,7 +164,24 @@ class App:
                 break
             self.log_box.insert("end", line + "\n")
             self.log_box.see("end")
+            self._update_progress(line)
         self.root.after(120, self._poll)
+
+    def _update_progress(self, line):
+        """从日志里认出「进度 200/3982」这样的行，同步到进度条"""
+        match = self.PROGRESS_RE.search(line)
+        if not match:
+            return
+        done = int(match.group(1))
+        total = max(int(match.group(2)), 1)
+        self.progress.configure(maximum=total, value=done)
+        self.progress_label.config(
+            text="{}/{}   {}%".format(done, total, int(done * 100 / total))
+        )
+
+    def _reset_progress(self):
+        self.progress.configure(maximum=100, value=0)
+        self.progress_label.config(text="")
 
     # ------------------------------------------------------------------ 状态
     def refresh_local(self):
@@ -214,6 +243,7 @@ class App:
             workers=16,
             no_assets=bool(self.skip_assets.get()),
         )
+        self._reset_progress()
         self.log("开始下载 {} ...".format(ver))
         self._run(mcroute.cmd_fetch, ns, done=self.refresh_local)
 
