@@ -16,34 +16,17 @@
 
 ## 下载与安装
 
-**方式一：安装包（推荐，不需要 Python）**
+**方式一：直接下载（推荐）**
 
 | 下载 | 大小 | 说明 |
 |---|---|---|
-| **[mcroute-setup.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-setup.exe)** | 13.3 MB | 安装包，双击安装 |
-| **[mcroute-portable.zip](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-portable.zip)** | 13.3 MB | 免安装，解压后双击 `start-mcroute.vbs` |
+| **[mcroute.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute.exe)** | **72 KB** | **C# 版，双击即用**：零依赖（Win10/11 自带 .NET Framework 4.8）、不需要安装、不写注册表 |
+| [mcroute-setup.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-setup.exe) | 13.3 MB | Python 版安装包（功能最全，含正版登录命令） |
+| [mcroute-portable.zip](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-portable.zip) | 13.3 MB | Python 版免安装（解压后双击 `start-mcroute.vbs`） |
 
-（以上是"永远指向最新版"的直链，不需要进 Releases 页面找）
-
-双击安装即可：
-
-- 安装位置：默认 `%LOCALAPPDATA%\mcroute`；**安装时可以选择自定义目录**（弹窗里选「否」）
-  （两种方式都不需要管理员权限）
-- 自动创建开始菜单和桌面快捷方式
-- 「设置 → 应用」里可以正常卸载
-- 建议**先把它拷到纯英文路径**（如 `D:\`）再运行
-
-> 安装包只有 13 MB，**不含任何游戏文件**——游戏文件在首次下载时从官方源获取。
-
-**三种安装方式怎么选：**
-
-| | exe 安装器 | MSI |
-|---|---|---|
-| 需要管理员 | 否 | 否（per-user） |
-| 安装目录 | 默认 `%LOCALAPPDATA%\mcroute`，**可自选** | 固定 per-user |
-| 批量部署 | 一般 | ✅ 静默参数成熟（`/qn`） |
-| 卸载 | 自带 `uninstall.bat` | 系统标准（设置 → 应用） |
-| 数据位置 | 同安装目录 | 同左 |
+> **C# 版和 Python 版的关系**：两者功能基本对等（6 种加载器 + 3 种整合包 + 体检/测试/启动器生成）。
+> C# 版 72 KB、秒开、不被杀软误报；Python 版多一个 `login` 正版登录命令，并且是「参考实现」，
+> 逻辑注释更全。数据目录都兼容（`versions/<名字>/` 标准布局）。
 
 **方式二：源码运行**
 
@@ -206,7 +189,7 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ## 图形界面
 
-双击 `run_gui.bat`（或 `python mcroute_gui.py`），四个标签页：
+源码运行（或 Python 版安装包）时是 tkinter 的四页界面：
 
 ![启动页](docs/gui-tabs.png)
 
@@ -222,7 +205,7 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 界面和命令行调的是**同一批函数**（`cmd_fetch` / `cmd_loader` / `cmd_install` / `cmd_launch`），
 所以两边行为永远一致，不会出现"GUI 能用 CLI 不能"这种偏差。
 
-## 打包成 exe（不装 Python 也能跑）
+## 打包成 exe（Python 版的打包方式）
 
 ```bat
 build_exe.bat
