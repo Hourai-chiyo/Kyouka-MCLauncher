@@ -24,6 +24,7 @@ namespace Mcroute
                     case "fetch": return Commands.Fetch(args);
                     case "build": return Commands.Build(args);
                     case "launch": return Commands.Launch(args);
+                    case "loader": return Loader.Run(args);
                     case "help":
                     case "--help":
                     case "-h": Guide(); return 0;
@@ -49,6 +50,7 @@ namespace Mcroute
             Console.WriteLine("  mcroute fetch <版本> [--no-assets]  下载完整闭包");
             Console.WriteLine("  mcroute build <版本>                只拼参数、检查缺什么");
             Console.WriteLine("  mcroute launch <版本> [--wait]      启动游戏");
+            Console.WriteLine("  mcroute loader <fabric|quilt|legacyfabric|forge|neoforge> <版本>  安装加载器");
             Console.WriteLine();
             Console.WriteLine("公共参数：--dir <数据目录>  --java <java.exe>  --game-dir <游戏目录>");
             Console.WriteLine();
