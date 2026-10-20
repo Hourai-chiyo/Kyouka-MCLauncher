@@ -112,7 +112,7 @@ mcroute/
 ├── docs/
 │   ├── 路由表-v1.md          下载源分级、实测数据、兜底顺序
 │   ├── 下载源实测报告.md      BMCLAPI 故障定位与各源测速原始数据
-│   └── screenshot.png
+│   └── gui-tabs.png          界面截图
 └── mcdata/             数据目录（不入版本库）
     ├── versions/       版本 JSON + client.jar
     ├── libraries/      库文件
