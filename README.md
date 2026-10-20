@@ -156,6 +156,10 @@ python mcroute.py launch 1.20.1-forge-47.2.0
 - **安装器的处理器依赖会从 `maven.neoforged.net` 下载**，该域名在国内被 DNS 污染，必须先本地备好，否则安装器中途失败、只留下不完整的 json
 - **库地址改写**：`maven.neoforged.net/...` → `neoforged.forgecdn.net/...`（路径完全一致）
 
+## 路线图
+
+下一步计划（Fabric / Quilt / Legacy Fabric、Java 检测与管理、整合包安装、明确不做的平台）见 [ROADMAP.md](ROADMAP.md)。
+
 ## 已知限制
 
 - 令牌不会自动续期（需通过审核的 client_id 才能验证续期链路）
