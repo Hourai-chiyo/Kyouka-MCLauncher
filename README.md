@@ -47,6 +47,7 @@
 python mcroute.py                    # 查看全部用法
 python mcroute.py fetch 1.21.1       # 下载完整闭包（client + 库 + assets，约 800MB）
 python mcroute.py launch 1.21.1      # 启动
+python mcroute.py loader neoforge 21.1.264   # 一条命令装好 NeoForge
 python mcroute.py sources            # 所有下载源测速
 python mcroute.py wiki 1.12.2        # 用 Wiki 索引兜底查版本
 ```
@@ -127,13 +128,20 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ## 加载器支持（NeoForge）
 
-NeoForge 不做手工拼装，而是**用官方安装器生成实例**，再由本工具合并启动：
+一条命令完成：
 
-1. 下载官方 installer（`neoforged.forgecdn.net` 上路径与官方 maven 完全一致）
-2. 用一个最小的 `launcher_profiles.json` 让它认为目录是合法的启动器目录
-3. 运行 `java -jar neoforge-<版本>-installer.jar --installClient mcdata`
-   —— 它会生成 `versions/neoforge-<版本>/neoforge-<版本>.json`（带 `inheritsFrom`）和补丁后的客户端 jar
-4. `python mcroute.py fetch neoforge-<版本>` 补齐依赖，`python mcroute.py launch neoforge-<版本>` 启动
+```bash
+python mcroute.py loader neoforge 21.1.264
+python mcroute.py fetch  neoforge-21.1.264
+python mcroute.py launch neoforge-21.1.264
+```
+
+`loader` 内部做的事（自己实现也很容易，但顺序不能错）：
+
+1. 从 `neoforged.forgecdn.net` 下载官方 installer（路径与官方 maven 完全一致）
+2. **预下载 installer 的处理器依赖**——它自己会去连 `maven.neoforged.net`，该域名在国内被 DNS 污染，失败后只会留下一个"看起来完整、其实缺游戏 jar"的 json
+3. 放一个最小的 `launcher_profiles.json`，让 installer 认这个目录
+4. 运行 installer，生成 `versions/neoforge-<版本>/`（带 `inheritsFrom` 的 json + 补丁后的客户端 jar）
 
 三个必须知道的前提（都已在本项目中处理）：
 

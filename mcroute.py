@@ -1306,6 +1306,149 @@ def cmd_login(_args):
     print("\n以后启动会自动带上这个账号；令牌过期会自动续期。")
 
 
+# ---------------------------------------------------------------------------
+# 子命令 8: loader —— 自动安装加载器（目前支持 NeoForge）
+# ---------------------------------------------------------------------------
+# NeoForge 官方 CDN，路径与官方 maven 完全一致（官方域名在国内被 DNS 污染）
+NEOFORGE_INSTALLER = ("https://neoforged.forgecdn.net/releases/net/neoforged/"
+                      "neoforge/{ver}/neoforge-{ver}-installer.jar")
+
+
+def find_java_anywhere(base, major=None):
+    """在 mcdata 和 Modrinth App 的 java 目录里找 java.exe"""
+    candidates = []
+    for root in (
+        os.path.join(base, "java_versions"),
+        os.path.join(os.environ.get("APPDATA", ""), "ModrinthApp", "meta", "java_versions"),
+    ):
+        if not os.path.isdir(root):
+            continue
+        for name in sorted(os.listdir(root)):
+            exe = os.path.join(root, name, "bin", "java.exe")
+            if os.path.isfile(exe):
+                candidates.append(exe)
+
+    if major is not None:
+        for exe in candidates:
+            if ("jre%d" % major) in exe or ("jdk%d" % major) in exe:
+                return exe
+    return candidates[0] if candidates else "java"
+
+
+def cmd_loader(args):
+    """
+    安装加载器。目前只支持 NeoForge。
+
+    为什么不能简单地拼参数启动：NeoForge 需要「补丁后的客户端 jar」，
+    那个文件只有官方 installer 能生成。所以流程是：
+        下载 installer -> 预下载它的处理器依赖 -> 跑 installer -> 得到可用实例
+    其中「预下载依赖」这一步是必须的：installer 自己会去连
+    maven.neoforged.net（国内被 DNS 污染），失败后只会留下一个不完整的 json。
+    """
+    import zipfile
+
+    kind = (args.kind or "").lower()
+    ver = args.version
+    base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
+
+    if kind != "neoforge":
+        print("[错误] 目前只支持 neoforge")
+        return
+
+    os.makedirs(base, exist_ok=True)
+    tmp_dir = os.path.join(base, "_tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+
+    java = args.java or find_java_anywhere(base, 21)
+    print("加载器  : NeoForge " + ver)
+    print("数据目录: " + base)
+    print("Java    : " + java)
+
+    # ---- 1) 下载 installer ----
+    installer = os.path.join(tmp_dir, "neoforge-installer.jar")
+    url = NEOFORGE_INSTALLER.format(ver=ver)
+    print("\n[1/4] 下载 installer ...")
+    try:
+        data, dt = fetch_bytes(url, timeout=180)
+    except Exception as exc:
+        print("      失败：" + str(exc))
+        return
+    with open(installer, "wb") as f:
+        f.write(data)
+    print("      OK，%.1f MB，%.1fs" % (len(data) / 1024 / 1024, dt))
+
+    # ---- 2) 预下载 installer 的处理器依赖（必须走 forgecdn）----
+    print("[2/4] 预下载 installer 处理器依赖 ...")
+    with zipfile.ZipFile(installer) as zf:
+        profile = json.loads(zf.read("install_profile.json").decode("utf-8"))
+
+    libs = profile.get("libraries") or []
+    ok = skip = fail = 0
+    for lib in libs:
+        artifact = (lib.get("downloads") or {}).get("artifact") or {}
+        rel = artifact.get("path")
+        raw_url = artifact.get("url")
+        sha1 = artifact.get("sha1")
+        if not rel or not raw_url:
+            continue
+        dest = os.path.join(base, "libraries", rel.replace("/", os.sep))
+        status, _path, info = download_one((raw_url, dest, sha1))
+        if status == "ok":
+            ok += 1
+        elif status == "skip":
+            skip += 1
+        else:
+            fail += 1
+            print("      失败：" + os.path.basename(dest) + " -> " + str(info))
+    print("      新下载 %d，已存在 %d，失败 %d" % (ok, skip, fail))
+    if fail:
+        print("      有依赖没下全，安装可能失败（可重跑本命令续传）")
+
+    # ---- 3) 让 installer 认这个目录（缺 launcher_profiles.json 它会拒绝）----
+    profiles_path = os.path.join(base, "launcher_profiles.json")
+    if not os.path.isfile(profiles_path):
+        with open(profiles_path, "w", encoding="utf-8") as f:
+            json.dump({"profiles": {}, "settings": {}, "version": 3}, f)
+        print("      已创建 launcher_profiles.json")
+
+    # ---- 4) 运行安装器 ----
+    print("[3/4] 运行 installer（可能要一两分钟）...")
+    import subprocess
+    try:
+        proc = subprocess.run(
+            [java, "-jar", installer, "--installClient", base],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
+        )
+    except Exception as exc:
+        print("      启动 installer 失败：" + str(exc))
+        return
+
+    tail = (proc.stdout or "")[-500:] + (proc.stderr or "")[-500:]
+    if proc.returncode != 0:
+        print("      installer 退出码 " + str(proc.returncode))
+        for line in tail.splitlines()[-8:]:
+            print("      | " + line)
+        return
+    print("      installer 完成")
+
+    # ---- 5) 检查产物 ----
+    print("[4/4] 检查产物 ...")
+    vdir = os.path.join(base, "versions", "neoforge-" + ver)
+    vjson = os.path.join(vdir, "neoforge-" + ver + ".json")
+    vjar = os.path.join(vdir, "neoforge-" + ver + ".jar")
+    if os.path.isfile(vjson) and os.path.isfile(vjar):
+        print("      OK：%s 和 补丁客户端 jar 都在" % os.path.basename(vjson))
+        print("\n下一步：")
+        print("  python mcroute.py fetch neoforge-%s --no-assets" % ver)
+        print("  python mcroute.py launch neoforge-%s" % ver)
+    else:
+        print("      [警告] 缺少产物：")
+        if not os.path.isfile(vjson):
+            print("        没有版本 json")
+        if not os.path.isfile(vjar):
+            print("        没有补丁客户端 jar（安装没跑完）")
+
+
 def cmd_status(_args):
     auth = auth_load()
     if not auth:
@@ -1340,6 +1483,7 @@ def print_guide():
     print("  fetch     python mcroute.py fetch 1.21.1        # 下载完整闭包（sha1 校验、可续传）")
     print("  build     python mcroute.py build 1.21.1        # 只拼启动命令，不执行")
     print("  launch    python mcroute.py launch 1.21.1       # 真正启动游戏")
+    print("  loader    python mcroute.py loader neoforge 21.1.264  # 一条命令装好 NeoForge")
     print()
     print("  [账号]")
     print("  login     python mcroute.py login               # 登录微软账号（需 client_id）")
@@ -1414,6 +1558,13 @@ def main():
 
     p10 = sub.add_parser("logout", help="退出登录，删除本地凭据")
     p10.set_defaults(func=cmd_logout)
+
+    p11 = sub.add_parser("loader", help="自动安装加载器（目前支持 neoforge）")
+    p11.add_argument("kind", help="加载器类型：neoforge")
+    p11.add_argument("version", help="加载器版本，例如 21.1.264")
+    p11.add_argument("--dir", help="数据目录，默认 mcdata/")
+    p11.add_argument("--java", help="指定 java.exe（安装器需要 Java 21+）")
+    p11.set_defaults(func=cmd_loader)
 
     args = parser.parse_args()
 
