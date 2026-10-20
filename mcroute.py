@@ -503,11 +503,13 @@ def merge_version(parent, child):
 
     for key, value in child.items():
         if key == "libraries":
+            # 键带上“是否有 natives”，理由同 plan_launch 里的注释：
+            # 同一库可能一条是普通 jar、一条只提供 natives，两条都要留。
             libs = {}
             for lib in parent.get("libraries") or []:
-                libs[lib.get("name", "")] = lib
+                libs[(lib.get("name", ""), bool(lib.get("natives")))] = lib
             for lib in value:
-                libs[lib.get("name", "")] = lib
+                libs[(lib.get("name", ""), bool(lib.get("natives")))] = lib
             merged["libraries"] = list(libs.values())
 
         elif key == "arguments":
@@ -581,12 +583,15 @@ def plan_launch(args):
     # 1) 先按 name 去重：同名库「后出现的覆盖先出现的」（官方启动器同语义）
     #    Fabric/Forge 的 json 常同时带旧的 lwjgl 3.2.1 和新的 3.2.2，
     #    不去重就会把旧的也算进 classpath，然后误报“文件缺失”。
-    libs_by_name = {}
+    # 去重键带上“是否有 natives”：同一个库可能在 json 里出现两次，
+    # 一条是普通 jar（要进 classpath），一条只提供 natives 分类器。
+    # 只用 name 做键会把前者顶掉，导致 Narrator 这类类找不到。
+    libs_by_key = {}
     for lib in vj.get("libraries", []):
-        libs_by_name[lib.get("name", "")] = lib
+        libs_by_key[(lib.get("name", ""), bool(lib.get("natives")))] = lib
 
     # 2) 再过滤 + 拼 classpath
-    for lib in libs_by_name.values():
+    for lib in libs_by_key.values():
         if not rules_allow(lib):
             skipped += 1
             continue
@@ -804,6 +809,39 @@ def cmd_build(args):
     print_plan(info)
 
 
+def extract_natives(jars, target_dir):
+    """
+    把老版本（1.19 之前）的 natives jar 解压到 java.library.path 指向的目录。
+
+    1.19+ 的 natives 是直接放在 classpath 上的（LWJGL 自己从 jar 里加载），
+    而 1.12.2 / 1.7.10 这些老版本必须把 .dll 解压出来，否则启动会报
+    UnsatisfiedLinkError: no lwjgl in java.library.path。
+    """
+    import zipfile
+
+    os.makedirs(target_dir, exist_ok=True)
+    extracted = 0
+
+    for jar in jars:
+        if not os.path.isfile(jar):
+            continue
+        try:
+            with zipfile.ZipFile(jar) as zf:
+                for name in zf.namelist():
+                    if name.endswith("/") or name.upper().startswith("META-INF/"):
+                        continue
+                    target = os.path.join(target_dir, os.path.basename(name))
+                    if os.path.isfile(target):
+                        continue
+                    with zf.open(name) as src, open(target, "wb") as dst:
+                        dst.write(src.read())
+                    extracted += 1
+        except Exception as exc:
+            print("[警告] 解压 natives 失败：" + os.path.basename(jar) + " -> " + str(exc))
+
+    return extracted
+
+
 def cmd_launch(args):
     """
     真正启动游戏。
@@ -830,6 +868,12 @@ def cmd_launch(args):
     # 游戏目录和 natives 目录先建好，否则游戏会报错
     os.makedirs(info["game_dir"], exist_ok=True)
     os.makedirs(info["natives_dir"], exist_ok=True)
+
+    # 老版本的 natives 要解压出来
+    if info.get("natives_jars"):
+        count = extract_natives(info["natives_jars"], info["natives_dir"])
+        if count:
+            print("[启动] 已解压 %d 个 natives 文件" % count)
 
     print(f"\n[启动] 版本     : {info['version']}")
     print(f"[启动] 工作目录 : {info['game_dir']}")
@@ -964,7 +1008,7 @@ def cmd_fetch(args):
     # ---- 3. 库（同名去重 + 规则过滤 + 老版本 natives） ----
     libs = {}
     for lib in vj.get("libraries", []):
-        libs[lib.get("name", "")] = lib
+        libs[(lib.get("name", ""), bool(lib.get("natives")))] = lib
 
     for lib in libs.values():
         if not rules_allow(lib):
@@ -1490,15 +1534,25 @@ def installer_url(kind, ver):
     return None
 
 
-FABRIC_META = "https://meta.fabricmc.net/v2"
+# 加载器 meta：base URL + profile id 前缀（id 一般由 meta 直接给，这里只作兜底）
+LOADER_META = {
+    "fabric": ("https://meta.fabricmc.net/v2", "fabric-loader"),
+    "quilt": ("https://meta.quiltmc.org/v3", "quilt-loader"),
+    "legacyfabric": ("https://meta.legacyfabric.net/v2", "fabric-loader"),
+}
 
 
-def resolve_fabric_loader(mc, loader=None):
+def normalize_loader_kind(kind):
+    """把 legacy-fabric / legacy_fabric / LegacyFabric 统一成 legacyfabric"""
+    return (kind or "").lower().replace("-", "").replace("_", "").replace(" ", "")
+
+
+def resolve_loader_version(meta_base, mc, loader=None):
     """没指定 loader 版本时，从 meta 里挑最新的 stable 版本"""
     if loader:
         return loader
     try:
-        data, _dt, _n = fetch_json(FABRIC_META + "/versions/loader/" + mc)
+        data, _dt, _n = fetch_json(meta_base + "/versions/loader/" + mc)
     except Exception:
         return None
     for item in data:
@@ -1510,27 +1564,30 @@ def resolve_fabric_loader(mc, loader=None):
     return None
 
 
-def install_fabric(base, ver, kind="fabric"):
+def install_meta_loader(base, kind, ver):
     """
-    Fabric / Quilt 没有安装器：加载器官方 meta 直接给一份现成的 version json
-    （自带 inheritsFrom），写进 versions/ 就能用现有的 fetch/launch 跑。
+    Fabric / Quilt / Legacy Fabric 没有安装器：
+    加载器官方 meta 直接给一份现成的 version json（自带 inheritsFrom），
+    写进 versions/ 就能用现有的 fetch/launch 跑。
 
     版本写法：
-        fabric 1.20.1                -> 自动挑最新 stable loader
-        fabric 1.20.1-0.19.5         -> 指定 loader 版本
+        fabric 1.20.1              -> 自动挑最新 stable loader
+        fabric 1.20.1-0.19.5       -> 指定 loader 版本
     """
+    meta_base, id_prefix = LOADER_META[kind]
+
     if "-" in ver:
         mc, _sep, loader = ver.partition("-")
     else:
         mc, loader = ver, None
 
-    loader = resolve_fabric_loader(mc, loader)
+    loader = resolve_loader_version(meta_base, mc, loader)
     if not loader:
         print("[错误] 找不到 " + mc + " 可用的加载器版本")
         return
 
-    print("      MC 版本: %s   加载器: %s" % (mc, loader))
-    url = "%s/versions/loader/%s/%s/profile/json" % (FABRIC_META, mc, loader)
+    print("      MC 版本: %s   加载器: %s %s" % (mc, kind, loader))
+    url = "%s/versions/loader/%s/%s/profile/json" % (meta_base, mc, loader)
     print("      " + url)
 
     try:
@@ -1539,7 +1596,7 @@ def install_fabric(base, ver, kind="fabric"):
         print("      拉取 profile 失败：" + str(exc))
         return
 
-    pkg_id = profile.get("id") or ("%s-loader-%s-%s" % (kind, loader, mc))
+    pkg_id = profile.get("id") or ("%s-%s-%s" % (id_prefix, loader, mc))
     vdir = os.path.join(base, "versions", pkg_id)
     os.makedirs(vdir, exist_ok=True)
     vjson = os.path.join(vdir, pkg_id + ".json")
@@ -1569,21 +1626,21 @@ def cmd_loader(args):
     """
     import zipfile
 
-    kind = (args.kind or "").lower()
+    kind = normalize_loader_kind(args.kind)
     ver = args.version
     base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
 
-    if kind not in ("neoforge", "forge", "fabric"):
-        print("[错误] 目前支持 neoforge / forge / fabric")
+    if kind not in ("neoforge", "forge") and kind not in LOADER_META:
+        print("[错误] 目前支持 " + " / ".join(["neoforge", "forge"] + list(LOADER_META)))
         return
 
     os.makedirs(base, exist_ok=True)
 
-    # Fabric 没有安装器，走 meta 合成，单独一条分支
-    if kind == "fabric":
-        print("加载器  : fabric " + ver)
+    # Fabric / Quilt / Legacy Fabric 没有安装器，走 meta 合成
+    if kind in LOADER_META:
+        print("加载器  : %s %s" % (kind, ver))
         print("数据目录: " + base)
-        install_fabric(base, ver)
+        install_meta_loader(base, kind, ver)
         return
 
     url = installer_url(kind, ver)
@@ -1758,7 +1815,7 @@ def print_guide():
     print("  fetch     python mcroute.py fetch 1.21.1        # 下载完整闭包（sha1 校验、可续传）")
     print("  build     python mcroute.py build 1.21.1        # 只拼启动命令，不执行")
     print("  launch    python mcroute.py launch 1.21.1       # 真正启动游戏")
-    print("  loader    python mcroute.py loader fabric 1.20.1     # 装加载器：fabric / forge / neoforge")
+    print("  loader    python mcroute.py loader fabric 1.20.1     # 装加载器：fabric / quilt / legacyfabric / forge / neoforge")
     print()
     print("  [账号]")
     print("  login     python mcroute.py login               # 登录微软账号（需 client_id）")
@@ -1835,7 +1892,7 @@ def main():
     p10.set_defaults(func=cmd_logout)
 
     p11 = sub.add_parser("loader", help="自动安装加载器（fabric / forge / neoforge）")
-    p11.add_argument("kind", help="加载器类型：fabric / forge / neoforge")
+    p11.add_argument("kind", help="加载器类型：fabric / quilt / legacyfabric / forge / neoforge")
     p11.add_argument("version", help="fabric: 1.20.1 或 1.20.1-0.19.5；forge: 1.20.1-47.2.0；neoforge: 21.1.264")
     p11.add_argument("--dir", help="数据目录，默认 mcdata/")
     p11.add_argument("--java", help="指定 java.exe（安装器需要 Java 21+）")
