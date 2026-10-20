@@ -39,8 +39,7 @@
 
     <Feature Id="Main" Title="mcroute" Level="1">
       <ComponentGroupRef Id="AppFiles" />
-      <ComponentRef Id="StartMenuShortcut" />
-      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="Shortcuts" />
     </Feature>
 
     <!-- 程序文件：整个 dist\mcroute 目录 -->
@@ -48,26 +47,26 @@
       <Files Include="$(sys.SOURCEFILEDIR)..\dist\mcroute\**" />
     </ComponentGroup>
 
-    <!-- 开始菜单快捷方式 -->
-    <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder" Guid="A1B2C3D4-1111-4A2B-9C3D-000000000001">
+    <!-- 快捷方式：必须有一个真实文件当 KeyPath，MSI 卸载时才会一并清理 -->
+    <Component Id="Shortcuts" Directory="INSTALLFOLDER" Guid="A1B2C3D4-3333-4A2B-9C3D-000000000003">
+      <File Id="ShortcutAnchor"
+            Source="$(sys.SOURCEFILEDIR)..\packaging\shortcuts-anchor.txt"
+            Name="shortcuts.txt"
+            KeyPath="yes" />
       <Shortcut Id="StartMenuLnk"
+                Directory="ProgramMenuFolder"
                 Name="mcroute"
                 Description="Minecraft Java 启动器"
                 Target="[SystemFolder]wscript.exe"
                 Arguments="&quot;[INSTALLFOLDER]start-mcroute.vbs&quot;"
                 WorkingDirectory="INSTALLFOLDER" />
-      <RegistryValue Root="HKCU" Key="Software\mcroute" Name="startmenu" Type="integer" Value="1" KeyPath="yes" />
-    </Component>
-
-    <!-- 桌面快捷方式 -->
-    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="A1B2C3D4-2222-4A2B-9C3D-000000000002">
       <Shortcut Id="DesktopLnk"
+                Directory="DesktopFolder"
                 Name="mcroute"
                 Description="Minecraft Java 启动器"
                 Target="[SystemFolder]wscript.exe"
                 Arguments="&quot;[INSTALLFOLDER]start-mcroute.vbs&quot;"
                 WorkingDirectory="INSTALLFOLDER" />
-      <RegistryValue Root="HKCU" Key="Software\mcroute" Name="desktop" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
   </Package>

@@ -257,7 +257,9 @@ build_msi.bat
 
 | 项目 | 结果 |
 |---|---|
-| 静默安装 | `msiexec /i mcroute.msi /qn` → 退出码 0，992 个文件 / 29.7 MB |
+| 静默安装 | `msiexec /i mcroute.msi /qn` → 退出码 0，991 个文件 / 29.7 MB |
+| **自定义目录** | `msiexec /i mcroute.msi /qn INSTALLFOLDER="D:\mcroute"` → 实测装到 D 盘 |
+| 卸载清理 | 目录 / 桌面 / 开始菜单 / 卸载项 **全部清除**（快捷方式组件挂了一个文件当 KeyPath，否则 MSI 不肯删） |
 | 快捷方式 | 开始菜单 + 桌面，指向 `wscript.exe "...\start-mcroute.vbs"` |
 | 卸载项 | 控制面板可见「mcroute 0.1.0」 |
 | 启动 | 通过快捷方式正常拉起 GUI |
