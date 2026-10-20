@@ -25,3 +25,7 @@ launch-*.txt
 # 抓取的进程命令行（含令牌，绝不入库）
 _*_cmd.txt
 _tmp/
+
+# 一次性补丁脚本与备份
+_patch_*.py
+*.bak
