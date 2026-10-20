@@ -1,0 +1,20 @@
+# 数据目录：体积大（约 900MB）且包含本机凭据，绝不入库
+mcdata/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+
+# 日志与临时文件
+*.log
+gui-*.png
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 系统
+Thumbs.db
+desktop.ini
+.DS_Store
