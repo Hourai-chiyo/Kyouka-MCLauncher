@@ -72,3 +72,6 @@ _internal/
 *.exe
 *.spec
 gui_*.log
+csharp/bin/
+csharp/obj/
+csharp/out/
