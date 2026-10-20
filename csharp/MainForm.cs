@@ -52,6 +52,7 @@ namespace Mcroute
             _tabs = new TabControl { Dock = DockStyle.Fill };
             _tabs.TabPages.Add(BuildLaunchTab());
             _tabs.TabPages.Add(BuildLoaderTab());
+            _tabs.TabPages.Add(BuildPackTab());
             _tabs.TabPages.Add(BuildManageTab());
             Controls.Add(_tabs);
 
@@ -145,6 +146,39 @@ namespace Mcroute
             });
 
             page.Controls.AddRange(new Control[] { _loaderKind, _loaderVer, install });
+            return page;
+        }
+
+        private TabPage BuildPackTab()
+        {
+            var page = new TabPage("  整合包  ");
+            page.Controls.Add(new Label
+            {
+                Text = "支持 Modrinth .mrpack / MultiMC·Prism 实例包 / CurseForge zip（自动识别）",
+                Location = new Point(14, 14),
+                AutoSize = true,
+                ForeColor = Color.DimGray,
+            });
+            page.Controls.Add(new Label { Text = "包文件", Location = new Point(14, 52), AutoSize = true });
+            var path = new TextBox { Location = new Point(90, 48), Width = 660 };
+            var browse = new Button { Text = "浏览...", Location = new Point(760, 46), Size = new Size(90, 28) };
+            browse.Click += (s2, e2) =>
+            {
+                using (var dlg = new OpenFileDialog())
+                {
+                    dlg.Filter = "整合包|*.mrpack;*.zip|所有文件|*.*";
+                    if (dlg.ShowDialog() == DialogResult.OK) path.Text = dlg.FileName;
+                }
+            };
+            var install = new Button { Text = "安装这个整合包", Location = new Point(90, 88), Size = new Size(140, 32) };
+            install.Click += (s2, e2) =>
+            {
+                if (path.Text.Trim().Length == 0) { MessageBox.Show("先选一个整合包文件", "提示"); return; }
+                string file = path.Text.Trim();
+                RunInBackground("安装 " + System.IO.Path.GetFileName(file),
+                    () => Packs.Install(new[] { "install", file, "--dir", _baseDir }));
+            };
+            page.Controls.AddRange(new Control[] { path, browse, install });
             return page;
         }
 

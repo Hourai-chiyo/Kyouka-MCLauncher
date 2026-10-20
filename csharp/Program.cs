@@ -50,6 +50,7 @@ namespace Mcroute
                     case "verify": return ExtraCommands.Verify(args);
                     case "test": return ExtraCommands.Test(args);
                     case "mkbat": return ExtraCommands.Mkbat(args);
+                    case "install": return Packs.Install(args);
                     case "help":
                     case "--help":
                     case "-h": Guide(); return 0;
@@ -79,6 +80,7 @@ namespace Mcroute
             Console.WriteLine("  mcroute verify <版本> [--fix]       体检 / 补全");
             Console.WriteLine("  mcroute test <版本> [--timeout 90]  测试启动");
             Console.WriteLine("  mcroute mkbat <版本>                生成双击启动器 launch.bat");
+            Console.WriteLine("  mcroute install <整合包>            装 mrpack / MultiMC / CurseForge 包");
             Console.WriteLine();
             Console.WriteLine("公共参数：--dir <数据目录>  --java <java.exe>  --game-dir <游戏目录>");
             Console.WriteLine();
