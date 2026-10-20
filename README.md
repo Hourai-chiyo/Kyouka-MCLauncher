@@ -171,6 +171,33 @@ build_exe.bat
 > 所以改成 `--console` 打包 + 用 vbs 把控制台窗口隐藏，效果一样但稳定得多。
 > 直接双击 `mcroute.exe` 也能用，只是会多一个黑色控制台窗口（还能顺便看日志）。
 
+## 安装包（mcroute-setup.exe）
+
+```bat
+build_installer.bat
+```
+
+产物：`dist\mcroute-setup.exe`（约 13 MB，**单文件**）
+
+| 特性 | 说明 |
+|---|---|
+| 安装位置 | `%LOCALAPPDATA%\mcroute`（**不需要管理员权限**） |
+| 快捷方式 | 开始菜单 + 桌面 |
+| 卸载 | 设置 → 应用 里能看到「mcroute (Minecraft 启动器)」，或运行安装目录下的 `uninstall.bat` |
+| 静默安装 | `mcroute-setup.exe /S`（不弹任何窗口，适合脚本部署） |
+
+工作原理：把整个程序目录压成 `payload.zip` 嵌进一个 C# 小程序里，运行时解压到安装目录、
+创建快捷方式、写卸载注册项，最后启动。用的编译器是 Windows 自带的
+`C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe`，**不需要装任何工具链**。
+
+> **为什么不用 IExpress**：这台机器（Win11 26100）上 IExpress 打包**一律失败**，
+> 连最小用例（两个小文件 + 10 行 SED）都返回退出码 1 且不给任何原因。
+> 试过换 ASCII 路径、改 CRLF 换行、换目标目录，都不行。所以改用 csc 方案——
+> 而且它比 IExpress 更好控制：能自定义 UI、能静默、能写注册表、体积还更小。
+>
+> **已知注意点**：从**纯英文路径**运行安装器最稳（`C:\...\mcroute-setup.exe`）。
+> 放在中文路径下运行可能失败（IExpress 时代就有的老问题，这台机器上复现过）。
+
 ## 加载器支持（NeoForge / Forge / Fabric / Quilt / Legacy Fabric）
 
 一条命令完成：
