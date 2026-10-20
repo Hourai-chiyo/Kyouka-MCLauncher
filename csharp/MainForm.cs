@@ -13,7 +13,7 @@ namespace Mcroute
     /// <summary>C# 版 GUI（WinForms，.NET Framework 4.8 自带，不需要任何依赖）。</summary>
     public class MainForm : Form
     {
-        private readonly string _baseDir;
+        private string _baseDir;
         private TabControl _tabs;
         private ListBox _versionList;
         private ListBox _manageList;
@@ -24,41 +24,50 @@ namespace Mcroute
         private TextBox _loaderVer;
         private TextBox _log;
         private Label _status;
+        private TextBox _dataDirBox;
         private readonly List<Tuple<string, int>> _javas = new List<Tuple<string, int>>();
 
         public MainForm()
         {
-            // 文档截图时可以指定数据目录（MCROUTE_DATA），平时走默认逻辑
-            _baseDir = Version.BaseDir(Environment.GetEnvironmentVariable("MCROUTE_DATA"));
+            // 文档截图时可以指定数据目录（MCROUTE_DATA），平时走配置 + 默认逻辑
+            string fromEnv = Environment.GetEnvironmentVariable("MCROUTE_DATA");
+            _baseDir = Version.BaseDir(string.IsNullOrEmpty(fromEnv) ? Config.LoadDataDir() : fromEnv);
+
             Text = "mcroute — Minecraft 启动器（C# 版）";
-            ClientSize = new Size(940, 640);
-            MinimumSize = new Size(820, 560);
+            ClientSize = new Size(980, 690);
+            MinimumSize = new Size(780, 540);
             StartPosition = FormStartPosition.CenterScreen;
+            Font = new Font("Microsoft YaHei UI", 9f);
 
             BuildUi();
-            RefreshVersions();
-            RefreshJava();
-
+            RefreshAll();
             AppendLog("数据目录：" + _baseDir);
         }
 
-        // ---------------- UI ----------------
+        // ---------------- 布局（全部 Dock/TableLayout，窗口放大不会散架） ----------------
         private void BuildUi()
         {
-            var top = new Panel { Dock = DockStyle.Top, Height = 34, Padding = new Padding(8, 6, 8, 0) };
-            var account = new Label { Text = "未登录 · 离线模式（可单机游玩）", AutoSize = true, ForeColor = Color.DimGray };
-            top.Controls.Add(account);
-            Controls.Add(top);
+            var top = new Panel { Dock = DockStyle.Top, Height = 30, Padding = new Padding(10, 7, 10, 0) };
+            top.Controls.Add(new Label { Text = "未登录 · 离线模式（可单机游玩）", AutoSize = true, ForeColor = Color.DimGray });
 
-            _tabs = new TabControl { Dock = DockStyle.Fill };
-            _tabs.TabPages.Add(BuildLaunchTab());
-            _tabs.TabPages.Add(BuildLoaderTab());
-            _tabs.TabPages.Add(BuildPackTab());
-            _tabs.TabPages.Add(BuildManageTab());
-            Controls.Add(_tabs);
+            var dataRow = new Panel { Dock = DockStyle.Top, Height = 34, Padding = new Padding(10, 2, 10, 0) };
+            var dataLabel = new Label { Text = "数据目录", AutoSize = true, Location = new Point(0, 8) };
+            _dataDirBox = new TextBox
+            {
+                Left = 76,
+                Top = 5,
+                Width = 560,
+                ReadOnly = true,
+                Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right,
+            };
+            var pickDir = new Button { Text = "选择...", Width = 78, Height = 26, Top = 3, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            pickDir.Left = 640;
+            dataRow.Resize += (s, e) => pickDir.Left = dataRow.ClientSize.Width - pickDir.Width - 14;
+            pickDir.Click += (s, e) => PickDataDir();
+            dataRow.Controls.AddRange(new Control[] { dataLabel, _dataDirBox, pickDir });
 
-            var bottom = new Panel { Dock = DockStyle.Bottom, Height = 190 };
-            _status = new Label { Dock = DockStyle.Top, Height = 22, Text = "就绪", ForeColor = Color.DimGray, Padding = new Padding(8, 4, 0, 0) };
+            var bottom = new Panel { Dock = DockStyle.Bottom, Height = 180 };
+            _status = new Label { Dock = DockStyle.Top, Height = 22, Text = "就绪", ForeColor = Color.DimGray, Padding = new Padding(10, 4, 0, 0) };
             _log = new TextBox
             {
                 Dock = DockStyle.Fill,
@@ -70,100 +79,168 @@ namespace Mcroute
             };
             bottom.Controls.Add(_log);
             bottom.Controls.Add(_status);
+
+            var middle = new Panel { Dock = DockStyle.Fill };
+            _tabs = new TabControl { Dock = DockStyle.Fill };
+            _tabs.TabPages.Add(BuildLaunchTab());
+            _tabs.TabPages.Add(BuildLoaderTab());
+            _tabs.TabPages.Add(BuildPackTab());
+            _tabs.TabPages.Add(BuildManageTab());
+            middle.Controls.Add(_tabs);
+
+            // Dock 顺序：先加的占外框，后加的填剩余
+            Controls.Add(middle);
             Controls.Add(bottom);
+            Controls.Add(dataRow);
+            Controls.Add(top);
         }
 
         private TabPage BuildLaunchTab()
         {
-            var page = new TabPage("  启动  ");
+            var page = new TabPage("  启动  ") { Padding = new Padding(8) };
 
-            var listLabel = new Label { Text = "本地已安装版本", Location = new Point(12, 10), AutoSize = true };
-            _versionList = new ListBox { Location = new Point(12, 32), Size = new Size(430, 300), Font = new Font("Microsoft YaHei UI", 9f) };
+            var split = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
+            split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58f));
+            split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42f));
+
+            // 左：版本列表 + 按钮
+            var leftInner = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) };
+            var listLabel = new Label { Text = "本地已安装版本", Dock = DockStyle.Top, Height = 22 };
+            _versionList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
             _versionList.DoubleClick += (s, e) => LaunchSelected();
-
-            var refresh = new Button { Text = "刷新", Location = new Point(12, 340), Size = new Size(80, 30) };
-            refresh.Click += (s, e) => { RefreshVersions(); RefreshJava(); };
-            var launch = new Button { Text = "▶ 启动选中版本", Location = new Point(100, 340), Size = new Size(150, 30) };
+            var btnRow = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 40, Padding = new Padding(0, 6, 0, 0) };
+            var refresh = new Button { Text = "刷新", Width = 80, Height = 28 };
+            refresh.Click += (s, e) => RefreshAll();
+            var launch = new Button { Text = "▶ 启动选中版本", Width = 150, Height = 28 };
             launch.Click += (s, e) => LaunchSelected();
+            btnRow.Controls.Add(refresh);
+            btnRow.Controls.Add(launch);
+            leftInner.Controls.Add(_versionList);
+            leftInner.Controls.Add(listLabel);
+            leftInner.Controls.Add(btnRow);
 
-            var dlLabel = new Label { Text = "下载原版版本", Location = new Point(465, 10), AutoSize = true };
-            _downloadBox = new TextBox { Location = new Point(465, 32), Width = 180, Text = "1.21.1" };
-            var skipAssets = new CheckBox { Text = "跳过资源（快，但没有音效贴图）", Location = new Point(465, 58), AutoSize = true };
-            var dlBtn = new Button { Text = "开始下载", Location = new Point(465, 84), Size = new Size(120, 30) };
+            // 右：下载 / Java / 内存（用 TableLayout，避免出现多余滚动条）
+            var right = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
+            right.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            right.RowStyles.Add(new RowStyle(SizeType.Absolute, 152f));
+            right.RowStyles.Add(new RowStyle(SizeType.Absolute, 132f));
+            right.RowStyles.Add(new RowStyle(SizeType.Absolute, 108f));
+            right.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+            var dlGroup = new GroupBox { Text = "下载原版版本", Dock = DockStyle.Fill, Padding = new Padding(10) };
+            var dlFlow = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false };
+            _downloadBox = new TextBox { Width = 180, Text = "1.21.1" };
+            var skipAssets = new CheckBox { Text = "跳过资源（快，但没有音效贴图）", AutoSize = true };
+            var dlBtn = new Button { Text = "开始下载", Width = 120, Height = 28 };
             dlBtn.Click += (s, e) => RunDownload(skipAssets.Checked);
+            dlFlow.Controls.Add(_downloadBox);
+            dlFlow.Controls.Add(skipAssets);
+            dlFlow.Controls.Add(dlBtn);
+            dlGroup.Controls.Add(dlFlow);
 
-            var javaLabel = new Label { Text = "Java（自动按版本匹配）", Location = new Point(465, 130), AutoSize = true };
-            _javaCombo = new ComboBox { Location = new Point(465, 152), Width = 440, DropDownStyle = ComboBoxStyle.DropDownList };
-            var reJava = new Button { Text = "重新检测 Java", Location = new Point(465, 182), Size = new Size(120, 28) };
+            var javaGroup = new GroupBox { Text = "Java（自动按版本匹配）", Dock = DockStyle.Fill, Padding = new Padding(10) };
+            var javaPanel = new Panel { Dock = DockStyle.Fill };
+            _javaCombo = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
+            var reJava = new Button { Text = "重新检测 Java", Width = 130, Height = 28, Top = 36, Left = 0 };
             reJava.Click += (s, e) => RefreshJava();
+            javaPanel.Controls.Add(_javaCombo);
+            javaPanel.Controls.Add(reJava);
+            javaGroup.Controls.Add(javaPanel);
 
-            var memLabel = new Label { Text = "最大内存", Location = new Point(465, 222), AutoSize = true };
-            _memBox = new TextBox { Location = new Point(465, 244), Width = 80, Text = "2G" };
+            var memGroup = new GroupBox { Text = "最大内存", Dock = DockStyle.Fill, Padding = new Padding(10) };
+            var memPanel = new Panel { Dock = DockStyle.Fill };
+            _memBox = new TextBox { Width = 80, Text = "2G" };
+            var memHint = new Label { Text = "整合包通常要 4G 以上", AutoSize = true, Top = 36, Left = 0, ForeColor = Color.DimGray };
+            memPanel.Controls.Add(_memBox);
+            memPanel.Controls.Add(memHint);
+            memGroup.Controls.Add(memPanel);
 
-            page.Controls.AddRange(new Control[]
-            {
-                listLabel, _versionList, refresh, launch,
-                dlLabel, _downloadBox, skipAssets, dlBtn,
-                javaLabel, _javaCombo, reJava, memLabel, _memBox,
-            });
+            right.Controls.Add(dlGroup, 0, 0);
+            right.Controls.Add(javaGroup, 0, 1);
+            right.Controls.Add(memGroup, 0, 2);
+
+            split.Controls.Add(leftInner, 0, 0);
+            split.Controls.Add(right, 1, 0);
+            page.Controls.Add(split);
             return page;
         }
 
         private TabPage BuildLoaderTab()
         {
-            var page = new TabPage("  加载器  ");
-            page.Controls.Add(new Label
+            var page = new TabPage("  加载器  ") { Padding = new Padding(12) };
+            var outer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 74f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 46f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+            outer.Controls.Add(new Label
             {
                 Text = "给某个 MC 版本装加载器（自动下载原版 + 安装 + 补库）",
-                Location = new Point(14, 14),
                 AutoSize = true,
                 ForeColor = Color.DimGray,
-            });
+            }, 0, 0);
 
-            page.Controls.Add(new Label { Text = "加载器", Location = new Point(14, 50), AutoSize = true });
-            _loaderKind = new ComboBox
-            {
-                Location = new Point(90, 46),
-                Width = 160,
-                DropDownStyle = ComboBoxStyle.DropDownList,
-            };
+            var form = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2 };
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70f));
+            form.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            form.Controls.Add(new Label { Text = "加载器", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
+            _loaderKind = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
             _loaderKind.Items.AddRange(new object[] { "fabric", "quilt", "legacyfabric", "forge", "neoforge" });
             _loaderKind.SelectedIndex = 0;
+            form.Controls.Add(_loaderKind, 1, 0);
+            form.Controls.Add(new Label { Text = "版本", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
+            _loaderVer = new TextBox { Dock = DockStyle.Top, Text = "1.20.1" };
+            form.Controls.Add(_loaderVer, 1, 1);
+            outer.Controls.Add(form, 0, 1);
 
-            page.Controls.Add(new Label { Text = "版本", Location = new Point(14, 88), AutoSize = true });
-            _loaderVer = new TextBox { Location = new Point(90, 84), Width = 260, Text = "1.20.1" };
-
-            var install = new Button { Text = "安装加载器", Location = new Point(90, 122), Size = new Size(130, 32) };
+            var installRow = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
+            var install = new Button { Text = "安装加载器", Width = 130, Height = 30 };
             install.Click += (s, e) => RunLoader();
+            installRow.Controls.Add(install);
+            outer.Controls.Add(installRow, 0, 2);
 
-            page.Controls.Add(new Label
+            outer.Controls.Add(new Label
             {
-                Text = "提示：\n· fabric / quilt / legacyfabric：版本写 MC 版本即可，自动挑最新 stable\n" +
-                       "· forge：写 1.7.10 或 1.20.1-47.2.0 都行（自动补全）\n" +
-                       "· neoforge：写 21.1.264",
-                Location = new Point(14, 170),
-                AutoSize = true,
+                Dock = DockStyle.Fill,
                 ForeColor = Color.DimGray,
-            });
+                Text = "提示：\n" +
+                       "· fabric / quilt / legacyfabric：版本写 MC 版本即可，自动挑最新 stable\n" +
+                       "· forge：写 1.7.10 或 1.20.1-47.2.0 都行（自动补全）\n" +
+                       "· neoforge：写 21.1.264\n\n" +
+                       "Forge / NeoForge 会调用官方安装器（第一次要几分钟）；Fabric 系直接读 meta，几秒完成。\n" +
+                       "装完后到「启动」页刷新，就能看到一个新版本。",
+            }, 0, 3);
 
-            page.Controls.AddRange(new Control[] { _loaderKind, _loaderVer, install });
+            page.Controls.Add(outer);
             return page;
         }
 
         private TabPage BuildPackTab()
         {
-            var page = new TabPage("  整合包  ");
-            page.Controls.Add(new Label
+            var page = new TabPage("  整合包  ") { Padding = new Padding(12) };
+            var outer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 40f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 46f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+            outer.Controls.Add(new Label
             {
                 Text = "支持 Modrinth .mrpack / MultiMC·Prism 实例包 / CurseForge zip（自动识别）",
-                Location = new Point(14, 14),
                 AutoSize = true,
                 ForeColor = Color.DimGray,
-            });
-            page.Controls.Add(new Label { Text = "包文件", Location = new Point(14, 52), AutoSize = true });
-            var path = new TextBox { Location = new Point(90, 48), Width = 660 };
-            var browse = new Button { Text = "浏览...", Location = new Point(760, 46), Size = new Size(90, 28) };
-            browse.Click += (s2, e2) =>
+            }, 0, 0);
+
+            var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3 };
+            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 66f));
+            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90f));
+            pathRow.Controls.Add(new Label { Text = "包文件", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
+            var path = new TextBox { Dock = DockStyle.Top };
+            pathRow.Controls.Add(path, 1, 0);
+            var browse = new Button { Text = "浏览...", Dock = DockStyle.Top };
+            browse.Click += (s, e) =>
             {
                 using (var dlg = new OpenFileDialog())
                 {
@@ -171,80 +248,105 @@ namespace Mcroute
                     if (dlg.ShowDialog() == DialogResult.OK) path.Text = dlg.FileName;
                 }
             };
-            var install = new Button { Text = "安装这个整合包", Location = new Point(90, 88), Size = new Size(140, 32) };
-            install.Click += (s2, e2) =>
+            pathRow.Controls.Add(browse, 2, 0);
+            outer.Controls.Add(pathRow, 0, 1);
+
+            var installRow = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
+            var install = new Button { Text = "安装这个整合包", Width = 150, Height = 30 };
+            install.Click += (s, e) =>
             {
                 if (path.Text.Trim().Length == 0) { MessageBox.Show("先选一个整合包文件", "提示"); return; }
                 string file = path.Text.Trim();
-                RunInBackground("安装 " + System.IO.Path.GetFileName(file),
+                RunInBackground("安装 " + Path.GetFileName(file),
                     () => Packs.Install(new[] { "install", file, "--dir", _baseDir }));
             };
-            page.Controls.AddRange(new Control[] { path, browse, install });
+            installRow.Controls.Add(install);
+            outer.Controls.Add(installRow, 0, 2);
+
+            outer.Controls.Add(new Label
+            {
+                Dock = DockStyle.Fill,
+                ForeColor = Color.DimGray,
+                Text = "说明：\n" +
+                       "· 装成标准 versions/<包名>/ 布局，其它启动器也认\n" +
+                       "· CurseForge 包需要 API key：环境变量 CF_API_KEY，或 mcdata\\cf_api_key.txt\n" +
+                       "· 装完到「管理」页体检 / 测试启动",
+            }, 0, 3);
+
+            page.Controls.Add(outer);
             return page;
         }
 
         private TabPage BuildManageTab()
         {
-            var page = new TabPage("  管理  ");
-            page.Controls.Add(new Label
+            var page = new TabPage("  管理  ") { Padding = new Padding(8) };
+            var outer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 44f));
+
+            outer.Controls.Add(new Label
             {
                 Text = "所有本地版本：原版 / 整合包 / 外部导入，都能体检、测试、生成启动器",
-                Location = new Point(12, 12),
                 AutoSize = true,
-            });
+            }, 0, 0);
 
-            _manageList = new ListBox { Location = new Point(12, 36), Size = new Size(890, 300), Font = new Font("Microsoft YaHei UI", 9f) };
+            _manageList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
+            outer.Controls.Add(_manageList, 0, 1);
 
-            var refresh = new Button { Text = "刷新", Location = new Point(12, 344), Size = new Size(80, 30) };
-            refresh.Click += (s, e) => RefreshVersions();
-            var verify = new Button { Text = "体检", Location = new Point(100, 344), Size = new Size(80, 30) };
+            var btnRow = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
+            var refresh = new Button { Text = "刷新", Width = 80, Height = 28 };
+            refresh.Click += (s, e) => RefreshAll();
+            var verify = new Button { Text = "体检", Width = 80, Height = 28 };
             verify.Click += (s, e) => RunOnSelected("verify");
-            var test = new Button { Text = "测试启动", Location = new Point(188, 344), Size = new Size(100, 30) };
+            var test = new Button { Text = "测试启动", Width = 100, Height = 28 };
             test.Click += (s, e) => RunOnSelected("test");
-            var mkbat = new Button { Text = "生成启动器", Location = new Point(296, 344), Size = new Size(110, 30) };
+            var mkbat = new Button { Text = "生成启动器", Width = 110, Height = 28 };
             mkbat.Click += (s, e) => RunOnSelected("mkbat");
-            var openDir = new Button { Text = "打开目录", Location = new Point(414, 344), Size = new Size(90, 30) };
+            var openDir = new Button { Text = "打开目录", Width = 90, Height = 28 };
             openDir.Click += (s, e) => OpenSelectedDir();
+            btnRow.Controls.AddRange(new Control[] { refresh, verify, test, mkbat, openDir });
+            outer.Controls.Add(btnRow, 0, 2);
 
-            page.Controls.AddRange(new Control[] { _manageList, refresh, verify, test, mkbat, openDir });
+            page.Controls.Add(outer);
             return page;
         }
 
-        /// <summary>给文档截图用：逐页渲染成 png（--shot 模式）。</summary>
-        public void CaptureTabs(string dir)
+        // ---------------- 数据目录 ----------------
+        private void PickDataDir()
         {
-            Directory.CreateDirectory(dir);
-            string[] names = { "launch", "loader", "packs", "manage" };
-            int i = 0;
-            var timer = new System.Windows.Forms.Timer { Interval = 800 };
-            timer.Tick += (s2, e2) =>
+            using (var dlg = new FolderBrowserDialog())
             {
-                if (i >= _tabs.TabPages.Count)
+                dlg.Description = "选择数据目录（里面有 versions / libraries / assets 的那一层）";
+                dlg.SelectedPath = _baseDir;
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+
+                string chosen = dlg.SelectedPath;
+                if (!Directory.Exists(Path.Combine(chosen, "versions")) &&
+                    Directory.Exists(Path.Combine(chosen, "mcdata", "versions")))
+                    chosen = Path.Combine(chosen, "mcdata");
+                if (!Directory.Exists(Path.Combine(chosen, "versions")))
                 {
-                    timer.Stop();
-                    Close();
+                    MessageBox.Show("这个目录里没有 versions 文件夹，看起来不是启动器的数据目录。\n\n" +
+                                    "应该选包含 versions / libraries / assets 的那一层。", "提示");
                     return;
                 }
-                _tabs.SelectedIndex = i;
-                Application.DoEvents();
-                try
-                {
-                    using (var bmp = new Bitmap(ClientSize.Width, Height))
-                    {
-                        DrawToBitmap(bmp, new Rectangle(0, 0, bmp.Width, bmp.Height));
-                        string name = i < names.Length ? names[i] : "tab" + i;
-                        bmp.Save(Path.Combine(dir, "gui-csharp-" + name + ".png"),
-                                 System.Drawing.Imaging.ImageFormat.Png);
-                        Console.WriteLine("saved " + name);
-                    }
-                }
-                catch (Exception ex) { Console.WriteLine("fail " + ex.Message); }
-                i++;
-            };
-            timer.Start();
+
+                _baseDir = chosen;
+                Config.SaveDataDir(chosen);
+                RefreshAll();
+                AppendLog("已切换数据目录：" + chosen);
+            }
         }
 
         // ---------------- 数据 ----------------
+        private void RefreshAll()
+        {
+            _dataDirBox.Text = _baseDir;
+            RefreshVersions();
+            RefreshJava();
+        }
+
         private void RefreshVersions()
         {
             _versionList.Items.Clear();
@@ -252,7 +354,7 @@ namespace Mcroute
             string root = Path.Combine(_baseDir, "versions");
             if (!Directory.Exists(root))
             {
-                AppendLog("还没有本地版本，先下载一个。");
+                AppendLog("这个数据目录里还没有版本：" + root);
                 return;
             }
 
@@ -307,12 +409,6 @@ namespace Mcroute
         }
 
         // ---------------- 操作 ----------------
-        private void RefreshAll()
-        {
-            RefreshVersions();
-            RefreshJava();
-        }
-
         private string SelectedVersion()
         {
             object sel = _versionList.SelectedItem;
@@ -429,7 +525,40 @@ namespace Mcroute
             _log.AppendText(text + Environment.NewLine);
         }
 
-        /// <summary>把 Console 输出接到 TextBox。</summary>
+        /// <summary>给文档截图用：逐页渲染成 png（--shot 模式）。</summary>
+        public void CaptureTabs(string dir)
+        {
+            Directory.CreateDirectory(dir);
+            string[] names = { "launch", "loader", "packs", "manage" };
+            int i = 0;
+            var timer = new System.Windows.Forms.Timer { Interval = 800 };
+            timer.Tick += (s2, e2) =>
+            {
+                if (i >= _tabs.TabPages.Count)
+                {
+                    timer.Stop();
+                    Close();
+                    return;
+                }
+                _tabs.SelectedIndex = i;
+                Application.DoEvents();
+                try
+                {
+                    using (var bmp = new Bitmap(ClientSize.Width, Height))
+                    {
+                        DrawToBitmap(bmp, new Rectangle(0, 0, bmp.Width, bmp.Height));
+                        string name = i < names.Length ? names[i] : "tab" + i;
+                        bmp.Save(Path.Combine(dir, "gui-csharp-" + name + ".png"),
+                                 System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("saved " + name);
+                    }
+                }
+                catch (Exception ex) { Console.WriteLine("fail " + ex.Message); }
+                i++;
+            };
+            timer.Start();
+        }
+
         private class TextBoxWriter : TextWriter
         {
             private readonly MainForm _owner;
@@ -437,6 +566,40 @@ namespace Mcroute
             public override Encoding Encoding { get { return Encoding.UTF8; } }
             public override void Write(string value) { if (!string.IsNullOrEmpty(value)) _owner.AppendLog(value.TrimEnd()); }
             public override void WriteLine(string value) { _owner.AppendLog(value); }
+        }
+    }
+
+    /// <summary>GUI 小配置（记住数据目录）。</summary>
+    public static class Config
+    {
+        private static string PathFile()
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute");
+            Directory.CreateDirectory(dir);
+            return Path.Combine(dir, "gui.json");
+        }
+
+        public static string LoadDataDir()
+        {
+            try
+            {
+                string f = PathFile();
+                if (!File.Exists(f)) return null;
+                var data = J.Obj(J.ParseFile(f));
+                string dir = J.Str(data, "data_dir");
+                return string.IsNullOrEmpty(dir) ? null : dir;
+            }
+            catch { return null; }
+        }
+
+        public static void SaveDataDir(string dir)
+        {
+            try
+            {
+                J.SaveFile(PathFile(), new Dictionary<string, object> { { "data_dir", dir } });
+            }
+            catch { }
         }
     }
 }
