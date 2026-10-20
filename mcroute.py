@@ -626,12 +626,29 @@ def plan_launch(args):
                 if not os.path.isfile(full):
                     missing.append(("库", full))
 
-    # 1c) 客户端 jar：先找本版本目录，没有就用 inheritsFrom 的父版本目录
+    # 1c) 客户端 jar
+    # 加载器版本（Forge/NeoForge）的 json 里通常没有自己的 jar，但它的
+    # -DignoreList 写着要忽略 ${version_name}.jar —— 说明它期望版本目录里
+    # 存在这么一个文件。所以我们从父版本复制一份过来。
+    # 不复制、直接把父版本 jar 塞进 classpath 会踩这个坑：
+    #   ResolutionException: Modules _1._18._2 and minecraft export package ...
+    # 因为同一个游戏被当成两个模块加载了。
     client_jar = os.path.join(vdir, ver + ".jar")
     if not os.path.isfile(client_jar):
         parent_id = vj.get("inheritsFrom")
         if parent_id:
-            client_jar = os.path.join(base, "versions", parent_id, parent_id + ".jar")
+            parent_jar = os.path.join(base, "versions", parent_id, parent_id + ".jar")
+            if os.path.isfile(parent_jar):
+                import shutil
+                try:
+                    shutil.copyfile(parent_jar, client_jar)
+                    print("[准备] 已把 %s 复制为 %s" % (os.path.basename(parent_jar),
+                                                     os.path.basename(client_jar)))
+                except Exception as exc:
+                    print("[警告] 复制客户端 jar 失败：" + str(exc))
+                    client_jar = parent_jar
+            else:
+                client_jar = parent_jar
     if os.path.isfile(client_jar):
         classpath.append(client_jar)
     else:
@@ -920,6 +937,9 @@ def file_sha1(path):
 URL_REWRITES = [
     # NeoForge 官方的 maven 域名在国内被 DNS 污染，官方 CDN 路径完全一致
     ("https://maven.neoforged.net/", "https://neoforged.forgecdn.net/"),
+    # CurseForge 的 media 域名会返回 403（CloudFront 拒绝），
+    # 同一路径在 edge 域名上是正常的，文件字节完全一致
+    ("https://media.forgecdn.net/", "https://edge.forgecdn.net/"),
 ]
 
 
@@ -1767,6 +1787,179 @@ def cmd_loader(args):
         print("      [警告] 没有新增版本目录，安装可能没跑完（看上面的输出）")
 
 
+def mrpack_loader_of(deps, mc):
+    """
+    解析 modrinth.index.json 里的 dependencies，返回 (kind, 版本字符串, 版本目录名)。
+    没有加载器时 kind 为 None（纯原版）。
+    """
+    if "forge" in deps:
+        ver = deps["forge"]
+        return "forge", "%s-%s" % (mc, ver), "%s-forge-%s" % (mc, ver)
+    if "neoforge" in deps:
+        ver = deps["neoforge"]
+        return "neoforge", ver, "neoforge-" + ver
+    if "fabric-loader" in deps:
+        ver = deps["fabric-loader"]
+        return "fabric", "%s-%s" % (mc, ver), "fabric-loader-%s-%s" % (ver, mc)
+    if "quilt-loader" in deps:
+        ver = deps["quilt-loader"]
+        return "quilt", "%s-%s" % (mc, ver), "quilt-loader-%s-%s" % (ver, mc)
+    return None, None, mc
+
+
+def cmd_install(args):
+    """
+    安装 Modrinth 整合包（.mrpack）。
+
+    mrpack 的结构：
+        modrinth.index.json   -> 依赖（游戏版本 + 加载器）+ 文件清单（URL + sha1/sha512）
+        overrides/            -> 配置、光影、资源包等要原样铺进实例的东西
+
+    所以流程就是：读索引 -> 确保加载器版本在本地 -> 并发下载清单里的文件 -> 解压 overrides。
+    """
+    import shutil
+    import zipfile
+
+    pack = os.path.abspath(args.pack)
+    base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
+
+    if not os.path.isfile(pack):
+        print("[错误] 文件不存在：" + pack)
+        return
+    if not pack.lower().endswith(".mrpack"):
+        print("[错误] 目前只支持 .mrpack（Modrinth 格式）")
+        return
+
+    with zipfile.ZipFile(pack) as zf:
+        names = zf.namelist()
+        if "modrinth.index.json" not in names:
+            print("[错误] 压缩包里没有 modrinth.index.json，可能不是 Modrinth 整合包")
+            return
+        index = json.loads(zf.read("modrinth.index.json").decode("utf-8"))
+
+    name = (index.get("name") or os.path.splitext(os.path.basename(pack))[0]).strip()
+    safe_name = "".join(c if c not in '\\/:*?"<>|' else "_" for c in name)
+    inst_root = os.path.join(base, "instances", safe_name)
+    game_dir = os.path.join(inst_root, ".minecraft")
+    os.makedirs(game_dir, exist_ok=True)
+
+    deps = index.get("dependencies") or {}
+    mc = deps.get("minecraft")
+    if not mc:
+        print("[错误] 索引里没有 minecraft 依赖")
+        return
+    kind, loader_ver, version_id = mrpack_loader_of(deps, mc)
+
+    print("整合包  : " + name)
+    print("实例目录: " + inst_root)
+    print("MC 版本 : " + str(mc))
+    print("加载器  : " + (("%s %s" % (kind, loader_ver)) if kind else "无（原版）"))
+    print("目标版本: " + version_id)
+
+    # ---- 1) 先确保原版在本地（加载器安装器要用它做补丁，启动也要它的 jar）----
+    mc_json = os.path.join(base, "versions", mc, mc + ".json")
+    if not os.path.isfile(mc_json):
+        print("\n[1/3] 本地没有原版 %s，先下载 ..." % mc)
+        cmd_fetch(argparse.Namespace(version=mc, dir=base, workers=args.workers,
+                                     no_assets=getattr(args, "no_assets", False)))
+        if not os.path.isfile(mc_json):
+            print("[错误] 原版下载失败，安装中止")
+            return
+
+    # ---- 2) 确保加载器版本在本地 ----
+    vjson = os.path.join(base, "versions", version_id, version_id + ".json")
+    if not os.path.isfile(vjson):
+        if kind:
+            print("\n[2/3] 本地没有 %s，先自动安装加载器 ..." % version_id)
+            try:
+                cmd_loader(argparse.Namespace(kind=kind, version=loader_ver,
+                                              dir=base, java=None))
+            except Exception as exc:
+                print("      自动安装失败：" + str(exc))
+                print("      请手动运行：python mcroute.py loader %s %s" % (kind, loader_ver))
+                return
+        else:
+            print("\n[2/3] 本地没有 %s，先下载 ..." % mc)
+            cmd_fetch(argparse.Namespace(version=mc, dir=base, workers=16, no_assets=False))
+    else:
+        print("[2/3] 加载器版本已在本地")
+
+    # ---- 2) 下载清单里的文件 ----
+    jobs = []
+    skipped = 0
+    for item in index.get("files") or []:
+        rel = item.get("path")
+        urls = item.get("downloads") or []
+        env = item.get("env") or {}
+        if env.get("client") == "unsupported":
+            skipped += 1
+            continue
+        if not rel or not urls:
+            skipped += 1
+            continue
+        hashes = item.get("hashes") or {}
+        dest = os.path.join(game_dir, rel.replace("/", os.sep))
+        jobs.append((urls[0], dest, hashes.get("sha1")))
+
+    print("[3/4] 下载 %d 个文件（跳过 %d 个仅服务端/无地址的）" % (len(jobs), skipped))
+
+    import concurrent.futures
+    ok = skip = fail = 0
+    done = 0
+    failed = []
+    total = len(jobs)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
+        futures = [pool.submit(download_one, job) for job in jobs]
+        for future in concurrent.futures.as_completed(futures):
+            status, p_, info = future.result()
+            done += 1
+            if status == "ok":
+                ok += 1
+            elif status == "skip":
+                skip += 1
+            else:
+                fail += 1
+                failed.append((os.path.basename(p_), info))
+            if done % 25 == 0 or done == total:
+                print("      进度 %d/%d   新下载 %d  已存在 %d  失败 %d" % (done, total, ok, skip, fail))
+
+    if failed:
+        print("      失败 %d 个（可重跑续传）：" % len(failed))
+        for n, why in failed[:5]:
+            print("        " + n + " -> " + str(why))
+
+    # ---- 3) 解压 overrides ----
+    prefix = "overrides/"
+    count = 0
+    with zipfile.ZipFile(pack) as zf:
+        for entry in zf.namelist():
+            if not entry.startswith(prefix) or entry.endswith("/"):
+                continue
+            rel = entry[len(prefix):]
+            dest = os.path.join(game_dir, rel.replace("/", os.sep))
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with zf.open(entry) as src_file, open(dest, "wb") as dst_file:
+                shutil.copyfileobj(src_file, dst_file)
+            count += 1
+    print("[4/4] 已铺开 overrides：%d 个文件" % count)
+
+    # ---- 记录实例元数据 ----
+    meta = {
+        "name": name,
+        "version_id": version_id,
+        "minecraft": mc,
+        "loader": kind,
+        "loader_version": loader_ver,
+        "game_dir": game_dir,
+        "source": pack,
+    }
+    with open(os.path.join(inst_root, "instance.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+
+    print("\n完成。启动命令：")
+    print('  python mcroute.py launch %s --game-dir "%s"' % (version_id, game_dir))
+
+
 def cmd_java(args):
     """列出机器上检测到的所有 Java（按主版本升序）"""
     base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
@@ -1901,6 +2094,13 @@ def main():
     p12 = sub.add_parser("java", help="列出检测到的 Java")
     p12.add_argument("--dir", help="数据目录，默认 mcdata/")
     p12.set_defaults(func=cmd_java)
+
+    p13 = sub.add_parser("install", help="安装整合包（目前支持 Modrinth .mrpack）")
+    p13.add_argument("pack", help=".mrpack 文件路径")
+    p13.add_argument("--dir", help="数据目录，默认 mcdata/")
+    p13.add_argument("--workers", type=int, default=16, help="并发线程数，默认 16")
+    p13.add_argument("--no-assets", action="store_true", help="下载原版时跳过资源对象（快速验证）")
+    p13.set_defaults(func=cmd_install)
 
     args = parser.parse_args()
 

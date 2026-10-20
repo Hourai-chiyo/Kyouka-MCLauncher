@@ -16,6 +16,9 @@
 - **Fabric / Quilt / Legacy Fabric**：不用安装器，直接从各自官方 meta 拿 profile json；自动挑最新 stable loader
   （Quilt 用 `meta.quiltmc.org/v3`，Legacy Fabric 用 `meta.legacyfabric.net/v2`）
 - **老版本 natives 解压**：1.19 之前必须把 .dll 解出来放进 `java.library.path`，否则 `UnsatisfiedLinkError`
+- **整合包安装（.mrpack）**：解析 `modrinth.index.json` → 自动装对应加载器 → 并发下载并 sha1 校验 → 铺开 `overrides/`
+- **URL 改写补充**：`media.forgecdn.net` 会 403，同路径的 `edge.forgecdn.net` 正常（文件字节一致）
+- **版本 jar 从父版本复制**：Forge/NeoForge 的 `-DignoreList` 期望版本目录里有 `${version_name}.jar`，缺了会把同一个游戏加载成两个模块（`ResolutionException`）
 - **修复同名库去重**：同一个库可能在 json 里出现两次（一条普通 jar、一条只提供 natives），按 name 去重会把前者顶掉，导致 `NoClassDefFoundError: Narrator` 这类问题
   （顺带支持了 Fabric/Quilt 风格的库声明：`name` + maven 仓库根地址，没有 `downloads` 块）
 
@@ -34,7 +37,7 @@
 
 ---
 
-### 2. 整合包安装（.mrpack / CurseForge zip）
+### 2. 整合包：CurseForge zip / MultiMC 导出包
 
 需要解析整合包 manifest、处理依赖树、把 mod 落进实例的 `mods/`。
 现在只支持"一个版本目录"，还没有"实例"概念（多个实例共享 libraries/assets）。

@@ -28,6 +28,7 @@
 | 下载 | 客户端 / 库 / natives / assets，全部 sha1 校验、可断点续传、并发下载 |
 | 启动 | 原版 / **NeoForge** / **Forge** / **Fabric** / **Quilt** / **Legacy Fabric** |
 | Java 检测 | 扫描 PATH 与常见安装目录，按版本要求自动匹配（`python mcroute.py java` 列出全部） |
+| **整合包** | 安装 Modrinth `.mrpack`：解析索引 → 自动装加载器 → 并发下载 → 铺 overrides |
 | 本地缓存 | 内容寻址（`assets/objects/<h2>/<hash>`），天然去重 |
 | 图形界面 | tkinter，零依赖，下载 / 启动 / 登录状态 / 日志 |
 | 微软登录 | OAuth 设备码流程（需自备 client_id，见下） |
@@ -52,6 +53,7 @@ python mcroute.py loader neoforge 21.1.264   # 一条命令装好 NeoForge
 python mcroute.py loader forge 1.20.1-47.2.0 # 或 Forge（版本写成 <MC版本>-<Forge版本>）
 python mcroute.py sources            # 所有下载源测速
 python mcroute.py wiki 1.12.2        # 用 Wiki 索引兜底查版本
+python mcroute.py install "pack.mrpack"   # 安装 Modrinth 整合包
 ```
 
 `fetch` 可以随时中断、重复执行：已完成且 sha1 校验通过的文件会自动跳过。
