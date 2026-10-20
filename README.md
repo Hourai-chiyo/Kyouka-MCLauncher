@@ -6,10 +6,11 @@
 
 [![Release](https://img.shields.io/github/v/release/Hourai-chiyo/mcroute?label=release)](https://github.com/Hourai-chiyo/mcroute/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Hourai-chiyo/mcroute/total)](https://github.com/Hourai-chiyo/mcroute/releases)
+[![License](https://img.shields.io/github/license/Hourai-chiyo/mcroute)](LICENSE)
 
 一个面向中国大陆网络环境的 **Minecraft: Java Edition 启动器**，重点是「下载源可靠」和「离线可自持」。
 
-![界面截图](docs/screenshot.png)
+![界面截图](docs/gui-tabs.png)
 
 ---
 
@@ -345,4 +346,6 @@ Tokens are stored only on the local machine. No telemetry, no ads, no monetizati
 
 ## 许可证
 
-本项目的代码可自由参考、修改。Minecraft 及其相关内容的一切权利归 Mojang 与 Microsoft 所有。
+本项目代码采用 **MIT 许可证**，见 [LICENSE](LICENSE)。
+
+Minecraft 及其相关内容的一切权利归 Mojang 与 Microsoft 所有；MIT 许可证仅覆盖本项目的代码，不覆盖通过本项目下载的游戏文件。
