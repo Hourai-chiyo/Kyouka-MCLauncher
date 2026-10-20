@@ -331,16 +331,14 @@ def expand_arg_entries(entries, ctx):
 
 
 def find_java(base, vj):
-    """按 version json 要求的 Java 大版本，在 java_versions/ 里找对应的 java.exe"""
+    """
+    按 version json 要求的 Java 大版本找 java.exe：
+      1. <数据目录>/java_versions
+      2. Modrinth App 的 java 目录（本机常见）
+      3. PATH 里的 java
+    """
     major = (vj.get("javaVersion") or {}).get("majorVersion")
-    root = os.path.join(base, "java_versions")
-    if major and os.path.isdir(root):
-        for name in sorted(os.listdir(root)):
-            if f"jre{major}" in name or f"jdk{major}" in name:
-                exe = os.path.join(root, name, "bin", "java.exe")
-                if os.path.isfile(exe):
-                    return exe
-    return "java"
+    return find_java_anywhere(base, major)
 
 
 def write_argfile(path, args):
