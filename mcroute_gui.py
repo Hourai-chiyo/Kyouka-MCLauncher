@@ -304,23 +304,28 @@ class App:
     def refresh_instances(self):
         self.inst_list.delete(0, "end")
         self.inst_meta = []
-        iroot = os.path.join(DATA_DIR, "instances")
-        if not os.path.isdir(iroot):
-            return
-        for name in sorted(os.listdir(iroot)):
-            meta_path = os.path.join(iroot, name, "instance.json")
-            if not os.path.isfile(meta_path):
+
+        # 新布局：versions/<名字>/instance.json —— 和 PCL2 / HMCL 一致，别的启动器也认
+        # 旧布局：instances/<名字>/instance.json —— 保留兼容，免得老实例消失
+        for root in (os.path.join(DATA_DIR, "versions"),
+                     os.path.join(DATA_DIR, "instances")):
+            if not os.path.isdir(root):
                 continue
-            try:
-                with open(meta_path, "r", encoding="utf-8") as f:
-                    meta = json.load(f)
-            except Exception:
-                continue
-            self.inst_meta.append(meta)
-            self.inst_list.insert(
-                "end",
-                "{}   [{}]".format(meta.get("name") or name, meta.get("version_id", "?")),
-            )
+            for name in sorted(os.listdir(root)):
+                meta_path = os.path.join(root, name, "instance.json")
+                if not os.path.isfile(meta_path):
+                    continue
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        meta = json.load(f)
+                except Exception:
+                    continue
+                meta.setdefault("game_dir", os.path.join(root, name))
+                self.inst_meta.append(meta)
+                self.inst_list.insert(
+                    "end",
+                    "{}   [{}]".format(meta.get("name") or name, meta.get("version_id", "?")),
+                )
         self.log("找到 {} 个整合包实例".format(len(self.inst_meta)))
 
     def refresh_java(self):

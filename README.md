@@ -294,6 +294,31 @@ build_installer.bat
 > **已知注意点**：从**纯英文路径**运行安装器最稳（`C:\...\mcroute-setup.exe`）。
 > 放在中文路径下运行可能失败（IExpress 时代就有的老问题，这台机器上复现过）。
 
+## 实例目录结构（和主流启动器兼容）
+
+整合包**不用自定义目录**，直接装成主流启动器认识的样子：
+
+```
+mcdata/
+└── versions/
+    └── SkyFactory 4/                 ← 实例 = 一个标准版本目录
+        ├── SkyFactory 4.json         ← 合并后的完整版本 json（没有 inheritsFrom）
+        ├── SkyFactory 4.jar          ← 客户端 jar（自包含）
+        ├── instance.json             ← 本工具自己的元数据（名称/加载器/来源）
+        ├── mods/  config/  saves/    ← 版本隔离：游戏文件就在这里面
+        └── resourcepacks/  shaderpacks/
+```
+
+**为什么这样设计**：PCL2 / HMCL / Prism 扫描版本的规则是固定的——只认
+`versions/<版本名>/<版本名>.json`，不认自定义的实例目录。装成这个结构之后：
+
+- 把 `mcdata` 直接当某个启动器的 `.minecraft` 用，实例会**原样出现在版本列表里**
+- 反过来，别的启动器的版本目录也能被本工具识别（只要能读到 json）
+- 我们的启动器同样使用这套结构（`launch <实例名>` 走版本隔离）
+
+> ⚠️ 在 PCL2 / HMCL 里使用时，**必须开启「版本隔离」**。关掉隔离的话启动器会去
+> `.minecraft/mods` 找 mod，就看不到这个包自带的 mod 了。
+
 ## 加载器支持（NeoForge / Forge / Fabric / Quilt / Legacy Fabric）
 
 一条命令完成：

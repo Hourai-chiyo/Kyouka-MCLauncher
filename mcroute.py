@@ -574,7 +574,13 @@ def plan_launch(args):
     lib_root = os.path.join(base, "libraries")
     assets_root = os.path.join(base, "assets")
     natives_dir = os.path.join(base, "natives", ver)
-    game_dir = os.path.abspath(args.game_dir) if args.game_dir else os.path.join(base, "instances", ver)
+    if args.game_dir:
+        game_dir = os.path.abspath(args.game_dir)
+    elif os.path.isfile(os.path.join(base, "versions", ver, "instance.json")):
+        # 整合包实例：版本隔离，游戏目录就是版本目录（和 PCL2 / HMCL 一致）
+        game_dir = os.path.join(base, "versions", ver)
+    else:
+        game_dir = os.path.join(base, "instances", ver)
 
     # ---- 1. 过滤库 + 拼 classpath ----
     classpath = []
@@ -2129,8 +2135,9 @@ def install_curseforge(pack, base, args):
 
     name = (manifest.get("name") or os.path.splitext(os.path.basename(pack))[0]).strip()
     safe_name = "".join(c if c not in '\\/:*?"<>|' else "_" for c in name)
-    inst_root = os.path.join(base, "instances", safe_name)
-    game_dir = os.path.join(inst_root, ".minecraft")
+    # 主流启动器兼容布局：实例就是 versions/<名字>/，mods/config 直接放在里面（版本隔离）
+    inst_root = instance_version_dir(base, safe_name)
+    game_dir = inst_root
     mods_dir = os.path.join(game_dir, "mods")
     os.makedirs(mods_dir, exist_ok=True)
 
@@ -2244,6 +2251,9 @@ def install_curseforge(pack, base, args):
             count += 1
     print("[4/4] 已铺开 overrides：%d 个文件" % count)
 
+    # 生成标准版本目录（让 PCL2 / HMCL 也能直接认出来）
+    write_instance_version(base, safe_name, version_id)
+
     meta = {
         "name": name,
         "version_id": version_id,
@@ -2257,7 +2267,7 @@ def install_curseforge(pack, base, args):
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
     print("\n完成。启动命令：")
-    print('  python mcroute.py launch %s --game-dir "%s"' % (version_id, game_dir))
+    print("  python mcroute.py launch " + os.path.basename(inst_root))
 
 
 MMC_LOADER_UIDS = {
@@ -2327,8 +2337,9 @@ def install_mmc(pack, base, args):
 
     name = (cfg.get("name") or os.path.splitext(os.path.basename(pack))[0]).strip()
     safe_name = "".join(c if c not in '\\/:*?"<>|' else "_" for c in name)
-    inst_root = os.path.join(base, "instances", safe_name)
-    game_dir = os.path.join(inst_root, ".minecraft")
+    # 主流启动器兼容布局：实例就是 versions/<名字>/，mods/config 直接放在里面（版本隔离）
+    inst_root = instance_version_dir(base, safe_name)
+    game_dir = inst_root
     os.makedirs(game_dir, exist_ok=True)
 
     print("整合包  : " + name)
@@ -2377,6 +2388,9 @@ def install_mmc(pack, base, args):
             count += 1
     print("[3/3] 已铺开 %d 个文件（mods/config/saves 等）" % count)
 
+    # 生成标准版本目录（让 PCL2 / HMCL 也能直接认出来）
+    write_instance_version(base, safe_name, version_id)
+
     meta = {
         "name": name,
         "version_id": version_id,
@@ -2391,7 +2405,77 @@ def install_mmc(pack, base, args):
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
     print("\n完成。启动命令：")
-    print('  python mcroute.py launch %s --game-dir "%s"' % (version_id, game_dir))
+    print("  python mcroute.py launch " + os.path.basename(inst_root))
+
+
+def instance_version_dir(base, name):
+    """实例对应的标准版本目录：<base>/versions/<名字>"""
+    safe = "".join(c if c not in '\\/:*?"<>|' else "_" for c in name).strip()
+    return os.path.join(base, "versions", safe)
+
+
+def find_client_jar(base, version):
+    """沿 inheritsFrom 链找第一个真实存在的客户端 jar"""
+    cur = version
+    for _ in range(6):
+        if not cur:
+            return None
+        vdir = os.path.join(base, "versions", cur)
+        jar = os.path.join(vdir, cur + ".jar")
+        if os.path.isfile(jar):
+            return jar
+        vjson = os.path.join(vdir, cur + ".json")
+        if not os.path.isfile(vjson):
+            return None
+        try:
+            with open(vjson, "r", encoding="utf-8") as f:
+                cur = json.load(f).get("inheritsFrom")
+        except Exception:
+            return None
+    return None
+
+
+def write_instance_version(base, name, parent_version):
+    """
+    把整合包实例写成一个「标准版本目录」：
+
+        versions/<名字>/<名字>.json     合并后的完整 json（不再有 inheritsFrom）
+        versions/<名字>/<名字>.jar      客户端 jar（从父版本复制过来）
+
+    为什么要这样：PCL2 / HMCL / Prism 只认 `versions/<版本名>/<版本名>.json`，
+    不认我们自定义的 instances 目录。写成标准结构后：
+      · 它们会把 <名字> 当成一个正常版本，直接可选可启动
+      · 我们的启动器也用同一份结构（版本隔离，mods/config 就在这个目录里）
+    """
+    import shutil
+
+    vdir = instance_version_dir(base, name)
+    os.makedirs(vdir, exist_ok=True)
+    vid = os.path.basename(vdir)
+
+    merged = load_version_json(base, parent_version)
+    if not merged:
+        print("[警告] 读取父版本 json 失败：" + str(parent_version))
+        return None
+
+    merged = dict(merged)
+    merged["id"] = vid
+    merged.pop("inheritsFrom", None)   # 已经合并过了，不再依赖父版本
+
+    # 客户端 jar：从 inheritsFrom 链上找第一个存在的复制过来，做到自包含
+    src_jar = find_client_jar(base, parent_version)
+    dst_jar = os.path.join(vdir, vid + ".jar")
+    if src_jar and not os.path.isfile(dst_jar):
+        try:
+            shutil.copyfile(src_jar, dst_jar)
+        except Exception as exc:
+            print("[警告] 复制客户端 jar 失败：" + str(exc))
+
+    with open(os.path.join(vdir, vid + ".json"), "w", encoding="utf-8") as f:
+        json.dump(merged, f, ensure_ascii=False, indent=2)
+
+    print("[实例] 已写出标准版本目录：versions\\" + vid)
+    return vdir
 
 
 def cmd_install(args):
@@ -2446,8 +2530,9 @@ def install_mrpack(pack, base, args):
 
     name = (index.get("name") or os.path.splitext(os.path.basename(pack))[0]).strip()
     safe_name = "".join(c if c not in '\\/:*?"<>|' else "_" for c in name)
-    inst_root = os.path.join(base, "instances", safe_name)
-    game_dir = os.path.join(inst_root, ".minecraft")
+    # 主流启动器兼容布局：实例就是 versions/<名字>/，mods/config 直接放在里面（版本隔离）
+    inst_root = instance_version_dir(base, safe_name)
+    game_dir = inst_root
     os.makedirs(game_dir, exist_ok=True)
 
     deps = index.get("dependencies") or {}
@@ -2551,6 +2636,9 @@ def install_mrpack(pack, base, args):
     print("[4/4] 已铺开 overrides：%d 个文件" % count)
 
     # ---- 记录实例元数据 ----
+    # 生成标准版本目录（让 PCL2 / HMCL 也能直接认出来）
+    write_instance_version(base, safe_name, version_id)
+
     meta = {
         "name": name,
         "version_id": version_id,
@@ -2564,7 +2652,7 @@ def install_mrpack(pack, base, args):
         json.dump(meta, f, ensure_ascii=False, indent=2)
 
     print("\n完成。启动命令：")
-    print('  python mcroute.py launch %s --game-dir "%s"' % (version_id, game_dir))
+    print("  python mcroute.py launch " + os.path.basename(inst_root))
 
 
 def cmd_java(args):
