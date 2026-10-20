@@ -1241,10 +1241,13 @@ def resolve_client_id():
     return None
 
 
-def http_request(url, payload=None, headers=None, method=None, timeout=30):
+def http_request(url, payload=None, headers=None, method=None, timeout=30, retries=3):
     """
     统一发请求，返回 (JSON数据, 耗时, 是否成功)。
     失败也返回 JSON —— 微软把错误原因写在响应体里（error / error_description）。
+
+    连接级失败（TLS 握手被重置、超时）会退避重试：
+    国内连微软端点偶尔会在握手阶段被掐断，重连通常就好了。
     """
     import urllib.parse
 
@@ -1259,19 +1262,33 @@ def http_request(url, payload=None, headers=None, method=None, timeout=30):
             hdrs.setdefault("Content-Type", "application/x-www-form-urlencoded")
             data = urllib.parse.urlencode(payload).encode("utf-8")
 
-    req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
-    t0 = time.time()
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read()
-        return json.loads(raw.decode("utf-8")), time.time() - t0, True
-    except urllib.error.HTTPError as exc:
-        raw = exc.read()
+    last_error = None
+    for attempt in range(retries):
+        req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
+        t0 = time.time()
         try:
-            return json.loads(raw.decode("utf-8")), time.time() - t0, False
-        except Exception:
-            return {"error": "http_" + str(exc.code),
-                    "error_description": raw.decode("utf-8", "replace")}, time.time() - t0, False
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read()
+            return json.loads(raw.decode("utf-8")), time.time() - t0, True
+        except urllib.error.HTTPError as exc:
+            # HTTPError 是"服务器正常回了个错误"（比如 400/401），不重试
+            raw = exc.read()
+            try:
+                return json.loads(raw.decode("utf-8")), time.time() - t0, False
+            except Exception:
+                return {"error": "http_" + str(exc.code),
+                        "error_description": raw.decode("utf-8", "replace")}, time.time() - t0, False
+        except Exception as exc:
+            # 连接被重置 / 超时 / 握手失败：重试
+            last_error = exc
+            if attempt + 1 < retries:
+                print("[网络] %s，%d 秒后重试（%d/%d）..." % (
+                    type(exc).__name__, attempt + 1, attempt + 1, retries - 1))
+                time.sleep(1.5 * (attempt + 1))
+
+    return ({"error": "network_error",
+             "error_description": "%s: %s" % (type(last_error).__name__, last_error)},
+            time.time() - t0, False)
 
 
 def auth_load():

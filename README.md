@@ -193,9 +193,34 @@ python mcroute.py loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 
 ## 已知限制
 
-- 令牌不会自动续期（需通过审核的 client_id 才能验证续期链路）
-- 下载只有日志进度，没有图形进度条
-- 前端目录目前是命令行 + tkinter，没有安装器
+### 正版登录卡在 Mojang 的 AppID 备案（当前唯一的硬阻塞）
+
+实测链路（2026-10-20）：
+
+| 步骤 | 状态 |
+|---|---|
+| 设备码 → 微软账号授权 | ✅ |
+| `login.microsoftonline.com` 换访问令牌 | ✅ |
+| Xbox Live 认证（XBL） | ✅ |
+| XSTS 授权 | ✅ |
+| `login_with_xbox` 换 Minecraft 令牌 | ❌ `Invalid app registration` |
+
+前四步全通，最后一步是 **Mojang 侧**拒绝：第三方启动器想让玩家用正版账号登录，必须先把 AppID 提交备案。
+
+- 申请地址：<https://aka.ms/mce-reviewappid>
+- 这与账号、网络、加速器都无关，纯粹是等待审批
+- 审批通过前只能用**离线模式**（可单机游玩，进不了正版服务器）
+- 通过后只需再跑一次 `python mcroute.py login`，之后靠 refresh token 自动续期
+
+### 其他
+
+- **离线模式下的报错是正常的**：部分版本（如 1.20.1、1.12.2）的 authlib 启动时会拿占位令牌去校验，
+  会打印 `InvalidCredentialsException: 401` / `Realms` 授权失败，不影响进游戏
+- **没有一键安装器**：需要 Python 3.9+（本项目在 3.14 上测试）和 tkinter（Windows 自带）
+- **CurseForge 整合包需要 API key**：`console.curseforge.com` 免费申请，放环境变量 `CF_API_KEY`
+  或 `mcdata/cf_api_key.txt`
+- **内存要手动指定**：`--memory 6G`，默认 2G（大整合包 2G 会崩）
+- **OptiFine 不支持**：它是"改 jar"的版本覆盖模式，和多版本共存天然冲突
 
 ---
 
