@@ -330,15 +330,115 @@ def expand_arg_entries(entries, ctx):
     return out
 
 
+_JAVA_VERSION_CACHE = {}
+
+# 常见安装位置：这些目录下面是一层「版本目录」，里面是 bin\java.exe 或 jre\bin\java.exe
+JAVA_SEARCH_DIRS = [
+    os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Eclipse Adoptium"),
+    os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), "Java"),
+    os.path.join(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"), "Java"),
+    os.path.join(os.environ.get("APPDATA", ""), ".minecraft", "runtime"),
+    os.path.join(os.environ.get("APPDATA", ""), "ModrinthApp", "meta", "java_versions"),
+    os.path.join(os.environ.get("USERPROFILE", ""), "curseforge", "minecraft", "Install", "java"),
+]
+
+
+def java_major_of(exe):
+    """
+    跑一次 java -version 解析主版本号（结果缓存，不重复跑）。
+
+    为什么必须真跑：目录名可能被改过，PATH 里也可能是 shim/javapath，
+    光看路径名不可靠。1.8.0_xxx 会归一成 8。
+    """
+    if exe in _JAVA_VERSION_CACHE:
+        return _JAVA_VERSION_CACHE[exe]
+
+    import re
+    import subprocess
+
+    major = None
+    try:
+        proc = subprocess.run([exe, "-version"], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=15)
+        text = (proc.stdout or "") + (proc.stderr or "")
+        match = re.search(r'version "(\d+)(?:\.(\d+))?', text)
+        if match:
+            first = int(match.group(1))
+            major = 8 if first == 1 else first
+    except Exception:
+        major = None
+
+    _JAVA_VERSION_CACHE[exe] = major
+    return major
+
+
+def scan_java(base=None):
+    """
+    找出机器上所有可用的 java.exe，返回 [(路径, 主版本号), ...]（按版本升序）。
+
+    来源顺序：PATH -> 常见安装目录 -> 我们自己管理的 <数据目录>/java_versions
+    """
+    seen = set()
+    candidates = []
+
+    def add(path_):
+        if not path_ or not os.path.isfile(path_):
+            return
+        key = os.path.normcase(os.path.realpath(path_))
+        if key in seen:
+            return
+        seen.add(key)
+        candidates.append(path_)
+
+    # 1) PATH
+    for part in (os.environ.get("PATH") or "").split(os.pathsep):
+        if part.strip():
+            add(os.path.join(part.strip().strip('"'), "java.exe"))
+
+    # 2) 常见安装目录（一层版本子目录）
+    for root in JAVA_SEARCH_DIRS:
+        if not os.path.isdir(root):
+            continue
+        for name in sorted(os.listdir(root)):
+            sub = os.path.join(root, name)
+            if os.path.isdir(sub):
+                add(os.path.join(sub, "bin", "java.exe"))
+                add(os.path.join(sub, "jre", "bin", "java.exe"))
+
+    # 3) 我们自己下载管理的
+    if base:
+        ours = os.path.join(base, "java_versions")
+        if os.path.isdir(ours):
+            for name in sorted(os.listdir(ours)):
+                add(os.path.join(ours, name, "bin", "java.exe"))
+
+    result = []
+    for exe in candidates:
+        major = java_major_of(exe)
+        if major is not None:
+            result.append((exe, major))
+    result.sort(key=lambda item: item[1])
+    return result
+
+
 def find_java(base, vj):
     """
-    按 version json 要求的 Java 大版本找 java.exe：
-      1. <数据目录>/java_versions
-      2. Modrinth App 的 java 目录（本机常见）
-      3. PATH 里的 java
+    按 version json 要求的 Java 大版本挑一个 java.exe。
+    没有精确匹配时，挑版本最接近的（并会在启动前给出提示）。
     """
-    major = (vj.get("javaVersion") or {}).get("majorVersion")
-    return find_java_anywhere(base, major)
+    required = (vj.get("javaVersion") or {}).get("majorVersion")
+    available = scan_java(base)
+
+    if required is not None:
+        for exe, major in available:
+            if major == required:
+                return exe
+
+    if not available:
+        return "java"
+    if required is None:
+        return available[-1][0]
+    return min(available, key=lambda item: abs(item[1] - required))[0]
 
 
 def write_argfile(path, args):
@@ -503,6 +603,11 @@ def plan_launch(args):
 
     # ---- 2. 找 Java ----
     java = args.java or find_java(base, vj)
+    java_major = java_major_of(java) if os.path.isfile(java) else None
+    required_java = (vj.get("javaVersion") or {}).get("majorVersion")
+    if required_java and java_major and java_major != required_java:
+        print("[提示] 这个版本声明需要 Java %s，当前用的是 Java %s。" % (required_java, java_major))
+        print("       多数情况能跑，但不要预期它稳定；建议装一个对应的 JDK。")
 
     # ---- 3. 占位符上下文 ----
     separator = ";" if os.name == "nt" else ":"
@@ -605,6 +710,7 @@ def plan_launch(args):
         "base": base,
         "version": ver,
         "java": java,
+        "java_major": java_major,
         "main_class": main_class,
         "argv": full_cmd,
         "argfile": argfile,
@@ -628,7 +734,8 @@ def print_plan(info):
     print(f"  实例目录   : {info['base']}")
     print(f"  版本       : {info['version']}")
     print(f"  mainClass  : {info['main_class']}")
-    print(f"  Java       : {info['java']}")
+    _java_note = "   (Java %s)" % info.get("java_major") if info.get("java_major") else ""
+    print(f"  Java       : {info['java']}{_java_note}")
     print(f"  classpath  : {len(info['classpath'])} 个条目（按规则跳过 {info['skipped']} 个不适用的库）")
     print(f"  natives    : {len(info['natives_jars'])} 个 jar 需要解压到 {info['natives_dir']}")
     print(f"  assets索引 : {info['asset_index_id']}")
@@ -1495,6 +1602,20 @@ def cmd_loader(args):
         print("      [警告] 没有新增版本目录，安装可能没跑完（看上面的输出）")
 
 
+def cmd_java(args):
+    """列出机器上检测到的所有 Java（按主版本升序）"""
+    base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
+    items = scan_java(base)
+    if not items:
+        print("没找到任何 Java。")
+        print("可以从 https://api.adoptium.net 下载 JRE，解压到 "
+              + os.path.join(base, "java_versions"))
+        return
+    print("检测到 %d 个 Java：" % len(items))
+    for exe, major in items:
+        print("  Java %-3s %s" % (major, exe))
+
+
 def cmd_status(_args):
     auth = auth_load()
     if not auth:
@@ -1611,6 +1732,10 @@ def main():
     p11.add_argument("--dir", help="数据目录，默认 mcdata/")
     p11.add_argument("--java", help="指定 java.exe（安装器需要 Java 21+）")
     p11.set_defaults(func=cmd_loader)
+
+    p12 = sub.add_parser("java", help="列出检测到的 Java")
+    p12.add_argument("--dir", help="数据目录，默认 mcdata/")
+    p12.set_defaults(func=cmd_java)
 
     args = parser.parse_args()
 

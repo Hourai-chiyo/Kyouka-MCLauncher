@@ -27,6 +27,7 @@
 | 版本清单 | Mojang 官方 → Modrinth → Minecraft Wiki 三级兜底 |
 | 下载 | 客户端 / 库 / natives / assets，全部 sha1 校验、可断点续传、并发下载 |
 | 启动 | 原版与 **NeoForge**；加载器版本自动合并 `inheritsFrom` 后启动 |
+| Java 检测 | 扫描 PATH 与常见安装目录，按版本要求自动匹配（`python mcroute.py java` 列出全部） |
 | 本地缓存 | 内容寻址（`assets/objects/<h2>/<hash>`），天然去重 |
 | 图形界面 | tkinter，零依赖，下载 / 启动 / 登录状态 / 日志 |
 | 微软登录 | OAuth 设备码流程（需自备 client_id，见下） |

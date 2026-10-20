@@ -12,6 +12,7 @@
 - sha1 校验 / 断点续传 / 内容寻址资源去重
 - 微软登录（设备码流程 + refresh token 静默续期）—— 等 Mojang AppID 白名单
 - 图形界面 + 下载进度条
+- **Java 检测**：扫描 PATH + 常见安装目录（Adoptium / .minecraft runtime / Modrinth / CurseForge），逐个跑 `-version` 校验主版本，按 version json 的需求匹配；`java` 子命令可列出全部
 
 ---
 
@@ -41,44 +42,7 @@ python mcroute.py loader quilt  1.20.1-0.27.0
 
 ---
 
-### 2. Java 检测与管理（当前是隐性风险）
-
-**现状（已实测核对）**：
-- `find_java()` 只在 `mcdata/java_versions` 和 Modrinth App 的 java 目录里找，找不到就退回 PATH
-- **本机其实装了 Java 8 / 11 / 17 / 21 四个 Adoptium JDK**，但检测器完全没看 `Program Files`
-- 结果：Forge 1.20.1 明明有对应的 JDK 17，却被退回用 **21** 跑——能跑，但不是它声明的版本
-
-**本机实测可用的 Java（2026-10-20 枚举）**：
-
-| 版本 | 路径 |
-|---|---|
-| 8 / 11 / 17 / 21 | `C:\Program Files\Eclipse Adoptium\jdk-*\bin` |
-| 17 | `%APPDATA%\.minecraft\runtime\java-runtime-epsilon\bin`（Mojang 官方 runtime） |
-| 21 / 8 | `%APPDATA%\ModrinthApp\meta\java_versions\*\bin` |
-| 8 | `%USERPROFILE%\curseforge\minecraft\Install\java\jre-legacy\bin` |
-
-**检测优先级建议**：
-1. 注册表 `SOFTWARE\JavaSoft\JDK` / `JRE`（含 WOW6432Node）
-2. 上面这些已知目录（`Program Files\Eclipse Adoptium`、`Program Files\Java`、`%APPDATA%\.minecraft\runtime` 等）
-3. `mcdata/java_versions`（我们自己下载并管理的）
-4. PATH
-5. 全都没有 -> 从 Adoptium 下载到 `mcdata/java_versions`
-
-**要做的**：
-
-1. **读需求**：从 version json 的 `javaVersion.majorVersion` 取要求的大版本
-   （1.12.2→8，1.17→16，1.20.1→17，1.21.1→21）
-2. **本机检测**：注册表 `SOFTWARE\JavaSoft`、`Program Files`、`PATH`、已有 `java_versions`
-3. **缺失时下载**：Adoptium API 实测可用（`api.adoptium.net`），清华 TUNA 镜像作备用，
-   落到 `mcdata/java_versions/<name>/`，之后自动复用
-4. **启动前校验**：大版本不匹配时**明确提示**，而不是静默用错的版本
-5. 可选子命令：`java list` / `java install 17`
-
-**为什么重要**：这是目前唯一一个"用户机器上缺东西时无法自助"的环节，而且错配 Java 版本报出的错往往和真正原因无关（和之前 `No value present` 那个坑同一类）。
-
----
-
-### 3. OptiFine（评估后倾向不做）
+### 2. OptiFine（评估后倾向不做）
 
 **问题**：OptiFine 的官方 installer 采用「版本覆盖」模式——直接改写 jar，这和"多版本共存"天然冲突，一个版本被它改过之后就不能再正常启动了。
 
@@ -89,7 +53,7 @@ python mcroute.py loader quilt  1.20.1-0.27.0
 
 ---
 
-### 4. 整合包安装（.mrpack / CurseForge zip）
+### 3. 整合包安装（.mrpack / CurseForge zip）
 
 需要解析整合包 manifest、处理依赖树、把 mod 落进实例的 `mods/`。
 现在只支持"一个版本目录"，还没有"实例"概念（多个实例共享 libraries/assets）。
