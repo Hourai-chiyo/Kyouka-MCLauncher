@@ -1333,15 +1333,32 @@ def find_java_anywhere(base, major=None):
     return candidates[0] if candidates else "java"
 
 
+def installer_url(kind, ver):
+    """
+    加载器 installer 的下载地址。
+      neoforge: 版本形如 21.1.264
+      forge   : 版本形如 1.20.1-47.2.0（maven 路径就是 <mc>-<forge版本>）
+    """
+    if kind == "neoforge":
+        return ("https://neoforged.forgecdn.net/releases/net/neoforged/"
+                "neoforge/{v}/neoforge-{v}-installer.jar").format(v=ver)
+    if kind == "forge":
+        return ("https://maven.minecraftforge.net/net/minecraftforge/forge/"
+                "{v}/forge-{v}-installer.jar").format(v=ver)
+    return None
+
+
 def cmd_loader(args):
     """
-    安装加载器。目前只支持 NeoForge。
+    安装加载器（neoforge / forge）。
 
-    为什么不能简单地拼参数启动：NeoForge 需要「补丁后的客户端 jar」，
-    那个文件只有官方 installer 能生成。所以流程是：
-        下载 installer -> 预下载它的处理器依赖 -> 跑 installer -> 得到可用实例
-    其中「预下载依赖」这一步是必须的：installer 自己会去连
-    maven.neoforged.net（国内被 DNS 污染），失败后只会留下一个不完整的 json。
+    两者机制相同：官方 installer 会生成「补丁后的客户端 jar」和带 inheritsFrom 的 json。
+    所以流程也相同：
+        下载 installer -> 预下载它的处理器依赖 -> 跑 installer -> 检查产物
+
+    预下载那一步是必须的：installer 自己会去连官方 maven，而 neoforge 的
+    maven.neoforged.net 在国内被 DNS 污染，失败后只会留下一个缺 jar 的 json，
+    后续启动会报出毫无关联的错误（比如 No value present）。
     """
     import zipfile
 
@@ -1349,23 +1366,29 @@ def cmd_loader(args):
     ver = args.version
     base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
 
-    if kind != "neoforge":
-        print("[错误] 目前只支持 neoforge")
+    if kind not in ("neoforge", "forge"):
+        print("[错误] 目前支持 neoforge 和 forge")
         return
 
+    url = installer_url(kind, ver)
     os.makedirs(base, exist_ok=True)
     tmp_dir = os.path.join(base, "_tmp")
     os.makedirs(tmp_dir, exist_ok=True)
 
-    java = args.java or find_java_anywhere(base, 21)
-    print("加载器  : NeoForge " + ver)
+    # 安装器本身需要的 Java：NeoForge 用 21，Forge 用 17（找不到就退回任意一个）
+    java = args.java or find_java_anywhere(base, 21 if kind == "neoforge" else 17)
+    print("加载器  : {0} {1}".format(kind, ver))
     print("数据目录: " + base)
     print("Java    : " + java)
 
+    vroot = os.path.join(base, "versions")
+    os.makedirs(vroot, exist_ok=True)
+    before = set(os.listdir(vroot))
+
     # ---- 1) 下载 installer ----
-    installer = os.path.join(tmp_dir, "neoforge-installer.jar")
-    url = NEOFORGE_INSTALLER.format(ver=ver)
+    installer = os.path.join(tmp_dir, kind + "-installer.jar")
     print("\n[1/4] 下载 installer ...")
+    print("      " + url)
     try:
         data, dt = fetch_bytes(url, timeout=180)
     except Exception as exc:
@@ -1375,14 +1398,26 @@ def cmd_loader(args):
         f.write(data)
     print("      OK，%.1f MB，%.1fs" % (len(data) / 1024 / 1024, dt))
 
-    # ---- 2) 预下载 installer 的处理器依赖（必须走 forgecdn）----
+    # ---- 2) 预下载处理器依赖 ----
     print("[2/4] 预下载 installer 处理器依赖 ...")
-    with zipfile.ZipFile(installer) as zf:
-        profile = json.loads(zf.read("install_profile.json").decode("utf-8"))
+    try:
+        with zipfile.ZipFile(installer) as zf:
+            profile = json.loads(zf.read("install_profile.json").decode("utf-8"))
+            # 安装器不仅要下载处理器依赖，还要下载 version.json 里的运行时库；
+            # 官方 maven 一慢它就超时失败，所以两类都替它下好。
+            template_libs = []
+            if "version.json" in zf.namelist():
+                template = json.loads(zf.read("version.json").decode("utf-8"))
+                template_libs = template.get("libraries") or []
+    except Exception as exc:
+        print("      读取 install_profile.json 失败：" + str(exc))
+        return
 
-    libs = profile.get("libraries") or []
+    all_libs = list(profile.get("libraries") or []) + template_libs
+    print("      处理器依赖 %d 个 + 运行时库 %d 个" % (len(profile.get("libraries") or []), len(template_libs)))
+
     ok = skip = fail = 0
-    for lib in libs:
+    for lib in all_libs:
         artifact = (lib.get("downloads") or {}).get("artifact") or {}
         rel = artifact.get("path")
         raw_url = artifact.get("url")
@@ -1402,49 +1437,62 @@ def cmd_loader(args):
     if fail:
         print("      有依赖没下全，安装可能失败（可重跑本命令续传）")
 
-    # ---- 3) 让 installer 认这个目录（缺 launcher_profiles.json 它会拒绝）----
+    # ---- 3) 让 installer 认这个目录 ----
     profiles_path = os.path.join(base, "launcher_profiles.json")
     if not os.path.isfile(profiles_path):
         with open(profiles_path, "w", encoding="utf-8") as f:
             json.dump({"profiles": {}, "settings": {}, "version": 3}, f)
         print("      已创建 launcher_profiles.json")
 
-    # ---- 4) 运行安装器 ----
+    # ---- 4) 运行 installer ----
     print("[3/4] 运行 installer（可能要一两分钟）...")
     import subprocess
     try:
         proc = subprocess.run(
             [java, "-jar", installer, "--installClient", base],
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900,
         )
     except Exception as exc:
         print("      启动 installer 失败：" + str(exc))
         return
 
-    tail = (proc.stdout or "")[-500:] + (proc.stderr or "")[-500:]
     if proc.returncode != 0:
         print("      installer 退出码 " + str(proc.returncode))
-        for line in tail.splitlines()[-8:]:
+        tail = ((proc.stdout or "") + (proc.stderr or "")).splitlines()[-10:]
+        for line in tail:
             print("      | " + line)
         return
     print("      installer 完成")
 
     # ---- 5) 检查产物 ----
     print("[4/4] 检查产物 ...")
-    vdir = os.path.join(base, "versions", "neoforge-" + ver)
-    vjson = os.path.join(vdir, "neoforge-" + ver + ".json")
-    vjar = os.path.join(vdir, "neoforge-" + ver + ".jar")
-    if os.path.isfile(vjson) and os.path.isfile(vjar):
-        print("      OK：%s 和 补丁客户端 jar 都在" % os.path.basename(vjson))
-        print("\n下一步：")
-        print("  python mcroute.py fetch neoforge-%s --no-assets" % ver)
-        print("  python mcroute.py launch neoforge-%s" % ver)
+    # 期望的版本目录名：neoforge-<ver> / <mc>-forge-<ver>
+    if kind == "neoforge":
+        expected = "neoforge-" + ver
     else:
-        print("      [警告] 缺少产物：")
-        if not os.path.isfile(vjson):
-            print("        没有版本 json")
-        if not os.path.isfile(vjar):
-            print("        没有补丁客户端 jar（安装没跑完）")
+        mc_part, _sep, forge_part = ver.partition("-")
+        expected = mc_part + "-forge-" + forge_part if forge_part else ver
+
+    after = set(os.listdir(vroot))
+    new_dirs = sorted(after - before)
+    if expected in after:
+        new_dirs = [expected] + [d for d in new_dirs if d != expected]
+        # 重跑时目录已存在，用期望目录名兜底
+        before.discard(expected) if expected in before else None
+    if new_dirs:
+        for name in new_dirs:
+            vdir = os.path.join(vroot, name)
+            files = os.listdir(vdir) if os.path.isdir(vdir) else []
+            has_json = any(f.endswith(".json") for f in files)
+            has_jar = any(f.endswith(".jar") for f in files)
+            print("      新增版本目录：" + name)
+            print("        版本 json: " + ("有" if has_json else "缺失"))
+            print("        补丁 jar : " + ("有" if has_jar else "无（1.20+ 的 Forge 不需要，运行时打补丁）"))
+        print("\n下一步：")
+        print("  python mcroute.py fetch  " + new_dirs[0] + " --no-assets")
+        print("  python mcroute.py launch " + new_dirs[0])
+    else:
+        print("      [警告] 没有新增版本目录，安装可能没跑完（看上面的输出）")
 
 
 def cmd_status(_args):

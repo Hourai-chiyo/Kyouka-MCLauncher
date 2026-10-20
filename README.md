@@ -48,6 +48,7 @@ python mcroute.py                    # 查看全部用法
 python mcroute.py fetch 1.21.1       # 下载完整闭包（client + 库 + assets，约 800MB）
 python mcroute.py launch 1.21.1      # 启动
 python mcroute.py loader neoforge 21.1.264   # 一条命令装好 NeoForge
+python mcroute.py loader forge 1.20.1-47.2.0 # 或 Forge（版本写成 <MC版本>-<Forge版本>）
 python mcroute.py sources            # 所有下载源测速
 python mcroute.py wiki 1.12.2        # 用 Wiki 索引兜底查版本
 ```
@@ -126,7 +127,7 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ---
 
-## 加载器支持（NeoForge）
+## 加载器支持（NeoForge / Forge）
 
 一条命令完成：
 
@@ -134,6 +135,12 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 python mcroute.py loader neoforge 21.1.264
 python mcroute.py fetch  neoforge-21.1.264
 python mcroute.py launch neoforge-21.1.264
+
+# Forge（版本格式是 <MC版本>-<Forge版本>，与官方 maven 路径一致）
+python mcroute.py fetch  1.20.1                       # 先准备原版
+python mcroute.py loader forge 1.20.1-47.2.0
+python mcroute.py fetch  1.20.1-forge-47.2.0
+python mcroute.py launch 1.20.1-forge-47.2.0
 ```
 
 `loader` 内部做的事（自己实现也很容易，但顺序不能错）：
