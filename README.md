@@ -10,7 +10,7 @@
 
 一个面向中国大陆网络环境的 **Minecraft: Java Edition 启动器**，重点是「下载源可靠」和「离线可自持」。
 
-![界面截图](docs/gui-tabs.png)
+![界面截图](docs/gui-csharp-launch.png)
 
 ---
 
@@ -189,21 +189,28 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ## 图形界面
 
-源码运行（或 Python 版安装包）时是 tkinter 的四页界面：
+### C# 版（72 KB，主推）
 
-![启动页](docs/gui-tabs.png)
+![启动页](docs/gui-csharp-launch.png)
 
 | 标签页 | 能干什么 |
 |---|---|
-| **启动** | 列出本地版本（**整合包实例也在里面，标了 `[整合包]`**）、下载原版、选 Java、设内存、启动 |
-| **加载器** | 选 fabric / quilt / legacyfabric / forge / neoforge，填版本，一键装 |
+| **启动** | 本地版本列表、下载原版、选 Java、设内存、启动 |
+| **加载器** | fabric / quilt / legacyfabric / forge / neoforge 一键装（自动下原版 + 补库） |
 | **整合包** | 选文件安装，自动识别 mrpack / MultiMC / CurseForge |
-| **实例** | 列出已装整合包实例：启动 / 体检 / 测试启动 / 生成启动器 / 打开目录 |
+| **管理** | 所有本地版本（原版 / 整合包 / 外部）：体检、测试启动、生成启动器、打开目录 |
 
-![实例页](docs/gui-tab-instances.png)
+![加载器页](docs/gui-csharp-loader.png)
+![整合包页](docs/gui-csharp-packs.png)
+![管理页](docs/gui-csharp-manage.png)
 
-界面和命令行调的是**同一批函数**（`cmd_fetch` / `cmd_loader` / `cmd_install` / `cmd_launch`），
-所以两边行为永远一致，不会出现"GUI 能用 CLI 不能"这种偏差。
+### Python 版（tkinter，功能最全）
+
+![Python 版启动页](docs/gui-tabs.png)
+![Python 版实例页](docs/gui-tab-instances.png)
+
+两个版本调的是**同一套算法**（下载源路由、版本合并、natives 解压、加载器安装、整合包安装），
+所以行为一致，不会出现"GUI 能用 CLI 不能"这种偏差。C# 版就是用 Python 版当参考实现移植过来的。
 
 ## 打包成 exe（Python 版的打包方式）
 

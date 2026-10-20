@@ -28,7 +28,8 @@ namespace Mcroute
 
         public MainForm()
         {
-            _baseDir = Version.BaseDir(null);
+            // 文档截图时可以指定数据目录（MCROUTE_DATA），平时走默认逻辑
+            _baseDir = Version.BaseDir(Environment.GetEnvironmentVariable("MCROUTE_DATA"));
             Text = "mcroute — Minecraft 启动器（C# 版）";
             ClientSize = new Size(940, 640);
             MinimumSize = new Size(820, 560);
@@ -207,6 +208,40 @@ namespace Mcroute
 
             page.Controls.AddRange(new Control[] { _manageList, refresh, verify, test, mkbat, openDir });
             return page;
+        }
+
+        /// <summary>给文档截图用：逐页渲染成 png（--shot 模式）。</summary>
+        public void CaptureTabs(string dir)
+        {
+            Directory.CreateDirectory(dir);
+            string[] names = { "launch", "loader", "packs", "manage" };
+            int i = 0;
+            var timer = new System.Windows.Forms.Timer { Interval = 800 };
+            timer.Tick += (s2, e2) =>
+            {
+                if (i >= _tabs.TabPages.Count)
+                {
+                    timer.Stop();
+                    Close();
+                    return;
+                }
+                _tabs.SelectedIndex = i;
+                Application.DoEvents();
+                try
+                {
+                    using (var bmp = new Bitmap(ClientSize.Width, Height))
+                    {
+                        DrawToBitmap(bmp, new Rectangle(0, 0, bmp.Width, bmp.Height));
+                        string name = i < names.Length ? names[i] : "tab" + i;
+                        bmp.Save(Path.Combine(dir, "gui-csharp-" + name + ".png"),
+                                 System.Drawing.Imaging.ImageFormat.Png);
+                        Console.WriteLine("saved " + name);
+                    }
+                }
+                catch (Exception ex) { Console.WriteLine("fail " + ex.Message); }
+                i++;
+            };
+            timer.Start();
         }
 
         // ---------------- 数据 ----------------

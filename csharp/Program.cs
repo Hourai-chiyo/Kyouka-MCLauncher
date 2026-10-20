@@ -15,6 +15,17 @@ namespace Mcroute
         [STAThread]
         public static int Main(string[] args)
         {
+            // 文档截图模式：mcroute.exe --shot <目录>
+            if (args.Length >= 2 && args[0] == "--shot")
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                var form = new MainForm();
+                form.Shown += (s2, e2) => form.CaptureTabs(args[1]);
+                Application.Run(form);
+                return 0;
+            }
+
             // 双击（无参数）-> GUI；带参数 -> 命令行（WinExe 默认没有控制台，挂到父控制台）
             if (args.Length == 0)
             {
