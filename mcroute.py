@@ -1807,7 +1807,173 @@ def mrpack_loader_of(deps, mc):
     return None, None, mc
 
 
+MMC_LOADER_UIDS = {
+    "net.minecraftforge": "forge",
+    "net.neoforged": "neoforge",
+    "net.fabricmc.fabric-loader": "fabric",
+    "org.quiltmc.quilt-loader": "quilt",
+}
+
+
+def install_mmc(pack, base, args):
+    """
+    安装 MultiMC / Prism / HMCL 导出的实例包。
+
+    这类包的结构：
+        instance.cfg      实例设置（名称、内存分配）
+        mmc-pack.json     组件列表：net.minecraft / net.minecraftforge / fabric-loader ...
+        .minecraft/       mods、config、saves 等
+
+    和 mrpack 最大的区别：**mod 已经打在包里**，不需要下载清单，直接铺开就行。
+    """
+    import zipfile
+
+    with zipfile.ZipFile(pack) as zf:
+        names = zf.namelist()
+        if "mmc-pack.json" not in names:
+            print("[错误] 没有 mmc-pack.json，不是 MultiMC 系实例包")
+            return
+        pack_meta = json.loads(zf.read("mmc-pack.json").decode("utf-8"))
+
+        cfg = {}
+        if "instance.cfg" in names:
+            for line in zf.read("instance.cfg").decode("utf-8", "replace").splitlines():
+                line = line.strip()
+                if "=" in line and not line.startswith("#"):
+                    key, _sep, value = line.partition("=")
+                    cfg[key.strip()] = value.strip()
+
+    # ---- 解析组件 ----
+    mc = None
+    loader_kind = None
+    loader_ver = None
+    for comp in pack_meta.get("components") or []:
+        uid = comp.get("uid", "")
+        ver = comp.get("version", "")
+        if uid == "net.minecraft":
+            mc = ver
+        elif uid in MMC_LOADER_UIDS:
+            loader_kind = MMC_LOADER_UIDS[uid]
+            loader_ver = ver
+
+    if not mc:
+        print("[错误] mmc-pack.json 里没有 net.minecraft 组件")
+        return
+
+    deps = {"minecraft": mc}
+    if loader_kind == "forge":
+        deps["forge"] = loader_ver
+    elif loader_kind == "neoforge":
+        deps["neoforge"] = loader_ver
+    elif loader_kind == "fabric":
+        deps["fabric-loader"] = loader_ver
+    elif loader_kind == "quilt":
+        deps["quilt-loader"] = loader_ver
+
+    _kind, loader_full, version_id = mrpack_loader_of(deps, mc)
+
+    name = (cfg.get("name") or os.path.splitext(os.path.basename(pack))[0]).strip()
+    safe_name = "".join(c if c not in '\\/:*?"<>|' else "_" for c in name)
+    inst_root = os.path.join(base, "instances", safe_name)
+    game_dir = os.path.join(inst_root, ".minecraft")
+    os.makedirs(game_dir, exist_ok=True)
+
+    print("整合包  : " + name)
+    print("实例目录: " + inst_root)
+    print("MC 版本 : " + str(mc))
+    print("加载器  : " + (("%s %s" % (loader_kind, loader_ver)) if loader_kind else "无（原版）"))
+    print("目标版本: " + version_id)
+    if cfg.get("MaxMemAlloc"):
+        print("建议内存: %s MB（来自 instance.cfg）" % cfg.get("MaxMemAlloc"))
+
+    # ---- 1) 原版 ----
+    mc_json = os.path.join(base, "versions", mc, mc + ".json")
+    if not os.path.isfile(mc_json):
+        print("\n[1/3] 本地没有原版 %s，先下载 ..." % mc)
+        cmd_fetch(argparse.Namespace(version=mc, dir=base, workers=args.workers,
+                                     no_assets=getattr(args, "no_assets", False)))
+        if not os.path.isfile(mc_json):
+            print("[错误] 原版下载失败，安装中止")
+            return
+
+    # ---- 2) 加载器 ----
+    vjson = os.path.join(base, "versions", version_id, version_id + ".json")
+    if not os.path.isfile(vjson) and loader_kind:
+        print("[2/3] 本地没有 %s，先自动安装加载器 ..." % version_id)
+        try:
+            cmd_loader(argparse.Namespace(kind=loader_kind, version=loader_full,
+                                          dir=base, java=None))
+        except Exception as exc:
+            print("      自动安装失败：" + str(exc))
+            return
+    else:
+        print("[2/3] 版本已就绪")
+
+    # ---- 3) 铺开 .minecraft/ ----
+    prefix = ".minecraft/"
+    count = 0
+    with zipfile.ZipFile(pack) as zf:
+        for entry in zf.namelist():
+            if not entry.startswith(prefix) or entry.endswith("/"):
+                continue
+            rel = entry[len(prefix):]
+            dest = os.path.join(game_dir, rel.replace("/", os.sep))
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with zf.open(entry) as src_file, open(dest, "wb") as dst_file:
+                dst_file.write(src_file.read())
+            count += 1
+    print("[3/3] 已铺开 %d 个文件（mods/config/saves 等）" % count)
+
+    meta = {
+        "name": name,
+        "version_id": version_id,
+        "minecraft": mc,
+        "loader": loader_kind,
+        "loader_version": loader_ver,
+        "game_dir": game_dir,
+        "max_mem_mb": cfg.get("MaxMemAlloc"),
+        "source": pack,
+    }
+    with open(os.path.join(inst_root, "instance.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+
+    print("\n完成。启动命令：")
+    print('  python mcroute.py launch %s --game-dir "%s"' % (version_id, game_dir))
+
+
 def cmd_install(args):
+    """安装整合包：自动识别 Modrinth .mrpack / MultiMC 系实例包 / CurseForge zip"""
+    import zipfile
+
+    pack = os.path.abspath(args.pack)
+    base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
+
+    if not os.path.isfile(pack):
+        print("[错误] 文件不存在：" + pack)
+        return
+    try:
+        with zipfile.ZipFile(pack) as zf:
+            names = set(zf.namelist())
+    except Exception as exc:
+        print("[错误] 打不开压缩包：" + str(exc))
+        return
+
+    if "modrinth.index.json" in names:
+        print("格式：Modrinth (.mrpack)")
+        install_mrpack(pack, base, args)
+    elif "mmc-pack.json" in names:
+        print("格式：MultiMC / Prism 实例包")
+        install_mmc(pack, base, args)
+    elif "manifest.json" in names:
+        print("格式：CurseForge 整合包")
+        print("[未支持] CurseForge 包只给 projectID/fileID，换直链需要 API key。")
+        print("         免费申请：https://console.curseforge.com/ → API Keys")
+        return
+    else:
+        print("[错误] 认不出的整合包格式（没有 modrinth.index.json / mmc-pack.json / manifest.json）")
+
+
+def install_mrpack(pack, base, args):
     """
     安装 Modrinth 整合包（.mrpack）。
 
@@ -1819,16 +1985,6 @@ def cmd_install(args):
     """
     import shutil
     import zipfile
-
-    pack = os.path.abspath(args.pack)
-    base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
-
-    if not os.path.isfile(pack):
-        print("[错误] 文件不存在：" + pack)
-        return
-    if not pack.lower().endswith(".mrpack"):
-        print("[错误] 目前只支持 .mrpack（Modrinth 格式）")
-        return
 
     with zipfile.ZipFile(pack) as zf:
         names = zf.namelist()

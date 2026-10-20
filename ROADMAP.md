@@ -16,6 +16,7 @@
 - **Fabric / Quilt / Legacy Fabric**：不用安装器，直接从各自官方 meta 拿 profile json；自动挑最新 stable loader
   （Quilt 用 `meta.quiltmc.org/v3`，Legacy Fabric 用 `meta.legacyfabric.net/v2`）
 - **老版本 natives 解压**：1.19 之前必须把 .dll 解出来放进 `java.library.path`，否则 `UnsatisfiedLinkError`
+- **整合包安装（MultiMC / Prism / HMCL 导出包）**：解析 `mmc-pack.json` 的组件 → 直接铺开包内的 `.minecraft/`（mod 已在包里，无需下载）
 - **整合包安装（.mrpack）**：解析 `modrinth.index.json` → 自动装对应加载器 → 并发下载并 sha1 校验 → 铺开 `overrides/`
 - **URL 改写补充**：`media.forgecdn.net` 会 403，同路径的 `edge.forgecdn.net` 正常（文件字节一致）
 - **版本 jar 从父版本复制**：Forge/NeoForge 的 `-DignoreList` 期望版本目录里有 `${version_name}.jar`，缺了会把同一个游戏加载成两个模块（`ResolutionException`）
@@ -37,10 +38,13 @@
 
 ---
 
-### 2. 整合包：CurseForge zip / MultiMC 导出包
+### 2. 整合包：CurseForge zip
 
-需要解析整合包 manifest、处理依赖树、把 mod 落进实例的 `mods/`。
-现在只支持"一个版本目录"，还没有"实例"概念（多个实例共享 libraries/assets）。
+CurseForge 的 manifest 只给 `projectID`/`fileID`，换下载直链必须调 `api.curseforge.com`，实测无 key 一律 403。
+
+需要用户提供免费 API key（`console.curseforge.com` → API Keys），然后加一个 `--cf-key` 参数或存进配置。
+
+顺带已知：CF 的下载域名 `media.forgecdn.net` 会 403，要改写成 `edge.forgecdn.net`（已实现）。
 
 ---
 
