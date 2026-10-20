@@ -21,7 +21,7 @@
 | 下载 | 大小 | 说明 |
 |---|---|---|
 | **[mcroute-setup.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-setup.exe)** | 13.3 MB | 安装包，双击安装 |
-| **[mcroute-portable.zip](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-portable.zip)** | 13.3 MB | 免安装，解压后双击 `启动 mcroute.vbs` |
+| **[mcroute-portable.zip](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-portable.zip)** | 13.3 MB | 免安装，解压后双击 `start-mcroute.vbs` |
 
 （以上是"永远指向最新版"的直链，不需要进 Releases 页面找）
 
@@ -33,6 +33,16 @@
 - 建议**先把它拷到纯英文路径**（如 `D:\`）再运行
 
 > 安装包只有 13 MB，**不含任何游戏文件**——游戏文件在首次下载时从官方源获取。
+
+**三种安装方式怎么选：**
+
+| | exe 安装器 | MSI | MSIX |
+|---|---|---|---|
+| 需要管理员 | 否 | 否（per-user） | 否，但**要手动信任证书** |
+| 批量部署 | 一般 | ✅ 静默参数成熟 | 一般 |
+| 卸载 | 自带脚本 | 系统标准 | 系统标准 |
+| 分发门槛 | 低 | 低 | 高（证书或商店签名） |
+| 数据位置 | `%LOCALAPPDATA%\mcroute` | 同左 | 系统虚拟化到 `Packages\...\LocalCache` |
 
 **方式二：源码运行**
 
@@ -219,7 +229,7 @@ build_exe.bat
 |---|---|
 | `mcroute.exe` | 主程序 |
 | `_internal\` | 运行库（别删） |
-| **`启动 mcroute.vbs`** | **双击这个启动**，不会弹黑窗口 |
+| **`start-mcroute.vbs`** | **双击这个启动**，不会弹黑窗口 |
 
 ![exe 版界面](docs/gui-exe.png)
 
@@ -229,6 +239,33 @@ build_exe.bat
 > 连崩溃日志都写不出来），`--onefile` 则报 `Could not create temporary directory`。
 > 所以改成 `--console` 打包 + 用 vbs 把控制台窗口隐藏，效果一样但稳定得多。
 > 直接双击 `mcroute.exe` 也能用，只是会多一个黑色控制台窗口（还能顺便看日志）。
+
+## MSI 安装包（企业 / 批量部署）
+
+```bat
+build_msi.bat
+```
+
+产物 `dist\mcroute.msi`（约 11 MB），**per-user 安装，不需要管理员权限**。
+
+实测（2026-10-20，Win11 26100）：
+
+| 项目 | 结果 |
+|---|---|
+| 静默安装 | `msiexec /i mcroute.msi /qn` → 退出码 0，992 个文件 / 29.7 MB |
+| 快捷方式 | 开始菜单 + 桌面，指向 `wscript.exe "...\start-mcroute.vbs"` |
+| 卸载项 | 控制面板可见「mcroute 0.1.0」 |
+| 启动 | 通过快捷方式正常拉起 GUI |
+| 静默卸载 | `msiexec /x mcroute.msi /qn` → 目录 / 快捷方式 / 卸载项全部清除 |
+
+> **WiX 版本要注意**：WiX **v7 要求接受 OSMF 付费条款**，直接构建会报
+> `error WIX7015: You must accept the Open Source Maintenance Fee (OSMF) EULA`。
+> 所以用 **v5**：
+> ```bash
+> dotnet tool install --global wix --version 5.0.2
+> ```
+> `product.wxs` 里用 `<Files Include="...\**" />` 递归收集文件（v4+ 的新特性），
+> 不用像老版本那样逐个列 988 个文件。
 
 ## 安装包（mcroute-setup.exe）
 

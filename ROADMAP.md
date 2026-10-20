@@ -16,6 +16,8 @@
 - **Fabric / Quilt / Legacy Fabric**：不用安装器，直接从各自官方 meta 拿 profile json；自动挑最新 stable loader
   （Quilt 用 `meta.quiltmc.org/v3`，Legacy Fabric 用 `meta.legacyfabric.net/v2`）
 - **老版本 natives 解压**：1.19 之前必须把 .dll 解出来放进 `java.library.path`，否则 `UnsatisfiedLinkError`
+- **MSI 安装包（WiX v5）**：per-user、静默安装/卸载实测通过；WiX v7 因 OSMF 付费条款不可用，锁在 v5
+- **MSIX 安装包**：makeappx 打包 + 自签名实测可注册运行；正式分发需证书信任或上架商店
 - **整合包安装（CurseForge zip）**：`manifest.json` 只有 projectID/fileID，靠官方 API 换地址；key 放环境变量 `CF_API_KEY` 或 `mcdata/cf_api_key.txt`
 - **整合包安装（MultiMC / Prism / HMCL 导出包）**：解析 `mmc-pack.json` 的组件 → 直接铺开包内的 `.minecraft/`（mod 已在包里，无需下载）
 - **整合包安装（.mrpack）**：解析 `modrinth.index.json` → 自动装对应加载器 → 并发下载并 sha1 校验 → 铺开 `overrides/`

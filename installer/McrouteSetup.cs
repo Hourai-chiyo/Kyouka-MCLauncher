@@ -43,7 +43,7 @@ class McrouteSetup
         string target = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute");
         string exe = Path.Combine(target, "mcroute.exe");
-        string vbs = Path.Combine(target, "启动 mcroute.vbs");
+        string vbs = Path.Combine(target, "start-mcroute.vbs");
 
         if (!silent)
         {

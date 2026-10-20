@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  mcroute 的 MSI 安装包定义（WiX v4+ / v7）
+
+  构建：
+      wix build installer\product.wxs -o dist\mcroute.msi
+
+  特点：
+    - perUser 安装：装到 %LOCALAPPDATA%\mcroute，不需要管理员权限
+    - 用 wscript 拉起 vbs，所以不会弹黑窗口
+    - 卸载项由 MSI 自动写入「设置 → 应用」，不用手写注册表
+
+  注意：源文件目录默认取 ..\dist\mcroute（由 build_msi.bat 保证先生成）
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <Package Name="mcroute"
+           Manufacturer="Hourai-chiyo"
+           Version="0.1.0"
+           UpgradeCode="7E3B6C21-9D4A-4F8B-A1C5-2F6D8E9B4A77"
+           Scope="perUser"
+           Compressed="yes"
+           InstallerVersion="500">
+
+    <SummaryInformation Description="mcroute - Minecraft Java 启动器" />
+
+    <MajorUpgrade DowngradeErrorMessage="已经装了更新的版本，先卸载它再装这个。" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- 安装目录：%LOCALAPPDATA%\mcroute -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="mcroute" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="mcroute" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- 程序文件：整个 dist\mcroute 目录 -->
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(sys.SOURCEFILEDIR)..\dist\mcroute\**" />
+    </ComponentGroup>
+
+    <!-- 开始菜单快捷方式 -->
+    <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder" Guid="A1B2C3D4-1111-4A2B-9C3D-000000000001">
+      <Shortcut Id="StartMenuLnk"
+                Name="mcroute"
+                Description="Minecraft Java 启动器"
+                Target="[SystemFolder]wscript.exe"
+                Arguments="&quot;[INSTALLFOLDER]start-mcroute.vbs&quot;"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\mcroute" Name="startmenu" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- 桌面快捷方式 -->
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="A1B2C3D4-2222-4A2B-9C3D-000000000002">
+      <Shortcut Id="DesktopLnk"
+                Name="mcroute"
+                Description="Minecraft Java 启动器"
+                Target="[SystemFolder]wscript.exe"
+                Arguments="&quot;[INSTALLFOLDER]start-mcroute.vbs&quot;"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\mcroute" Name="desktop" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+  </Package>
+</Wix>
