@@ -84,6 +84,7 @@ class App:
         root.minsize(860, 580)
 
         self._build_ui()
+        self.log("数据目录：" + mcroute.DEFAULT_DATA_DIR)
         self.refresh_versions()
         self.refresh_instances()
         self.refresh_java()

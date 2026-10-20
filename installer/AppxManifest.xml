@@ -38,7 +38,6 @@
 
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
-    <rescap:Capability Name="unvirtualizedResources" />
     <Capability Name="internetClient" />
     <Capability Name="privateNetworkClientServer" />
   </Capabilities>
