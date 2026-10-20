@@ -302,6 +302,43 @@ def maven_path(artifact, lib):
     return "/".join(group.split(".")) + f"/{artifact_id}/{version}/{filename}"
 
 
+def library_download(lib):
+    """
+    给一条库信息算出「下载地址 + libraries 下的相对路径 + 期望 sha1」。
+
+    有两种写法，都要支持：
+      1. 官方/Forge 风格：downloads.artifact.url 直接给了完整地址
+      2. Fabric/Quilt 风格：只有 name（maven 坐标）+ url（仓库根地址），
+         需要自己拼成 <url>/<group路径>/<artifact>/<version>/<artifact>-<version>.jar
+    """
+    downloads = lib.get("downloads") or {}
+    artifact = downloads.get("artifact")
+    if artifact and artifact.get("url"):
+        return artifact["url"], maven_path(artifact, lib), artifact.get("sha1")
+
+    name = lib.get("name") or ""
+    base_url = lib.get("url")
+    if not base_url or not name:
+        return None
+
+    parts = name.split(":")
+    if len(parts) < 3:
+        return None
+
+    group, artifact_id, version = parts[0], parts[1], parts[2]
+    classifier = parts[3] if len(parts) > 3 else None
+
+    filename = "%s-%s" % (artifact_id, version)
+    if classifier:
+        filename += "-" + classifier
+    filename += ".jar"
+
+    rel = "/".join(group.split(".")) + "/%s/%s/%s" % (artifact_id, version, filename)
+    if not base_url.endswith("/"):
+        base_url += "/"
+    return base_url + rel, rel, lib.get("sha1")
+
+
 def subst(template, ctx):
     """把 ${xxx} 占位符替换成实际值"""
     for key, value in ctx.items():
@@ -575,9 +612,9 @@ def plan_launch(args):
             continue
 
         # 2b) 普通库：直接进 classpath
-        artifact = downloads.get("artifact")
-        if artifact:
-            rel = maven_path(artifact, lib)
+        resolved = library_download(lib)
+        if resolved:
+            _url, rel, _sha1 = resolved
             if rel:
                 full = os.path.join(lib_root, rel.replace("/", os.sep))
                 classpath.append(full)
@@ -934,13 +971,11 @@ def cmd_fetch(args):
             continue
         downloads = lib.get("downloads") or {}
 
-        artifact = downloads.get("artifact")
-        if artifact and artifact.get("url"):
-            rel = maven_path(artifact, lib)
+        resolved = library_download(lib)
+        if resolved:
+            url, rel, sha1 = resolved
             if rel:
-                jobs.append((artifact["url"],
-                             os.path.join(lib_root, rel.replace("/", os.sep)),
-                             artifact.get("sha1")))
+                jobs.append((url, os.path.join(lib_root, rel.replace("/", os.sep)), sha1))
 
         natives = lib.get("natives") or {}
         classifier = natives.get("windows")
@@ -1455,6 +1490,71 @@ def installer_url(kind, ver):
     return None
 
 
+FABRIC_META = "https://meta.fabricmc.net/v2"
+
+
+def resolve_fabric_loader(mc, loader=None):
+    """没指定 loader 版本时，从 meta 里挑最新的 stable 版本"""
+    if loader:
+        return loader
+    try:
+        data, _dt, _n = fetch_json(FABRIC_META + "/versions/loader/" + mc)
+    except Exception:
+        return None
+    for item in data:
+        info = item.get("loader") or {}
+        if info.get("stable"):
+            return info.get("version")
+    if data:
+        return (data[0].get("loader") or {}).get("version")
+    return None
+
+
+def install_fabric(base, ver, kind="fabric"):
+    """
+    Fabric / Quilt 没有安装器：加载器官方 meta 直接给一份现成的 version json
+    （自带 inheritsFrom），写进 versions/ 就能用现有的 fetch/launch 跑。
+
+    版本写法：
+        fabric 1.20.1                -> 自动挑最新 stable loader
+        fabric 1.20.1-0.19.5         -> 指定 loader 版本
+    """
+    if "-" in ver:
+        mc, _sep, loader = ver.partition("-")
+    else:
+        mc, loader = ver, None
+
+    loader = resolve_fabric_loader(mc, loader)
+    if not loader:
+        print("[错误] 找不到 " + mc + " 可用的加载器版本")
+        return
+
+    print("      MC 版本: %s   加载器: %s" % (mc, loader))
+    url = "%s/versions/loader/%s/%s/profile/json" % (FABRIC_META, mc, loader)
+    print("      " + url)
+
+    try:
+        profile, _dt, _n = fetch_json(url)
+    except Exception as exc:
+        print("      拉取 profile 失败：" + str(exc))
+        return
+
+    pkg_id = profile.get("id") or ("%s-loader-%s-%s" % (kind, loader, mc))
+    vdir = os.path.join(base, "versions", pkg_id)
+    os.makedirs(vdir, exist_ok=True)
+    vjson = os.path.join(vdir, pkg_id + ".json")
+    with open(vjson, "w", encoding="utf-8") as f:
+        json.dump(profile, f, ensure_ascii=False, indent=2)
+
+    print("      已写入：" + vjson)
+    print("      mainClass : " + str(profile.get("mainClass")))
+    print("      inherits  : " + str(profile.get("inheritsFrom")))
+    print("      libraries : " + str(len(profile.get("libraries") or [])))
+    print("\n下一步：")
+    print("  python mcroute.py fetch  " + pkg_id)
+    print("  python mcroute.py launch " + pkg_id)
+
+
 def cmd_loader(args):
     """
     安装加载器（neoforge / forge）。
@@ -1473,12 +1573,20 @@ def cmd_loader(args):
     ver = args.version
     base = os.path.abspath(args.dir or DEFAULT_DATA_DIR)
 
-    if kind not in ("neoforge", "forge"):
-        print("[错误] 目前支持 neoforge 和 forge")
+    if kind not in ("neoforge", "forge", "fabric"):
+        print("[错误] 目前支持 neoforge / forge / fabric")
+        return
+
+    os.makedirs(base, exist_ok=True)
+
+    # Fabric 没有安装器，走 meta 合成，单独一条分支
+    if kind == "fabric":
+        print("加载器  : fabric " + ver)
+        print("数据目录: " + base)
+        install_fabric(base, ver)
         return
 
     url = installer_url(kind, ver)
-    os.makedirs(base, exist_ok=True)
     tmp_dir = os.path.join(base, "_tmp")
     os.makedirs(tmp_dir, exist_ok=True)
 
@@ -1650,7 +1758,7 @@ def print_guide():
     print("  fetch     python mcroute.py fetch 1.21.1        # 下载完整闭包（sha1 校验、可续传）")
     print("  build     python mcroute.py build 1.21.1        # 只拼启动命令，不执行")
     print("  launch    python mcroute.py launch 1.21.1       # 真正启动游戏")
-    print("  loader    python mcroute.py loader neoforge 21.1.264  # 一条命令装好 NeoForge")
+    print("  loader    python mcroute.py loader fabric 1.20.1     # 装加载器：fabric / forge / neoforge")
     print()
     print("  [账号]")
     print("  login     python mcroute.py login               # 登录微软账号（需 client_id）")
@@ -1726,9 +1834,9 @@ def main():
     p10 = sub.add_parser("logout", help="退出登录，删除本地凭据")
     p10.set_defaults(func=cmd_logout)
 
-    p11 = sub.add_parser("loader", help="自动安装加载器（目前支持 neoforge）")
-    p11.add_argument("kind", help="加载器类型：neoforge")
-    p11.add_argument("version", help="加载器版本，例如 21.1.264")
+    p11 = sub.add_parser("loader", help="自动安装加载器（fabric / forge / neoforge）")
+    p11.add_argument("kind", help="加载器类型：fabric / forge / neoforge")
+    p11.add_argument("version", help="fabric: 1.20.1 或 1.20.1-0.19.5；forge: 1.20.1-47.2.0；neoforge: 21.1.264")
     p11.add_argument("--dir", help="数据目录，默认 mcdata/")
     p11.add_argument("--java", help="指定 java.exe（安装器需要 Java 21+）")
     p11.set_defaults(func=cmd_loader)

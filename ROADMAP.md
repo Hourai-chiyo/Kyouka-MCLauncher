@@ -13,12 +13,14 @@
 - 微软登录（设备码流程 + refresh token 静默续期）—— 等 Mojang AppID 白名单
 - 图形界面 + 下载进度条
 - **Java 检测**：扫描 PATH + 常见安装目录（Adoptium / .minecraft runtime / Modrinth / CurseForge），逐个跑 `-version` 校验主版本，按 version json 的需求匹配；`java` 子命令可列出全部
+- **Fabric**：不用安装器，直接从官方 meta 拿 profile json；自动挑最新 stable loader
+  （顺带支持了 Fabric/Quilt 风格的库声明：`name` + maven 仓库根地址，没有 `downloads` 块）
 
 ---
 
 ## 下一步
 
-### 1. Fabric / Quilt / Legacy Fabric
+### 1. Quilt / Legacy Fabric
 
 **为什么简单**：它们没有安装器、没有二进制补丁，加载器官方 meta 直接给一份现成的 version json（自带 `inheritsFrom`），拿到就能用我们现有的合并逻辑。
 

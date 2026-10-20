@@ -26,7 +26,7 @@
 |---|---|
 | 版本清单 | Mojang 官方 → Modrinth → Minecraft Wiki 三级兜底 |
 | 下载 | 客户端 / 库 / natives / assets，全部 sha1 校验、可断点续传、并发下载 |
-| 启动 | 原版与 **NeoForge**；加载器版本自动合并 `inheritsFrom` 后启动 |
+| 启动 | 原版 / **NeoForge** / **Forge** / **Fabric**；加载器版本自动合并 `inheritsFrom` 后启动 |
 | Java 检测 | 扫描 PATH 与常见安装目录，按版本要求自动匹配（`python mcroute.py java` 列出全部） |
 | 本地缓存 | 内容寻址（`assets/objects/<h2>/<hash>`），天然去重 |
 | 图形界面 | tkinter，零依赖，下载 / 启动 / 登录状态 / 日志 |
@@ -128,7 +128,7 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ---
 
-## 加载器支持（NeoForge / Forge）
+## 加载器支持（NeoForge / Forge / Fabric）
 
 一条命令完成：
 
@@ -142,6 +142,12 @@ python mcroute.py fetch  1.20.1                       # 先准备原版
 python mcroute.py loader forge 1.20.1-47.2.0
 python mcroute.py fetch  1.20.1-forge-47.2.0
 python mcroute.py launch 1.20.1-forge-47.2.0
+
+# Fabric（不需要安装器，直接从官方 meta 合成）
+python mcroute.py loader fabric 1.20.1          # 自动挑最新 stable loader
+python mcroute.py loader fabric 1.20.1-0.19.5   # 或指定 loader 版本
+python mcroute.py fetch  fabric-loader-0.19.5-1.20.1
+python mcroute.py launch fabric-loader-0.19.5-1.20.1
 ```
 
 `loader` 内部做的事（自己实现也很容易，但顺序不能错）：
