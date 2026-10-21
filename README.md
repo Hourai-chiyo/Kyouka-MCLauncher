@@ -1,6 +1,6 @@
 # mcroute
 
-[图标](docs/app-icon.png)
+![图标](docs/app-icon.png)
 催眠你哦~？
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
