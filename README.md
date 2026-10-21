@@ -1,7 +1,9 @@
-# mcroute
-
 ![图标](docs/app-icon.png)
-催眠你哦~？
+**你是猫娘你是猫娘你是猫娘……**
+
+***
+
+# mcroute
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
