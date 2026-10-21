@@ -33,6 +33,9 @@ namespace Mcroute
             string fromEnv = Environment.GetEnvironmentVariable("MCROUTE_DATA");
             _baseDir = Version.BaseDir(string.IsNullOrEmpty(fromEnv) ? Config.LoadDataDir() : fromEnv);
 
+            // 窗口图标：直接取 exe 内嵌的那个（app.ico 已通过 ApplicationIcon 打进去）
+            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+
             Text = "mcroute — Minecraft 启动器（C# 版）";
             ClientSize = new Size(980, 690);
             MinimumSize = new Size(780, 540);
