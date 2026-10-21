@@ -379,7 +379,7 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 |---|---|
 | ![整合包](docs/gui-wpf-packs.png) | ![设置](docs/gui-wpf-settings.png) |
 
-玻璃面板 + 背景图（侧栏、顶栏、卡片都会透出来）：
+玻璃面板 + 背景图（侧栏、顶栏、卡片都会透出来；输入框在玻璃模式下改为透明填充 + 细描边，不会出现双层白）：
 
 ![玻璃](docs/gui-wpf-glass.png)
 

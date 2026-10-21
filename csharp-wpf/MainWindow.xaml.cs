@@ -805,6 +805,12 @@ namespace Mcroute.Wpf
                     if (res["SurfaceGlass"] != null) res["Surface"] = res["SurfaceGlass"];
                     if (res["BorderGlass"] != null) res["Border"] = res["BorderGlass"];
                     if (res["InputBgGlass"] != null) res["InputBg"] = res["InputBgGlass"];
+
+                    // 输入框：完全透明 + 细描边（窗口 11 / Notion 那种做法）
+                    // 之前是 "卡片 60% 白 + 输入框 60% 白 = 84% 白"，会白得像贴纸
+                    bool dark = Theme.Effective == "dark";
+                    res["FieldBg"] = Brush("#00FFFFFF");
+                    res["FieldBorder"] = Brush(dark ? "#40FFFFFF" : "#33000000");
                     if (Sidebar != null) Sidebar.Background = res["SurfaceGlass"] as Brush;
                     if (TopBar != null) TopBar.Background = System.Windows.Media.Brushes.Transparent;
                     PageDownload.Background = System.Windows.Media.Brushes.Transparent;
@@ -819,6 +825,8 @@ namespace Mcroute.Wpf
                     PageManage.SetResourceReference(Panel.BackgroundProperty, "Bg");
                     PageSettings.SetResourceReference(Panel.BackgroundProperty, "Bg");
                     if (Sidebar != null) Sidebar.SetResourceReference(Border.BackgroundProperty, "Surface");
+                    res["FieldBg"] = Brush(Theme.Effective == "dark" ? "#171C24" : "#FFFFFF");
+                    res["FieldBorder"] = Brush(Theme.Effective == "dark" ? "#28303C" : "#E4E7EC");
                     if (TopBar != null) TopBar.SetResourceReference(Panel.BackgroundProperty, "Surface");
                 }
 
@@ -833,6 +841,18 @@ namespace Mcroute.Wpf
             ApplyGlass(GlassBox.IsChecked == true, false);
             try { SaveConfig(); } catch { }
             AppendLog("玻璃面板：" + (GlassBox.IsChecked == true ? "开" : "关"));
+        }
+
+        private static Brush Brush(string hex)
+        {
+            try
+            {
+                var c = (Color)ColorConverter.ConvertFromString(hex);
+                var b = new SolidColorBrush(c);
+                b.Freeze();
+                return b;
+            }
+            catch { return Brushes.Transparent; }
         }
 
         // ================= 启动页背景 =================

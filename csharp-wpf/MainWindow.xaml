@@ -239,8 +239,8 @@
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
-            <Setter Property="Background" Value="{DynamicResource Surface}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+            <Setter Property="Background" Value="{DynamicResource FieldBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource FieldBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Template">
@@ -302,8 +302,8 @@
             <Setter Property="Height" Value="32"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Foreground" Value="{DynamicResource Text}"/>
-            <Setter Property="Background" Value="{DynamicResource Surface}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+            <Setter Property="Background" Value="{DynamicResource FieldBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource FieldBorder}"/>
             <Setter Property="Padding" Value="8,0"/>
             <Setter Property="Template">
                 <Setter.Value>
