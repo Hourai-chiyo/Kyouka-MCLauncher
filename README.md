@@ -240,21 +240,23 @@ mcroute/
 └── docs/                   截图 / 路由表 / 测速报告 / 签名指南
 ```
 
-### 镜像实测（2026-10-21，2.9 MB 探针）
+### 镜像实测（2026-10-21 晚，同一个 2.97 MB 文件）
 
 | 镜像 | 地址 | 速度 | 默认 |
 |---|---|---|---|
-| HIT 哈工大 | `mirrors.hit.edu.cn/bmclapi/` | **7.89 MB/s** | ✅ |
-| HA 河南大学 | `mirrors.ha.edu.cn/bmclapi/` | 4.07 MB/s | ✅ |
-| NYIST 南阳理工 | `mirror.nyist.edu.cn/bmclapi/` | 3.68 MB/s | ✅ |
-| QLU 齐鲁工大 | `mirrors.qlu.edu.cn/bmclapi/` | 3.05 MB/s | ✅ |
-| NJU 南京大学 | `mirror.nju.edu.cn/bmclapi/` | 3.05 MB/s | ✅ |
-| JCUT 荆楚理工 | `mirrors.jcut.edu.cn/bmclapi/` | 1.25 MB/s | ✅ |
-| ZJU 浙江大学 | `mirrors.zju.edu.cn/bmclapi/` | 极慢（2.9MB 数分钟） | ❌ 禁用 |
-| USTC 中科大 | `mirrors.ustc.edu.cn/bmclapi/` | 403 Forbidden | ❌ |
-| SJTU 上海交大 | `mirror.sjtu.edu.cn/bmclapi/` | 403 Forbidden | ❌ |
+| HIT 哈工大 | `mirrors.hit.edu.cn/bmclapi/` | **6.90 MB/s** | ✅ |
+| NYIST 南阳理工 | `mirror.nyist.edu.cn/bmclapi/` | 3.70 MB/s | ✅ |
+| **USTC 中科大** | `mirrors.ustc.edu.cn/bmclapi/` | **3.60 MB/s** | ✅ |
+| JCUT 荆楚理工 | `mirrors.jcut.edu.cn/bmclapi/` | 3.00 MB/s | ✅ |
+| HA 河南大学 | `mirrors.ha.edu.cn/bmclapi/` | 2.70 MB/s | ✅ |
+| NJU 南京大学 | `mirror.nju.edu.cn/bmclapi/` | 1.40 MB/s | ✅ |
+| **SJTU 上海交大** | `mirror.sjtu.edu.cn/bmclapi/` | 0.90 MB/s | ✅ |
+| QLU 齐鲁工大 | `mirrors.qlu.edu.cn/bmclapi/` | 0.20 MB/s | ❌ 默认禁用 |
+| ZJU 浙江大学 | `mirrors.zju.edu.cn/bmclapi/` | 0.05 MB/s | ❌ 默认禁用 |
 
-> 测速有波动，`mcroute.exe sources` 可以随时重测；配置文件是 `<数据目录>/mirrors.json`。
+> ⚠️ **USTC / SJTU 只拦「浏览器 UA」**：用 Chrome UA 请求会返回 403，
+> 用 mcroute 自己的 UA 才是 200。所以之前把它们标成"不可用"是误判。
+> 测速随时可重跑：`mcroute.exe sources`
 
 ## 分段并行下载（实验性，默认关闭）
 

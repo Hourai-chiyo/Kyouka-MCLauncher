@@ -70,14 +70,15 @@ namespace Mcroute
         {
             return new List<MirrorInfo>
             {
-                new MirrorInfo { Name = "HIT 哈工大",       Base = "https://mirrors.hit.edu.cn/bmclapi/",  Enabled = true,  SpeedMbps = 7.89 },
-                new MirrorInfo { Name = "HA 河南大学",      Base = "https://mirrors.ha.edu.cn/bmclapi/",   Enabled = true,  SpeedMbps = 4.07 },
-                new MirrorInfo { Name = "NYIST 南阳理工",   Base = "https://mirror.nyist.edu.cn/bmclapi/", Enabled = true,  SpeedMbps = 3.68 },
-                new MirrorInfo { Name = "QLU 齐鲁工大",     Base = "https://mirrors.qlu.edu.cn/bmclapi/",  Enabled = true,  SpeedMbps = 3.05 },
-                new MirrorInfo { Name = "NJU 南京大学",     Base = "https://mirror.nju.edu.cn/bmclapi/",   Enabled = true,  SpeedMbps = 3.05 },
-                new MirrorInfo { Name = "JCUT 荆楚理工",    Base = "https://mirrors.jcut.edu.cn/bmclapi/", Enabled = true,  SpeedMbps = 1.25 },
-                // 实测能连上但极慢（2.9MB 下了几分钟），默认禁用，需要时手动打开
-                new MirrorInfo { Name = "ZJU 浙江大学（慢）", Base = "https://mirrors.zju.edu.cn/bmclapi/", Enabled = false, SpeedMbps = 0.01 },
+                new MirrorInfo { Name = "HIT 哈工大",        Base = "https://mirrors.hit.edu.cn/bmclapi/",  Enabled = true,  SpeedMbps = 6.90 },
+                new MirrorInfo { Name = "NYIST 南阳理工",    Base = "https://mirror.nyist.edu.cn/bmclapi/", Enabled = true,  SpeedMbps = 3.70 },
+                new MirrorInfo { Name = "USTC 中科大",       Base = "https://mirrors.ustc.edu.cn/bmclapi/", Enabled = true,  SpeedMbps = 3.60 },
+                new MirrorInfo { Name = "JCUT 荆楚理工",     Base = "https://mirrors.jcut.edu.cn/bmclapi/", Enabled = true,  SpeedMbps = 3.00 },
+                new MirrorInfo { Name = "HA 河南大学",       Base = "https://mirrors.ha.edu.cn/bmclapi/",   Enabled = true,  SpeedMbps = 2.70 },
+                new MirrorInfo { Name = "NJU 南京大学",      Base = "https://mirror.nju.edu.cn/bmclapi/",   Enabled = true,  SpeedMbps = 1.40 },
+                new MirrorInfo { Name = "SJTU 上海交大",     Base = "https://mirror.sjtu.edu.cn/bmclapi/",  Enabled = true,  SpeedMbps = 0.90 },
+                new MirrorInfo { Name = "QLU 齐鲁工大（慢）", Base = "https://mirrors.qlu.edu.cn/bmclapi/",  Enabled = false, SpeedMbps = 0.20 },
+                new MirrorInfo { Name = "ZJU 浙江大学（慢）", Base = "https://mirrors.zju.edu.cn/bmclapi/",  Enabled = false, SpeedMbps = 0.05 },
             };
         }
 
