@@ -11,7 +11,14 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>0.1.0</Version>
+    <Version>0.1.11</Version>
+    <FileVersion>0.1.11.0</FileVersion>
+    <AssemblyVersion>0.1.11.0</AssemblyVersion>
+    <Product>mcroute — Minecraft Java 启动器</Product>
+    <Company>Hourai-chiyo</Company>
+    <Description>面向中国大陆网络环境的 Minecraft Java 启动器，重点是下载源路由与离线可自持。</Description>
+    <Copyright>MIT License © 2026 Hourai-chiyo</Copyright>
+    <AssemblyTitle>mcroute</AssemblyTitle>
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>
   </PropertyGroup>

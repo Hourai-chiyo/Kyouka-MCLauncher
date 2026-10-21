@@ -22,6 +22,34 @@
 
 ---
 
+## 关于「未知发布者」安全警告
+
+双击 `mcroute.exe` 时 Windows 可能提示：
+
+> 无法验证发布者。你确定要运行此软件吗？
+
+**这是正常的**：本项目没有购买代码签名证书，Windows 对未签名的 exe 一律这么提示。
+点「运行」即可，同一个文件（哈希不变）只会问一次。
+
+想确认文件没被篡改，可以核对 Release 里的 `SHA256SUMS.txt`：
+
+```powershell
+Get-FileHash .\mcroute.exe -Algorithm SHA256
+```
+
+### 如果想彻底消除提示
+
+那需要 **Authenticode 代码签名**，现实选项：
+
+| 方案 | 成本 | 说明 |
+|---|---|---|
+| 自签名证书 | 免费 | 只对自己机器有效，别人下载照样提示 |
+| [SignPath.io](https://signpath.io) | **开源项目免费** | 最推荐，需公开仓库 + 申请，签名跑在 CI 里 |
+| [Azure Trusted Signing](https://azure.microsoft.com/products/trusted-signing) | 约 ¥70/月 | 微软云签名，SmartScreen 信誉建立快 |
+| OV / EV 证书 | ¥1000+/年 | 商业项目再考虑；EV 能立刻通过 SmartScreen |
+
+---
+
 ## 下载与安装
 
 **方式一：直接下载（推荐）**
