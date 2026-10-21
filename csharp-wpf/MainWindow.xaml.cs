@@ -482,9 +482,17 @@ namespace Mcroute.Wpf
             try
             {
                 if (CurrentTheme() != "auto") return;
-                string before = Theme.Effective;
+
+                // 关键：只有系统主题"真的变了"才重刷调色板。
+                // 否则每次窗口获得焦点都 Theme.Apply 一遍，会把玻璃面板的覆盖层冲掉
+                //（表现：切出去截图再回来，卡片又变回纯白）。
+                bool systemDark = Theme.IsSystemDark();
+                bool currentDark = Theme.Effective == "dark";
+                if (systemDark == currentDark) return;
+
                 Theme.Apply("auto");
-                if (before != Theme.Effective) AppendLog("系统主题变了 → " + (Theme.Effective == "dark" ? "深色" : "浅色"));
+                ApplyGlass(_glassOn, false);     // 重刷后把玻璃盖回去
+                AppendLog("系统主题变了 → " + (systemDark ? "深色" : "浅色"));
             }
             catch { }
         }

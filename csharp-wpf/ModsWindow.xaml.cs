@@ -23,12 +23,9 @@ namespace Mcroute
             _version = version;
             TitleText.Text = "Mods — " + version;
 
-            Loaded += (s, e) => { Reload(); ApplyTheme(); };
-        }
-
-        private void ApplyTheme()
-        {
-            try { Theme.Apply(Theme.Effective); } catch { }
+            // 注意：不要在这里 Theme.Apply —— 资源是 Application 级的，
+            // 主窗口已经应用过（含玻璃覆盖层），重刷会把玻璃冲成实色。
+            Loaded += (s, e) => Reload();
         }
 
         private void Reload()
