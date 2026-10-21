@@ -55,7 +55,7 @@ namespace Mcroute
             {
                 StatusText.Text = CurseForge.HasKey(baseDir)
                     ? "输入关键词后回车搜索（CurseForge 已配置 Key）"
-                    : "输入关键词后回车搜索（CurseForge 需要 cf_api_key.txt 才能用）";
+                    : "输入关键词后回车搜索；CurseForge 需要 Key（官方控制台只能 Google 登录）";
                 SearchBox.Focus();
                 UpdateKeyPanel();
             };
@@ -374,7 +374,7 @@ namespace Mcroute
             if (KeyPanel == null) return;
             bool needKey = CurrentSource() == "cf" && !CurseForge.HasKey(_baseDir);
             KeyPanel.Visibility = needKey ? Visibility.Visible : Visibility.Collapsed;
-            if (needKey) StatusText.Text = "CurseForge 需要 API Key：填在下面，或从 Modrinth 搜索";
+            if (needKey) StatusText.Text = "CurseForge 需要 API Key（官方控制台只能 Google 登录，国内难申请）——可切回 Modrinth，或用底部「从链接安装」";
         }
 
         private void OpenModsDir_Click(object sender, RoutedEventArgs e)

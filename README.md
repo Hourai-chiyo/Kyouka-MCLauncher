@@ -425,8 +425,9 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 - **CurseForge**：把 API Key 放进 `<数据目录>/cf_api_key.txt`（或环境变量 `CF_API_KEY`）；
   部分 mod 作者关闭了第三方分发（`downloadUrl` 为空），这时会提示你去网页手动下载
 - 两家**不合并**：同名 mod 两边版本可能不同，混在一起容易装错
-- **CurseForge Key 直接填在界面里**：切到 CurseForge 且没有 Key 时，窗口里会出现输入框（「获取 Key」→「保存」），
-  保存到 `<数据目录>/cf_api_key.txt`：
+- **CurseForge Key 直接填在界面里**：切到 CurseForge 且没有 Key 时，窗口里会出现输入框（「获取 Key」→「保存」），保存到 `<数据目录>/cf_api_key.txt`。
+  ⚠️ **但 CurseForge 官方控制台目前只能用 Google 登录**，国内基本申请不到 Key —— 这不是我们的限制。
+  所以实际推荐路径是：**Modrinth（免 Key）** + **「从链接安装」**（mcmod / 网盘 / GitHub 直链都行）。
 
   ![填 Key](docs/gui-wpf-cfkey.png)
 

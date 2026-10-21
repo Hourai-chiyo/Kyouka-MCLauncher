@@ -152,7 +152,7 @@
                     <ComboBox x:Name="SourceBox" Width="120" Height="28" Margin="6,0,0,0"
                               SelectionChanged="SourceBox_Changed">
                         <ComboBoxItem Content="Modrinth" IsSelected="True"/>
-                        <ComboBoxItem Content="CurseForge"/>
+                        <ComboBoxItem Content="CurseForge" ToolTip="需要 API Key；官方控制台只能 Google 登录"/>
                     </ComboBox>
                 </StackPanel>
 
@@ -196,8 +196,11 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="CurseForge 需要 API Key（免费申请，每人一把）" FontSize="11"
-                                   Foreground="{DynamicResource TextSub}"/>
+                        <TextBlock Text="CurseForge 需要 API Key（官方控制台目前只能用 Google 登录，国内通常打不开）"
+                                   FontSize="11" Foreground="{DynamicResource TextSub}" TextWrapping="Wrap"/>
+                        <TextBlock Text="没有 Key 也不影响：Modrinth 免 Key 可直接搜；别的来源可以用底部「从链接安装」。"
+                                   FontSize="10.5" Margin="0,3,0,0"
+                                   Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
                         <TextBox x:Name="KeyBox" Height="28" Margin="0,6,0,0"
                                  ToolTip="从 console.curseforge.com 复制的 API Key"/>
                     </StackPanel>
