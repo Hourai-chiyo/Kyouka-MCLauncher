@@ -379,6 +379,15 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 |---|---|
 | ![整合包](docs/gui-wpf-packs.png) | ![设置](docs/gui-wpf-settings.png) |
 
+深色模式：
+
+| 启动页（深色） | 设置页（深色） |
+|---|---|
+| ![启动-深色](docs/gui-wpf-launch-dark.png) | ![设置-深色](docs/gui-wpf-settings-dark.png) |
+
+**主题**：浅色 / 深色 / **跟随系统**（读 Windows 的 AppsUseLightTheme，切系统主题后窗口重新激活即跟上）。
+深色不是简单反色：文字、边框、悬停、选中、滚动条全部走同一套主题变量。
+
 **界面细节**：版本列表直接显示加载器（`1.12.2 · Forge 14.23.5.2864`、`1.20.1 · NeoForge 47.1.106`）；
 双击版本直接启动；窗口大小/位置/最后停留的页签都会记住；启动前会先检查缺不缺文件，缺了直接显示在卡片上而不是弹窗。
 

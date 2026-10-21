@@ -64,6 +64,16 @@ namespace Mcroute.Wpf
                 //   · 完全没版本 + 没配置 -> 才引导选目录
                 if (!App.ShotMode) RestoreWindowState();
 
+                try
+                {
+                    string theme = LoadConfig("theme", "auto");
+                    string forced = Environment.GetEnvironmentVariable("MCROUTE_THEME");
+                    if (!string.IsNullOrEmpty(forced)) theme = forced;   // 截图/调试用
+                    ThemeBox.SelectedIndex = theme == "dark" ? 2 : theme == "light" ? 1 : 0;
+                    Theme.Apply(theme);
+                }
+                catch { }
+
                 if (!App.ShotMode && string.IsNullOrEmpty(LoadConfigDir()) && _versions.Count > 0)
                 {
                     SaveConfig();
@@ -177,6 +187,7 @@ namespace Mcroute.Wpf
                     { "win_l", (int)Math.Round(bounds.Left) },
                     { "win_t", (int)Math.Round(bounds.Top) },
                     { "page", _page },
+                    { "theme", CurrentTheme() },
                 };
 
                 foreach (string cfgPath in ConfigPaths())
@@ -294,21 +305,25 @@ namespace Mcroute.Wpf
         private static ListBoxItem MakeVersionItem(string name, string tag)
         {
             var panel = new StackPanel();
+
             var title = new TextBlock
             {
                 Text = name,
                 FontSize = 12.5,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = (Brush)Application.Current.Resources["Text"],
                 TextTrimming = TextTrimming.CharacterEllipsis,
             };
+            // 用资源引用而不是抓当前画刷：切主题时会自动跟着变
+            title.SetResourceReference(TextBlock.ForegroundProperty, "Text");
+
             var sub = new TextBlock
             {
                 Text = tag,
                 FontSize = 11,
                 Margin = new Thickness(0, 3, 0, 0),
-                Foreground = (Brush)Application.Current.Resources["TextMuted"],
             };
+            sub.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+
             panel.Children.Add(title);
             panel.Children.Add(sub);
             return new ListBoxItem { Content = panel, Tag = name };
@@ -429,6 +444,24 @@ namespace Mcroute.Wpf
             catch { }
         }
 
+        protected override void OnActivated(EventArgs e)
+        {
+            base.OnActivated(e);
+            FollowSystemTheme();
+        }
+
+        private void FollowSystemTheme()
+        {
+            try
+            {
+                if (CurrentTheme() != "auto") return;
+                string before = Theme.Effective;
+                Theme.Apply("auto");
+                if (before != Theme.Effective) AppendLog("系统主题变了 → " + (Theme.Effective == "dark" ? "深色" : "浅色"));
+            }
+            catch { }
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             try { SaveConfig(); } catch { }
@@ -509,9 +542,9 @@ namespace Mcroute.Wpf
             foreach (string dir in Directory.GetDirectories(root).OrderBy(x => Path.GetFileName(x)))
             {
                 string name = Path.GetFileName(dir);
-                string tag = File.Exists(Path.Combine(dir, "instance.json"))
-                    ? "整合包"
-                    : (Directory.Exists(Path.Combine(dir, "mods")) ? "外部" : "原版");
+                string mc, loader, loaderVer;
+                string tag = Version.Describe(_baseDir, name, out mc, out loader, out loaderVer);
+                if (File.Exists(Path.Combine(dir, "instance.json"))) tag += " · 整合包";
                 ManageList.Items.Add(MakeVersionItem(name, tag));
             }
             ManageCount.Text = ManageList.Items.Count + " 个";
@@ -675,6 +708,32 @@ namespace Mcroute.Wpf
                 }
             }
             AppendLog("检测到 " + JavaList.Items.Count + " 个 Java");
+        }
+
+        // ================= 主题 =================
+        private void ThemeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                var item = ThemeBox.SelectedItem as ComboBoxItem;
+                if (item == null) return;
+                string mode = (item.Tag as string) ?? "auto";
+                Theme.Apply(mode);
+                SaveConfig();
+                AppendLog("主题：" + (mode == "auto" ? "跟随系统（当前 " + (Theme.Effective == "dark" ? "深色" : "浅色") + "）"
+                                        : mode == "dark" ? "深色" : "浅色"));
+            }
+            catch { }
+        }
+
+        private string CurrentTheme()
+        {
+            try
+            {
+                var item = ThemeBox.SelectedItem as ComboBoxItem;
+                return item == null ? "auto" : ((item.Tag as string) ?? "auto");
+            }
+            catch { return "auto"; }
         }
 
         // ================= 启动页背景 =================
