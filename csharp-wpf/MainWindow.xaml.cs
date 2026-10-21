@@ -369,13 +369,25 @@ namespace Mcroute.Wpf
             });
         }
 
+        private void CopyManagePath_Click(object sender, RoutedEventArgs e)
+        {
+            string ver = SelectedManageVersion();
+            string dir = ver == null ? _baseDir : Path.Combine(_baseDir, "versions", ver);
+            if (!Directory.Exists(dir)) dir = _baseDir;
+            try
+            {
+                Clipboard.SetText(dir);
+                StatusText.Text = "路径已复制：" + dir;
+            }
+            catch (Exception ex) { MessageBox.Show("复制失败：" + ex.Message, "提示"); }
+        }
+
         private void OpenManageDir_Click(object sender, RoutedEventArgs e)
         {
             string ver = SelectedManageVersion();
             string dir = ver == null ? _baseDir : Path.Combine(_baseDir, "versions", ver);
             if (!Directory.Exists(dir)) dir = _baseDir;
-            try { Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true, Verb = "open" }); }
-            catch (Exception ex) { MessageBox.Show("打开目录失败：" + ex.Message, "提示"); }
+            OpenFolderSafe(dir);
         }
 
         // ================= 设置 =================
@@ -413,11 +425,7 @@ namespace Mcroute.Wpf
                 ? _baseDir
                 : Path.Combine(_baseDir, "versions", ver);
             if (!Directory.Exists(dir)) dir = _baseDir;
-            try
-            {
-                Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true, Verb = "open" });
-            }
-            catch (Exception ex) { MessageBox.Show("打开目录失败：" + ex.Message, "提示"); }
+            OpenFolderSafe(dir);
         }
 
         private void RefreshJava_Click(object sender, RoutedEventArgs e) { RefreshJava(); }
@@ -536,6 +544,67 @@ namespace Mcroute.Wpf
 
         // ================= 后台任务 + 日志 =================
         private bool _running;
+
+        /// <summary>
+        /// 打开文件夹。ShellExecute 在某些目录上会被拒（拒绝访问），所以按可靠度依次尝试：
+        /// explorer /select -> explorer 目录 -> ShellExecute；全失败则复制路径到剪贴板。
+        /// </summary>
+        private void OpenFolderSafe(string dir)
+        {
+            if (!Directory.Exists(dir))
+            {
+                MessageBox.Show("目录不存在：\n" + dir, "提示");
+                return;
+            }
+
+            var errors = new List<string>();
+
+            try
+            {
+                Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + dir + "\"")
+                {
+                    UseShellExecute = true,
+                });
+                return;
+            }
+            catch (Exception ex) { errors.Add("explorer /select: " + Describe(ex)); }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo("explorer.exe", "\"" + dir + "\"")
+                {
+                    UseShellExecute = true,
+                });
+                return;
+            }
+            catch (Exception ex) { errors.Add("explorer: " + Describe(ex)); }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = dir,
+                    UseShellExecute = true,
+                    Verb = "open",
+                });
+                return;
+            }
+            catch (Exception ex) { errors.Add("ShellExecute: " + Describe(ex)); }
+
+            try { Clipboard.SetText(dir); } catch { }
+            AppendLog("打开目录失败：" + string.Join(" | ", errors));
+            MessageBox.Show(
+                "打开目录失败：\n" + string.Join("\n", errors) + "\n\n" +
+                "路径已复制到剪贴板，可以手动粘到资源管理器地址栏。\n" + dir,
+                "提示");
+        }
+
+        private static string Describe(Exception ex)
+        {
+            var we = ex as System.ComponentModel.Win32Exception;
+            string code = we != null ? " (0x" + we.NativeErrorCode.ToString("X") + ")" : "";
+            return ex.Message + code;
+        }
 
         private void RunTask(string title, Func<int> action, Action onDone = null)
         {

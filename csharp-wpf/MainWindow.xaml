@@ -531,6 +531,8 @@
                                         Click="Mkbat_Click"/>
                                 <Button Style="{StaticResource GhostButton}" Content="打开目录" Width="90" Margin="8,0,0,0"
                                         Click="OpenManageDir_Click"/>
+                                <Button Style="{StaticResource GhostButton}" Content="复制路径" Width="90" Margin="8,0,0,0"
+                                        Click="CopyManagePath_Click"/>
                             </StackPanel>
                         </Grid>
                     </Border>

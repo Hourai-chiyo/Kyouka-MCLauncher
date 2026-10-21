@@ -688,21 +688,18 @@ namespace Mcroute
             string dir = Path.Combine(_baseDir, "versions", name);
             if (!Directory.Exists(dir)) dir = Path.Combine(_baseDir, "instances", name);
             if (!Directory.Exists(dir)) { MessageBox.Show("目录不存在：" + dir, "提示"); return; }
-            // 不要 Process.Start("explorer.exe", ...)：某些环境下二次启动 explorer 会
-            // 0xc0000142（DLL 初始化失败）。交给 ShellExecute 直接打开文件夹最稳。
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = dir,
-                    UseShellExecute = true,
-                    Verb = "open",
-                });
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("打开目录失败：" + ex.Message, "提示");
-            }
+            // 多策略：有些目录 ShellExecute 会被拒（拒绝访问），先试 explorer 打开
+            var errors = new System.Collections.Generic.List<string>();
+            try { Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + dir + "\"") { UseShellExecute = true }); return; }
+            catch (Exception ex) { errors.Add("explorer /select: " + ex.Message); }
+            try { Process.Start(new ProcessStartInfo("explorer.exe", "\"" + dir + "\"") { UseShellExecute = true }); return; }
+            catch (Exception ex) { errors.Add("explorer: " + ex.Message); }
+            try { Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true, Verb = "open" }); return; }
+            catch (Exception ex) { errors.Add("ShellExecute: " + ex.Message); }
+
+            try { System.Windows.Forms.Clipboard.SetText(dir); } catch { }
+            MessageBox.Show("打开目录失败：\n" + string.Join("\n", errors) + "\n\n路径已复制到剪贴板：\n" + dir,
+                "提示");
         }
 
         private string SelectedJava()
