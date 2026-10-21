@@ -11,8 +11,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>0.3.16</Version>
-    <FileVersion>0.3.16.0</FileVersion>
+    <Version>0.3.17</Version>
+    <FileVersion>0.3.17.0</FileVersion>
     <AssemblyVersion>0.3.4.0</AssemblyVersion>
     <Product>mcroute — Minecraft Java 启动器</Product>
     <Company>Hourai-chiyo</Company>

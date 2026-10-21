@@ -29,6 +29,38 @@ namespace Mcroute.Wpf
                 ShotMode = true;
             }
 
+            // 文件浏览窗口截图：--shot-browser <目录> <输出.png> [宽 高]
+            if (args.Length >= 3 && args[0] == "--shot-browser")
+            {
+                ShotMode = true;
+                try
+                {
+                    try { Mcroute.Theme.Apply(Environment.GetEnvironmentVariable("MCROUTE_THEME") ?? "auto"); } catch { }   // shot-browser 主题
+                    int w = args.Length >= 4 ? int.Parse(args[3]) : 820;
+                    int h = args.Length >= 5 ? int.Parse(args[4]) : 580;
+                    var browserWin = new FileBrowserWindow(args[1])
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = -10000, Top = -10000, Width = w, Height = h, ShowInTaskbar = false,
+                    };
+                    browserWin.Show();
+                    browserWin.UpdateLayout();
+                    Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                    var visual = (Visual)browserWin.Content;
+                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(visual);
+                    string outDir = Path.GetDirectoryName(Path.GetFullPath(args[2]));
+                    if (!string.IsNullOrEmpty(outDir)) Directory.CreateDirectory(outDir);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(rtb));
+                    using (var fs = File.Create(args[2])) enc.Save(fs);
+                    browserWin.Close();
+                }
+                catch (Exception ex) { ShotTrace("shot-browser 异常: " + ex); }
+                Shutdown(0);
+                return;
+            }
+
             // Mods 窗口截图：--shot-mods <版本> <输出.png> [宽 高]
             if (args.Length >= 3 && args[0] == "--shot-mods")
             {

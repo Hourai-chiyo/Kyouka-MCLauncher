@@ -222,6 +222,20 @@ namespace Mcroute.Wpf
             catch { }
         }
 
+        /// <summary>应用内文件浏览（系统 shell 不可用时的兜底）。</summary>
+        private void OpenBrowser(string dir)
+        {
+            try
+            {
+                var w = new FileBrowserWindow(dir) { Owner = this };
+                w.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("连内置浏览也失败了：" + ex.Message + "\n\n路径已复制到剪贴板。\n" + dir, "提示");
+            }
+        }
+
         /// <summary>给截图/脚本用：切到指定页（0 启动 / 1 下载 / 2 整合包 / 3 设置）。</summary>
         public void SetPage(int index)
         {
@@ -1188,18 +1202,10 @@ namespace Mcroute.Wpf
             }
             catch (Exception ex) { errors.Add("ShellExecute: " + Describe(ex)); }
 
-            // 3) 兜底：复制路径 + 给出排查提示
+            // 3) 兜底：系统 shell 全失败 → 用应用内文件浏览（不依赖资源管理器）
             try { Clipboard.SetText(dir); } catch { }
-            AppendLog("打开目录失败：" + string.Join(" | ", errors));
-            MessageBox.Show(
-                "打开目录失败：\n" + string.Join("\n", errors) + "\n\n" +
-                "路径已复制到剪贴板，可以直接粘到资源管理器地址栏。\n" + dir + "\n\n" +
-                "诊断：当前进程会话 = " + Process.GetCurrentProcess().SessionId + "\n" +
-                "（正常交互会话通常是 1）\n\n" +
-                "原因很可能是：mcroute 是从 AI 工具 / 沙箱窗口里启动的，\n" +
-                "和你的资源管理器不在同一个 Windows 会话，shell 调用因此被拒。\n" +
-                "请到资源管理器里双击 mcroute-wpf.exe 再试一次。",
-                "提示");
+            AppendLog("系统 shell 打不开目录（" + string.Join(" | ", errors) + "），改用应用内浏览");
+            OpenBrowser(dir);
         }
 
         private static string Describe(Exception ex)

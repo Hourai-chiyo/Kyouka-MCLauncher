@@ -188,7 +188,12 @@ namespace Mcroute
                     Verb = "open",
                 });
             }
-            catch (Exception ex) { MessageBox.Show("打开失败：" + ex.Message, "提示"); }
+            catch
+            {
+                // 系统 shell 不可用 -> 应用内浏览
+                try { new FileBrowserWindow(Mods.ModsDir(_baseDir, _version)) { Owner = this }.ShowDialog(); }
+                catch (Exception ex2) { MessageBox.Show("打开失败：" + ex2.Message, "提示"); }
+            }
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

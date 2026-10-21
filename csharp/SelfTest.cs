@@ -181,6 +181,54 @@ namespace Mcroute
             }
         }
 
+        /// <summary>调试：直接调 Shell API 打开目录，打印 HRESULT。</summary>
+        public static int ShellTest(string dir)
+        {
+            Console.WriteLine("  目标: " + dir);
+            Console.WriteLine("  存在: " + Directory.Exists(dir));
+            Console.WriteLine("  会话: " + System.Diagnostics.Process.GetCurrentProcess().SessionId);
+            try
+            {
+                var id = System.Security.Principal.WindowsIdentity.GetCurrent();
+                Console.WriteLine("  用户: " + id.Name + "  Token: " + id.ImpersonationLevel);
+            }
+            catch { }
+
+            try
+            {
+                IntPtr pidl = Native.ILCreateFromPath(dir);
+                Console.WriteLine("  ILCreateFromPath: " + (pidl == IntPtr.Zero ? "失败" : "OK"));
+                if (pidl != IntPtr.Zero)
+                {
+                    try
+                    {
+                        int hr = Native.SHOpenFolderAndSelectItems(pidl, 0, null, 0);
+                        Console.WriteLine("  SHOpenFolderAndSelectItems: 0x" + (hr & 0xFFFFFFFF).ToString("X8"));
+                        return hr == 0 ? 0 : 2;
+                    }
+                    finally { Native.ILFree(pidl); }
+                }
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("  [异常] " + ex.Message);
+                return 3;
+            }
+        }
+
+        private static class Native
+        {
+            [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+            public static extern IntPtr ILCreateFromPath(string pszPath);
+
+            [System.Runtime.InteropServices.DllImport("shell32.dll")]
+            public static extern void ILFree(IntPtr pidl);
+
+            [System.Runtime.InteropServices.DllImport("shell32.dll")]
+            public static extern int SHOpenFolderAndSelectItems(IntPtr pidlFolder, uint cidl, IntPtr[] apidl, uint dwFlags);
+        }
+
         private static void WriteEntry(ZipArchive zip, string name, string content)
         {
             var entry = zip.CreateEntry(name);
