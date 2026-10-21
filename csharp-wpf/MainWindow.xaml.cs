@@ -35,9 +35,22 @@ namespace Mcroute.Wpf
                 RefreshJava();
                 LoadBackground();
                 AppendLog("数据目录：" + _baseDir);
-                // 首次使用（没有记住的目录）直接引导选目录；截图模式不弹窗
-                if (!App.ShotMode && string.IsNullOrEmpty(LoadConfigDir())) PickDataDir_Click(this, new RoutedEventArgs());
-                else if (_versions.Count == 0) ShowFirstRunGuide();
+                // 数据目录已经在 ResolveDataDir 里自动挑好了：
+                //   · 有版本 -> 直接用（并写进配置，下次不再问）
+                //   · 完全没版本 + 没配置 -> 才引导选目录
+                if (!App.ShotMode && string.IsNullOrEmpty(LoadConfigDir()) && _versions.Count > 0)
+                {
+                    SaveConfig();
+                    AppendLog("已自动使用数据目录（以后不用再选）：" + _baseDir);
+                }
+                else if (!App.ShotMode && string.IsNullOrEmpty(LoadConfigDir()) && _versions.Count == 0)
+                {
+                    PickDataDir_Click(this, new RoutedEventArgs());
+                }
+                else if (_versions.Count == 0)
+                {
+                    ShowFirstRunGuide();
+                }
             };
         }
 
@@ -545,9 +558,20 @@ namespace Mcroute.Wpf
         // ================= 后台任务 + 日志 =================
         private bool _running;
 
+        [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern IntPtr ILCreateFromPath(string pszPath);
+
+        [System.Runtime.InteropServices.DllImport("shell32.dll")]
+        private static extern void ILFree(IntPtr pidl);
+
+        [System.Runtime.InteropServices.DllImport("shell32.dll")]
+        private static extern int SHOpenFolderAndSelectItems(IntPtr pidlFolder, uint cidl, IntPtr[] apidl, uint dwFlags);
+
         /// <summary>
-        /// 打开文件夹。ShellExecute 在某些目录上会被拒（拒绝访问），所以按可靠度依次尝试：
-        /// explorer /select -> explorer 目录 -> ShellExecute；全失败则复制路径到剪贴板。
+        /// 打开文件夹。
+        /// 注意：不能用 Process.Start("explorer.exe", 路径) —— 有些机器上 explorer 二次启动会
+        /// 0xc0000142（DLL 初始化失败）。这里改用 Shell API：SHOpenFolderAndSelectItems
+        /// （让已经在跑的 explorer 去打开，不新起进程），失败再退 ShellExecute，最后复制路径。
         /// </summary>
         private void OpenFolderSafe(string dir)
         {
@@ -559,26 +583,25 @@ namespace Mcroute.Wpf
 
             var errors = new List<string>();
 
+            // 1) Shell API：在资源管理器里打开并选中该文件夹
             try
             {
-                Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + dir + "\"")
+                IntPtr pidl = ILCreateFromPath(dir);
+                if (pidl != IntPtr.Zero)
                 {
-                    UseShellExecute = true,
-                });
-                return;
+                    try
+                    {
+                        int hr = SHOpenFolderAndSelectItems(pidl, 0, null, 0);
+                        if (hr == 0) return;
+                        errors.Add("SHOpenFolderAndSelectItems: 0x" + hr.ToString("X8"));
+                    }
+                    finally { ILFree(pidl); }
+                }
+                else errors.Add("ILCreateFromPath 失败");
             }
-            catch (Exception ex) { errors.Add("explorer /select: " + Describe(ex)); }
+            catch (Exception ex) { errors.Add("SHOpenFolderAndSelectItems: " + Describe(ex)); }
 
-            try
-            {
-                Process.Start(new ProcessStartInfo("explorer.exe", "\"" + dir + "\"")
-                {
-                    UseShellExecute = true,
-                });
-                return;
-            }
-            catch (Exception ex) { errors.Add("explorer: " + Describe(ex)); }
-
+            // 2) ShellExecute 打开目录本身
             try
             {
                 Process.Start(new ProcessStartInfo
@@ -591,6 +614,7 @@ namespace Mcroute.Wpf
             }
             catch (Exception ex) { errors.Add("ShellExecute: " + Describe(ex)); }
 
+            // 3) 兜底：复制路径
             try { Clipboard.SetText(dir); } catch { }
             AppendLog("打开目录失败：" + string.Join(" | ", errors));
             MessageBox.Show(
