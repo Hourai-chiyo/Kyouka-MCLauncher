@@ -46,6 +46,7 @@ namespace Mcroute.Wpf
                     int plus = shown.IndexOf('+');
                     if (plus > 0) shown = shown.Substring(0, plus);
                     VersionText.Text = "v" + shown + " · WPF";
+                    if (SideVersion != null) SideVersion.Text = "v" + shown;
                 }
                 catch { }
 
@@ -278,8 +279,18 @@ namespace Mcroute.Wpf
         // ================= 版本列表 =================
         private void Refresh_Click(object sender, RoutedEventArgs e) { RefreshVersions(); }
 
-        private void RefreshVersions()
+        private void VersionSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (VersionSearch == null) return;
+            string q = VersionSearch.Text ?? "";
+            if (SearchHint != null)
+                SearchHint.Visibility = string.IsNullOrEmpty(q) ? Visibility.Visible : Visibility.Collapsed;
+            RefreshVersions(q);
+        }
+
+        private void RefreshVersions(string filter = null)
+        {
+            string q = (filter ?? "").Trim().ToLowerInvariant();
             _versions.Clear();
             VersionList.Items.Clear();
 
@@ -302,13 +313,20 @@ namespace Mcroute.Wpf
                 if (isPack) tag += " · 整合包";
                 else if (hasMods && string.IsNullOrEmpty(loader)) tag += " · 外部";
 
+                if (q.Length > 0 &&
+                    name.ToLowerInvariant().IndexOf(q, StringComparison.Ordinal) < 0 &&
+                    tag.ToLowerInvariant().IndexOf(q, StringComparison.Ordinal) < 0)
+                    continue;
+
                 _versions.Add(name);
                 VersionList.Items.Add(MakeVersionItem(name, tag));
             }
 
             VersionCount.Text = _versions.Count + " 个";
             if (VersionList.Items.Count > 0) VersionList.SelectedIndex = 0;
-            AppendLog("找到 " + _versions.Count + " 个本地版本");
+            AppendLog(q.Length > 0
+                ? "搜索「" + filter + "」→ " + _versions.Count + " 个"
+                : "找到 " + _versions.Count + " 个本地版本");
         }
 
         private static ListBoxItem MakeVersionItem(string name, string tag)
@@ -497,7 +515,7 @@ namespace Mcroute.Wpf
             var args = noAssets
                 ? new[] { "fetch", ver, "--dir", _baseDir, "--no-assets" }
                 : new[] { "fetch", ver, "--dir", _baseDir };
-            RunTask("下载 " + ver, () => Commands.Fetch(args), RefreshVersions);
+            RunTask("下载 " + ver, () => Commands.Fetch(args), () => RefreshVersions());
         }
 
         private void Loader_Click(object sender, RoutedEventArgs e)
@@ -506,7 +524,7 @@ namespace Mcroute.Wpf
             string ver = LoaderVersion.Text.Trim();
             if (ver.Length == 0) { MessageBox.Show("先填版本号", "提示"); return; }
             RunTask("安装 " + kind + " " + ver,
-                () => Loader.Run(new[] { "loader", kind, ver, "--dir", _baseDir }), RefreshVersions);
+                () => Loader.Run(new[] { "loader", kind, ver, "--dir", _baseDir }), () => RefreshVersions());
         }
 
         private void InstallJava_Click(object sender, RoutedEventArgs e)
@@ -536,7 +554,7 @@ namespace Mcroute.Wpf
             string path = PackPath.Text.Trim();
             if (path.Length == 0) { MessageBox.Show("先选一个整合包文件", "提示"); return; }
             RunTask("安装 " + Path.GetFileName(path),
-                () => Packs.Install(new[] { "install", path, "--dir", _baseDir }), RefreshVersions);
+                () => Packs.Install(new[] { "install", path, "--dir", _baseDir }), () => RefreshVersions());
         }
 
         // ================= 管理页 =================
@@ -778,6 +796,8 @@ namespace Mcroute.Wpf
                 {
                     if (res["SurfaceGlass"] != null) res["Surface"] = res["SurfaceGlass"];
                     if (res["BorderGlass"] != null) res["Border"] = res["BorderGlass"];
+                    if (Sidebar != null) Sidebar.Background = res["SurfaceGlass"] as Brush;
+                    if (TopBar != null) TopBar.Background = System.Windows.Media.Brushes.Transparent;
                     PageDownload.Background = System.Windows.Media.Brushes.Transparent;
                     PagePacks.Background = System.Windows.Media.Brushes.Transparent;
                     PageManage.Background = System.Windows.Media.Brushes.Transparent;
@@ -789,6 +809,8 @@ namespace Mcroute.Wpf
                     PagePacks.SetResourceReference(Panel.BackgroundProperty, "Bg");
                     PageManage.SetResourceReference(Panel.BackgroundProperty, "Bg");
                     PageSettings.SetResourceReference(Panel.BackgroundProperty, "Bg");
+                    if (Sidebar != null) Sidebar.SetResourceReference(Border.BackgroundProperty, "Surface");
+                    if (TopBar != null) TopBar.SetResourceReference(Panel.BackgroundProperty, "Surface");
                 }
 
                 if (updateBox && GlassBox != null) GlassBox.IsChecked = on;

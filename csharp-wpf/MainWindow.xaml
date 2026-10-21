@@ -366,20 +366,14 @@
         </Grid.RowDefinitions>
 
         <!-- ================= 顶部 ================= -->
-        <Grid Grid.Row="0" Background="{DynamicResource Surface}">
+        <Grid x:Name="TopBar" Grid.Row="0" Background="{DynamicResource Surface}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel Orientation="Horizontal" Margin="22,0,0,0" VerticalAlignment="Center">
-                <Border Width="24" Height="24" CornerRadius="7" Background="{DynamicResource Primary}"/>
-                <TextBlock Text="mcroute" Margin="10,0,0,0" FontSize="15" FontWeight="SemiBold"
-                           Foreground="{DynamicResource Text}" VerticalAlignment="Center"/>
-            </StackPanel>
-
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="34,0,0,0" VerticalAlignment="Center"
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Center"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <RadioButton x:Name="NavLaunch" Style="{StaticResource NavItem}" Content="启动" IsChecked="True"
                              GroupName="nav" Checked="Nav_Checked"/>
@@ -410,87 +404,8 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- 左侧栏 -->
-            <Border Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,1,0">
-                <Grid Margin="20,18,20,18">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <StackPanel Grid.Row="0" Orientation="Horizontal">
-                        <Border Width="56" Height="56" CornerRadius="14" Background="{DynamicResource PrimaryDim}">
-                            <Grid>
-                                <Ellipse Width="22" Height="22" Fill="{DynamicResource TextFaint}" VerticalAlignment="Top" Margin="0,10,0,0"/>
-                                <Path Fill="{DynamicResource TextFaint}" Data="M0,19 C0,7 32,7 32,19 Z" Width="32" Height="19"
-                                      Stretch="Fill" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                            </Grid>
-                        </Border>
-                        <StackPanel Margin="12,4,0,0">
-                            <TextBlock Text="Steve" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource Text}"/>
-                            <Border Background="{DynamicResource Hairline}" CornerRadius="9" Padding="8,2" Margin="0,5,0,0" HorizontalAlignment="Left">
-                                <TextBlock Text="离线模式" FontSize="11" Foreground="{DynamicResource TextMuted}"/>
-                            </Border>
-                        </StackPanel>
-                    </StackPanel>
-
-                    <StackPanel Grid.Row="1" Margin="0,20,0,0">
-                        <TextBlock Text="数据目录" Style="{StaticResource FieldLabel}"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Height="30" CornerRadius="6" Background="{DynamicResource Bg}"
-                                    BorderBrush="{DynamicResource Border}" BorderThickness="1" Padding="8,0">
-                                <TextBlock x:Name="DataDirText" Text="…" FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                            </Border>
-                            <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="改"
-                                    Width="44" Height="30" Margin="6,0,0,0" Click="PickDataDir_Click"/>
-                        </Grid>
-                    </StackPanel>
-
-                    <Grid Grid.Row="2" Margin="0,18,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <Grid Grid.Row="0" Margin="0,0,0,8">
-                            <TextBlock Text="本地版本" Style="{StaticResource FieldLabel}" Margin="0"/>
-                            <TextBlock x:Name="VersionCount" Text="" FontSize="11" Foreground="{DynamicResource TextFaint}"
-                                       HorizontalAlignment="Right"/>
-                        </Grid>
-                        <ListBox x:Name="VersionList" Grid.Row="1" Style="{StaticResource PlainListBox}"
-                                 SelectionChanged="VersionList_SelectionChanged"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
-                    </Grid>
-
-                    <StackPanel Grid.Row="3">
-                        <Button x:Name="PlayButton" Style="{StaticResource PrimaryButton}" Content="开始游戏"
-                                Click="Play_Click"/>
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="8"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Style="{StaticResource GhostButton}" Content="刷新"
-                                    Click="Refresh_Click"/>
-                            <Button Grid.Column="2" Style="{StaticResource GhostButton}" Content="打开目录"
-                                    Click="OpenDir_Click"/>
-                        </Grid>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- 右侧内容 -->
-            <Grid Grid.Column="1" ClipToBounds="True">
-
                 <!-- 启动页背景：默认是矢量山形；也可以在设置里换成自己的图片 -->
-                <Grid x:Name="HeroLayer">
+                <Grid x:Name="HeroLayer" Grid.ColumnSpan="2">
                     <Grid.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                             <GradientStop Color="#1B2A4A" Offset="0"/>
@@ -520,6 +435,107 @@
                         </Border.Background>
                     </Border>
                 </Grid>
+
+            <!-- 左侧栏 -->
+            <Border x:Name="Sidebar" Grid.Column="0" Background="{DynamicResource Surface}"
+                    BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,1,0">
+                <Grid Margin="16,14,16,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 品牌 -->
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="26" Height="26" CornerRadius="8" Background="{DynamicResource Primary}"/>
+                        <TextBlock Text="mcroute" Margin="10,0,0,0" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Text}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="SideVersion" Text="" FontSize="10" Margin="8,3,0,0"
+                                   Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- 主按钮 -->
+                    <Button x:Name="PlayButton" Grid.Row="1" Style="{StaticResource PrimaryButton}"
+                            Content="开始游戏" Height="40" Margin="0,14,0,0" Click="Play_Click"/>
+
+                    <!-- 搜索 + 刷新 -->
+                    <Grid Grid.Row="2" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Column="0">
+                            <TextBox x:Name="VersionSearch" Height="30" TextChanged="VersionSearch_TextChanged"/>
+                            <TextBlock x:Name="SearchHint" Text="搜索版本…" FontSize="12"
+                                       Foreground="{DynamicResource TextFaint}" Margin="10,0,0,0"
+                                       VerticalAlignment="Center" IsHitTestVisible="False"/>
+                        </Grid>
+                        <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="⟳" Width="34" Height="30"
+                                Margin="6,0,0,0" ToolTip="刷新版本列表" Click="Refresh_Click"/>
+                    </Grid>
+
+                    <!-- 版本列表 -->
+                    <Grid Grid.Row="3" Margin="0,12,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <TextBlock Text="本地版本" Style="{StaticResource FieldLabel}" Margin="0"/>
+                            <TextBlock x:Name="VersionCount" Text="" FontSize="11" Foreground="{DynamicResource TextFaint}"
+                                       HorizontalAlignment="Right"/>
+                        </Grid>
+                        <ListBox x:Name="VersionList" Grid.Row="1" Style="{StaticResource PlainListBox}"
+                                 SelectionChanged="VersionList_SelectionChanged"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                    </Grid>
+
+                    <!-- 数据目录（紧凑一行） -->
+                    <Grid Grid.Row="4" Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Height="28" CornerRadius="6" Background="{DynamicResource Bg}"
+                                BorderBrush="{DynamicResource Border}" BorderThickness="1" Padding="8,0"
+                                ToolTip="{Binding ElementName=DataDirText, Path=Text}">
+                            <TextBlock x:Name="DataDirText" Text="…" FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                        </Border>
+                        <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="改" Width="40" Height="28"
+                                Margin="6,0,0,0" Click="PickDataDir_Click"/>
+                    </Grid>
+
+                    <!-- 底部账号 -->
+                    <Grid Grid.Row="5" Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Width="30" Height="30" CornerRadius="9" Background="{DynamicResource PrimaryDim}">
+                            <Grid>
+                                <Ellipse Width="12" Height="12" Fill="{DynamicResource TextFaint}" VerticalAlignment="Top" Margin="0,6,0,0"/>
+                                <Path Fill="{DynamicResource TextFaint}" Data="M0,10 C0,4 18,4 18,10 Z" Width="18" Height="10"
+                                      Stretch="Fill" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                            </Grid>
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="Steve" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Text}"/>
+                            <TextBlock Text="离线模式" FontSize="10" Foreground="{DynamicResource TextMuted}"/>
+                        </StackPanel>
+                        <Button Grid.Column="2" Style="{StaticResource GhostButton}" Content="打开目录" Width="88" Height="28"
+                                Click="OpenDir_Click"/>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- 右侧内容 -->
+            <Grid Grid.Column="1" ClipToBounds="True">
 
                 <!-- 启动页 -->
                 <Grid x:Name="PageLaunch">
