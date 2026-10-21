@@ -385,6 +385,11 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 |---|---|
 | ![启动-深色](docs/gui-wpf-launch-dark.png) | ![设置-深色](docs/gui-wpf-settings-dark.png) |
 
+**背景图可调**：选了背景图后，设置页多出「暗度」（0–100%）和「模糊」（0–24）两个滑块。
+暗度默认按图片亮度自动给（亮图 32% / 中等 24% / 暗图 18%），模糊调到 12–18 就是毛玻璃观感：
+
+![毛玻璃背景](docs/gui-wpf-frosted.png)
+
 **主题**：浅色 / 深色 / **跟随系统**（读 Windows 的 AppsUseLightTheme，切系统主题后窗口重新激活即跟上）。
 深色不是简单反色：文字、边框、悬停、选中、滚动条全部走同一套主题变量。
 

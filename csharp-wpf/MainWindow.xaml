@@ -742,6 +742,38 @@
                             <TextBlock Text="支持 jpg / png / bmp；图片只保存在本地数据目录，不会打包进程序"
                                        Margin="0,6,0,0" FontSize="11" Foreground="{DynamicResource TextFaint}"/>
 
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="暗度" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource TextSub}"/>
+                                <Slider x:Name="BgDimSlider" Grid.Column="1" Width="240" Height="24"
+                                        HorizontalAlignment="Left" Margin="10,0,0,0"
+                                        Minimum="0" Maximum="100" Value="35"
+                                        ValueChanged="BgDimSlider_ValueChanged"/>
+                                <TextBlock x:Name="BgDimText" Grid.Column="2" FontSize="11" Width="40"
+                                           VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}"/>
+                            </Grid>
+
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="模糊" VerticalAlignment="Center" FontSize="12"
+                                           Foreground="{DynamicResource TextSub}"/>
+                                <Slider x:Name="BgBlurSlider" Grid.Column="1" Width="240" Height="24"
+                                        HorizontalAlignment="Left" Margin="10,0,0,0"
+                                        Minimum="0" Maximum="24" Value="0"
+                                        ValueChanged="BgBlurSlider_ValueChanged"/>
+                                <TextBlock x:Name="BgBlurText" Grid.Column="2" FontSize="11" Width="40"
+                                           VerticalAlignment="Center" Foreground="{DynamicResource TextMuted}"/>
+                            </Grid>
+
                             <TextBlock Text="最大内存（例如 2G / 4G / 8192M）" Style="{StaticResource FieldLabel}" Margin="0,18,0,6"/>
                             <TextBox x:Name="MemoryBox" Text="2G" Width="140" HorizontalAlignment="Left"/>
 

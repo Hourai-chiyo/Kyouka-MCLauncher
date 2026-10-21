@@ -791,6 +791,7 @@ namespace Mcroute.Wpf
                 string file = BackgroundFile();
                 if (File.Exists(file)) File.Delete(file);
                 HeroImageLayer.Background = null;
+                HeroImageLayer.Effect = null;
                 HeroImageLayer.Visibility = Visibility.Collapsed;
                 HeroScrim.Visibility = Visibility.Collapsed;
                 HeroMountains.Visibility = Visibility.Visible;
@@ -802,6 +803,8 @@ namespace Mcroute.Wpf
                 MessageBox.Show("恢复默认失败：" + ex.Message, "提示");
             }
         }
+
+        private bool _applyingBg;          // 防止滑块赋值时递归触发保存
 
         private void ApplyBackgroundBrush(string file)
         {
@@ -817,11 +820,120 @@ namespace Mcroute.Wpf
                 Stretch = System.Windows.Media.Stretch.UniformToFill,
                 AlignmentX = AlignmentX.Center,
                 AlignmentY = AlignmentY.Center,
+                // 放大一点，模糊时边缘不会因为采样到区域外而透明
+                RelativeTransform = new ScaleTransform(1.08, 1.08, 0.5, 0.5),
             };
             HeroImageLayer.Background = brush;
             HeroImageLayer.Visibility = Visibility.Visible;
             HeroMountains.Visibility = Visibility.Collapsed;   // 图片模式不叠山形
-            HeroScrim.Visibility = Visibility.Visible;         // 暗色蒙版，保证白字可读
+            HeroScrim.Visibility = Visibility.Visible;
+
+            // 暗度：配置里没有就用亮度自适应（亮图压深一点，暗图别太黑）
+            _applyingBg = true;
+            try
+            {
+                int dim = (int)J.Int(LoadConfig(), "bg_dim", -1);
+                if (dim < 0)
+                {
+                    double lum = AverageLuminance(bmp);
+                    dim = lum > 0.70 ? 32 : lum > 0.5 ? 24 : lum > 0.3 ? 18 : 12;
+                    AppendLog(string.Format("背景亮度 {0:F2} → 自动暗度 {1}%", lum, dim));
+                }
+                BgDimSlider.Value = dim;
+                BgBlurSlider.Value = J.Int(LoadConfig(), "bg_blur", 0);
+            }
+            finally { _applyingBg = false; }
+
+            ApplyScrimDim(BgDimSlider.Value);
+            ApplyScrimBlur(BgBlurSlider.Value);
+        }
+
+        /// <summary>图片平均亮度（缩到 32x32 采样，够用且快）。</summary>
+        private static double AverageLuminance(System.Windows.Media.Imaging.BitmapSource bmp)
+        {
+            try
+            {
+                var small = new System.Windows.Media.Imaging.TransformedBitmap(bmp,
+                    new System.Windows.Media.ScaleTransform(
+                        32.0 / Math.Max(1, bmp.PixelWidth), 32.0 / Math.Max(1, bmp.PixelHeight)));
+                var conv = new System.Windows.Media.Imaging.FormatConvertedBitmap(
+                    small, PixelFormats.Bgra32, null, 0);
+                int w = conv.PixelWidth, h = conv.PixelHeight;
+                byte[] px = new byte[w * h * 4];
+                conv.CopyPixels(px, w * 4, 0);
+                double sum = 0;
+                for (int i = 0; i < px.Length; i += 4)
+                    sum += 0.0722 * px[i] + 0.7152 * px[i + 1] + 0.2126 * px[i + 2];
+                return sum / (255.0 * Math.Max(1, w * h));
+            }
+            catch { return 0.5; }
+        }
+
+        /// <summary>暗度 0~100 → 蒙版透明度（上浅下深，保证底部黑字/蓝按钮压得住）。</summary>
+        private void ApplyScrimDim(double percent)
+        {
+            double a = Math.Max(0, Math.Min(100, percent)) / 100.0;
+            byte top = (byte)Math.Round(a * 0.7 * 255);
+            byte bottom = (byte)Math.Round(a * 255);
+            var grad = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0),
+                EndPoint = new Point(0, 1),
+            };
+            grad.GradientStops.Add(new GradientStop(Color.FromArgb(top, 8, 14, 26), 0));
+            grad.GradientStops.Add(new GradientStop(Color.FromArgb(bottom, 8, 14, 26), 1));
+            grad.Freeze();
+            HeroScrim.Background = grad;
+
+            if (BgDimText != null) BgDimText.Text = (int)Math.Round(percent) + "%";
+        }
+
+        /// <summary>模糊半径（毛玻璃观感）。0 = 关闭。</summary>
+        private void ApplyScrimBlur(double radius)
+        {
+            if (HeroImageLayer == null) return;
+            if (radius <= 0.5)
+            {
+                HeroImageLayer.Effect = null;
+            }
+            else
+            {
+                var blur = new System.Windows.Media.Effects.BlurEffect
+                {
+                    Radius = radius,
+                    KernelType = System.Windows.Media.Effects.KernelType.Gaussian,
+                    RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance,
+                };
+                HeroImageLayer.Effect = blur;
+            }
+            if (BgBlurText != null) BgBlurText.Text = ((int)Math.Round(radius)).ToString();
+        }
+
+        private void BgDimSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (BgDimText == null || HeroScrim == null) return;
+            ApplyScrimDim(e.NewValue);
+            if (_applyingBg) return;
+            try { J.SaveFile(ConfigPaths()[0], MergeConfig("bg_dim", (int)Math.Round(e.NewValue))); } catch { }
+        }
+
+        private void BgBlurSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (BgBlurText == null || HeroImageLayer == null) return;
+            ApplyScrimBlur(e.NewValue);
+            if (_applyingBg) return;
+            try { J.SaveFile(ConfigPaths()[0], MergeConfig("bg_blur", (int)Math.Round(e.NewValue))); } catch { }
+        }
+
+        /// <summary>读现有配置 + 改一个键（滑块调整时即时落盘）。</summary>
+        private Dictionary<string, object> MergeConfig(string key, object value)
+        {
+            var cfg = LoadConfig();
+            if (cfg == null) cfg = new Dictionary<string, object>();
+            cfg["data_dir"] = _baseDir;
+            cfg["memory"] = MemoryBox.Text.Trim();
+            cfg[key] = value;
+            return cfg;
         }
 
         // ================= 后台任务 + 日志 =================
