@@ -75,3 +75,4 @@ gui_*.log
 csharp/bin/
 csharp/obj/
 csharp/out/
+release/
