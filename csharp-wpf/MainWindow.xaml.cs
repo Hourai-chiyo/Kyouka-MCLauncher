@@ -22,7 +22,7 @@ namespace Mcroute.Wpf
         {
             InitializeComponent();
 
-            _baseDir = Version.BaseDir(LoadConfigDir());
+            _baseDir = ResolveDataDir();
             DataDirText.Text = _baseDir;
             SettingsDataDir.Text = _baseDir;
             MemoryBox.Text = LoadConfig("memory", "2G");
@@ -35,7 +35,42 @@ namespace Mcroute.Wpf
                 RefreshJava();
                 LoadBackground();
                 AppendLog("数据目录：" + _baseDir);
+                // 首次使用（没有记住的目录）直接引导选目录；截图模式不弹窗
+                if (!App.ShotMode && string.IsNullOrEmpty(LoadConfigDir())) PickDataDir_Click(this, new RoutedEventArgs());
+                else if (_versions.Count == 0) ShowFirstRunGuide();
             };
+        }
+
+        /// <summary>
+        /// 选数据目录。顺序：
+        ///   1) 配置文件里记住的
+        ///   2) 已经装了版本的数据目录（exe 旁 / %LOCALAPPDATA%）
+        ///   3) 便携模式：exe 旁边本来就有 mcdata 文件夹
+        ///   4) 用户目录 %LOCALAPPDATA%\mcroute\mcdata
+        /// </summary>
+        private static string ResolveDataDir()
+        {
+            // 截图/自动化用：MCROUTE_DATA 直接指定
+            string fromEnv = Environment.GetEnvironmentVariable("MCROUTE_DATA");
+            if (!string.IsNullOrEmpty(fromEnv) && Directory.Exists(fromEnv)) return fromEnv;
+
+            string fromConfig = LoadConfigDir();
+            if (!string.IsNullOrEmpty(fromConfig) && Directory.Exists(fromConfig)) return fromConfig;
+
+            string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+            string exeMc = Path.Combine(exeDir, "mcdata");
+            string userMc = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute", "mcdata");
+
+            foreach (string candidate in new[] { exeMc, userMc })
+                if (Directory.Exists(Path.Combine(candidate, "versions"))) return candidate;
+
+            // 便携版：exe 旁边已经有 mcdata 文件夹就用它
+            if (Directory.Exists(exeMc)) return exeMc;
+
+            // 否则用用户目录（不污染 exe 所在文件夹）
+            try { Directory.CreateDirectory(userMc); return userMc; }
+            catch { return Version.BaseDir(null); }
         }
 
         // ================= 配置 =================
@@ -136,6 +171,18 @@ namespace Mcroute.Wpf
                 case "设置": PageSettings.Visibility = Visibility.Visible; RefreshJava(); break;
             }
             StatusText.Text = "就绪 · " + name + " 页";
+        }
+
+        /// <summary>首次启动（数据目录里没有版本）时引导用户选已有目录。</summary>
+        private void ShowFirstRunGuide()
+        {
+            var r = MessageBox.Show(
+                "当前数据目录里还没有任何版本：\n" + _baseDir + "\n\n" +
+                "如果以前用过别的启动器（PCL / HMCL / 官方启动器 / mcroute 另一个版本），\n" +
+                "可以「是」把它的数据目录导进来，不用重新下载。\n\n" +
+                "点「否」就留在这里，用「下载」页装一个新版本。",
+                "mcroute — 第一次使用", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (r == MessageBoxResult.Yes) PickDataDir_Click(this, new RoutedEventArgs());
         }
 
         // ================= 版本列表 =================

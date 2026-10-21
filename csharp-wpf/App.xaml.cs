@@ -9,6 +9,9 @@ namespace Mcroute.Wpf
 {
     public partial class App : Application
     {
+        /// <summary>截图模式：不要弹任何对话框（否则 CI/文档出图会卡住）。</summary>
+        public static bool ShotMode;
+
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
@@ -21,6 +24,11 @@ namespace Mcroute.Wpf
 
             // 文档截图模式：mcroute-wpf.exe --shot <输出.png> [宽 高 页码]
             // 不依赖窗口显示，用 RenderTargetBitmap 直接渲染（也方便 CI 出图）
+            if (args.Length >= 2 && args[0] == "--shot")
+            {
+                ShotMode = true;
+            }
+
             if (args.Length >= 2 && args[0] == "--shot")
             {
                 try

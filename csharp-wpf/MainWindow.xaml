@@ -161,6 +161,23 @@
             <Setter Property="FontSize" Value="13"/>
         </Style>
 
+        <!-- 多行输出框：独立样式，避免被上面的全局 TextBox 样式（高度 32 / 垂直居中）污染 -->
+        <Style x:Key="OutputBox" TargetType="TextBox">
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#D6E4F5"/>
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="VerticalContentAlignment" Value="Top"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+        </Style>
+
         <Style x:Key="PageTitle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="20"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -372,11 +389,7 @@
                                         BorderThickness="0" HorizontalAlignment="Right" Cursor="Hand"
                                         Click="ClearLog_Click"/>
                             </Grid>
-                            <TextBox x:Name="LogBox" Grid.Row="1" Margin="12,2,12,8" Padding="0" Background="Transparent"
-                                     BorderThickness="0" Foreground="#D6E4F5" FontFamily="Consolas"
-                                     FontSize="11" IsReadOnly="True" TextWrapping="NoWrap"
-                                     AcceptsReturn="True" VerticalContentAlignment="Top" MinLines="6"
-                                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
+                            <TextBox x:Name="LogBox" Grid.Row="1" Margin="12,2,12,8" Style="{StaticResource OutputBox}"/>
                         </Grid>
                     </Border>
                 </Grid>
@@ -392,36 +405,36 @@
 
                             <TextBlock Text="MC 版本（例如 1.20.1）" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="DownloadVersion" Text="1.21.1" Width="220" HorizontalAlignment="Left"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <WrapPanel Margin="0,10,0,0">
                                 <Button Style="{StaticResource GhostButton}" Content="下载原版" Width="110"
                                         Click="Fetch_Click"/>
                                 <Button Style="{StaticResource GhostButton}" Content="跳过资源下载" Width="120" Margin="8,0,0,0"
                                         Click="FetchNoAssets_Click"/>
-                            </StackPanel>
+                            </WrapPanel>
 
                             <Border Height="1" Background="{StaticResource Hairline}" Margin="0,20,0,18"/>
 
                             <TextBlock Text="加载器" Style="{StaticResource FieldLabel}"/>
-                            <StackPanel Orientation="Horizontal">
-                                <ComboBox x:Name="LoaderKind" Width="150">
+                            <WrapPanel>
+                                <ComboBox x:Name="LoaderKind" Width="140">
                                     <ComboBoxItem Content="fabric" IsSelected="True"/>
                                     <ComboBoxItem Content="quilt"/>
                                     <ComboBoxItem Content="legacyfabric"/>
                                     <ComboBoxItem Content="forge"/>
                                     <ComboBoxItem Content="neoforge"/>
                                 </ComboBox>
-                                <TextBox x:Name="LoaderVersion" Text="1.20.1" Width="180" Margin="8,0,0,0"/>
-                                <Button Style="{StaticResource GhostButton}" Content="安装加载器" Width="120"
+                                <TextBox x:Name="LoaderVersion" Text="1.20.1" Width="140" Margin="8,0,0,0"/>
+                                <Button Style="{StaticResource GhostButton}" Content="安装加载器" Width="110"
                                         Margin="8,0,0,0" Click="Loader_Click"/>
-                            </StackPanel>
+                            </WrapPanel>
                             <TextBlock Text="forge 写 1.7.10 或 1.20.1-47.2.0 都行（自动补全）；neoforge 写 21.1.264 / 47.1.106"
                                        Margin="0,10,0,0" FontSize="11" Foreground="{StaticResource TextFaint}"/>
 
                             <Border Height="1" Background="{StaticResource Hairline}" Margin="0,20,0,18"/>
 
                             <TextBlock Text="Java" Style="{StaticResource FieldLabel}"/>
-                            <StackPanel Orientation="Horizontal">
-                                <ComboBox x:Name="JavaMajor" Width="90">
+                            <WrapPanel>
+                                <ComboBox x:Name="JavaMajor" Width="80">
                                     <ComboBoxItem Content="8"/>
                                     <ComboBoxItem Content="11"/>
                                     <ComboBoxItem Content="17" IsSelected="True"/>
@@ -429,7 +442,7 @@
                                 </ComboBox>
                                 <Button Style="{StaticResource GhostButton}" Content="下载并安装 Java" Width="150"
                                         Margin="8,0,0,0" Click="InstallJava_Click"/>
-                            </StackPanel>
+                            </WrapPanel>
                             <TextBlock Text="源：Adoptium（清华镜像）→ Azul Zulu → AWS Corretto"
                                        Margin="0,10,0,0" FontSize="11" Foreground="{StaticResource TextFaint}"/>
                         </StackPanel>
@@ -502,13 +515,7 @@
                                         </Grid.RowDefinitions>
                                         <TextBlock Text="输出" FontSize="11" Foreground="#8FA8C7"
                                                    Margin="12,0,0,0" VerticalAlignment="Center"/>
-                                        <TextBox x:Name="ManageOutput" Grid.Row="1" Margin="12,2,12,10" Padding="0"
-                                                 Background="Transparent" BorderThickness="0" Foreground="#D6E4F5"
-                                                 FontFamily="Consolas" FontSize="11" IsReadOnly="True"
-                                                 AcceptsReturn="True" TextWrapping="NoWrap"
-                                                 VerticalContentAlignment="Top"
-                                                 VerticalScrollBarVisibility="Auto"
-                                                 HorizontalScrollBarVisibility="Disabled"/>
+                                        <TextBox x:Name="ManageOutput" Grid.Row="1" Margin="12,2,12,10" Style="{StaticResource OutputBox}"/>
                                     </Grid>
                                 </Border>
                             </Grid>
