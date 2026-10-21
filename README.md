@@ -425,6 +425,11 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 - **CurseForge**：把 API Key 放进 `<数据目录>/cf_api_key.txt`（或环境变量 `CF_API_KEY`）；
   部分 mod 作者关闭了第三方分发（`downloadUrl` 为空），这时会提示你去网页手动下载
 - 两家**不合并**：同名 mod 两边版本可能不同，混在一起容易装错
+- **CurseForge Key 直接填在界面里**：切到 CurseForge 且没有 Key 时，窗口里会出现输入框（「获取 Key」→「保存」），
+  保存到 `<数据目录>/cf_api_key.txt`：
+
+  ![填 Key](docs/gui-wpf-cfkey.png)
+
 - **从链接安装**：底部输入框粘任意 jar 直链（例如 mcmod 过验证码后拿到的下载链接、网盘直链），
   自动识别文件名/元数据后装进 `mods/`
 

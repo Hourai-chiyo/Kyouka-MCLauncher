@@ -57,6 +57,7 @@ namespace Mcroute
                     ? "输入关键词后回车搜索（CurseForge 已配置 Key）"
                     : "输入关键词后回车搜索（CurseForge 需要 cf_api_key.txt 才能用）";
                 SearchBox.Focus();
+                UpdateKeyPanel();
             };
         }
 
@@ -84,6 +85,15 @@ namespace Mcroute
         /// <summary>给截图用：填关键词并直接搜索。</summary>
         public void PreloadSearch(string query)
         {
+            // 截图用：MCROUTE_SHOT_SOURCE=cf 可以把来源切到 CurseForge
+            string src = Environment.GetEnvironmentVariable("MCROUTE_SHOT_SOURCE");
+            if (!string.IsNullOrEmpty(src))
+            {
+                foreach (var it in SourceBox.Items.OfType<ComboBoxItem>())
+                    if (string.Equals((it.Content as string) ?? "", src, StringComparison.OrdinalIgnoreCase))
+                        it.IsSelected = true;
+                UpdateKeyPanel();
+            }
             SearchBox.Text = query ?? "";
             Search_Click(this, new RoutedEventArgs());
         }
@@ -104,9 +114,10 @@ namespace Mcroute
 
             if (source == "cf" && !CurseForge.HasKey(_baseDir))
             {
-                StatusText.Text = "CurseForge 需要 API Key：放进 <数据目录>/cf_api_key.txt";
+                UpdateKeyPanel();
                 return;
             }
+            KeyPanel.Visibility = Visibility.Collapsed;
 
             StatusText.Text = "搜索中…";
             HitList.Items.Clear();
@@ -321,6 +332,49 @@ namespace Mcroute
                 }));
             });
             task.Start();
+        }
+
+        private void OpenCfConsole_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://console.curseforge.com/?#/api-keys",
+                    UseShellExecute = true,
+                });
+            }
+            catch (Exception ex) { MessageBox.Show("打不开浏览器：" + ex.Message + "\n\n请手动访问 https://console.curseforge.com", "提示"); }
+        }
+
+        private void SaveCfKey_Click(object sender, RoutedEventArgs e)
+        {
+            string key = KeyBox.Text.Trim();
+            if (key.Length < 20) { MessageBox.Show("Key 看起来太短了，请完整复制", "提示"); return; }
+            try
+            {
+                string path = System.IO.Path.Combine(_baseDir, "cf_api_key.txt");
+                System.IO.Directory.CreateDirectory(_baseDir);
+                System.IO.File.WriteAllText(path, key);
+                KeyPanel.Visibility = Visibility.Collapsed;
+                StatusText.Text = "已保存 CurseForge Key，可以搜索了";
+                KeyBox.Clear();
+            }
+            catch (Exception ex) { MessageBox.Show("保存失败：" + ex.Message, "提示"); }
+        }
+
+        private void SourceBox_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateKeyPanel();
+        }
+
+        /// <summary>切到 CurseForge 且没有 Key 时，显示输入面板。</summary>
+        private void UpdateKeyPanel()
+        {
+            if (KeyPanel == null) return;
+            bool needKey = CurrentSource() == "cf" && !CurseForge.HasKey(_baseDir);
+            KeyPanel.Visibility = needKey ? Visibility.Visible : Visibility.Collapsed;
+            if (needKey) StatusText.Text = "CurseForge 需要 API Key：填在下面，或从 Modrinth 搜索";
         }
 
         private void OpenModsDir_Click(object sender, RoutedEventArgs e)
