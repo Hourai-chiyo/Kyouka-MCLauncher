@@ -282,13 +282,51 @@ namespace Mcroute.Wpf
             string ver = SelectedVersion();
             if (ver == null) { MessageBox.Show("先在左边选一个版本", "提示"); return; }
             if (_running) { MessageBox.Show("还有任务在跑，等它结束", "提示"); return; }
+            if (_gameRunning) { MessageBox.Show("游戏已经在运行了", "提示"); return; }
 
             string mem = MemoryBox.Text.Trim();
             CardTitle.Text = "正在启动";
             CardDetail.Text = ver + " · " + mem + " 内存";
             SetProgress(0);
+
+            // 启动成功后 Core 会把进程回调回来，这里跟踪"运行中 / 已退出"
+            Commands.OnProcessStarted = proc =>
+            {
+                proc.Exited += (s2, e2) =>
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        _gameRunning = false;
+                        PlayButton.IsEnabled = true;
+                        int code = -1;
+                        try { code = proc.ExitCode; } catch { }
+                        CardTitle.Text = "游戏已退出";
+                        CardDetail.Text = "退出码 " + code + " · 日志：logs\\mcroute-launch.log";
+                        StatusText.Text = "就绪 · 游戏已退出";
+                    }));
+                };
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _gameRunning = true;
+                    PlayButton.IsEnabled = false;
+                    CardTitle.Text = "游戏运行中";
+                    CardDetail.Text = "PID " + proc.Id + " · 关掉游戏后这里会自动更新";
+                    StatusText.Text = "游戏运行中（PID " + proc.Id + "）";
+                }));
+            };
+
             RunTask("启动 " + ver, () =>
                 Commands.Launch(new[] { "launch", ver, "--dir", _baseDir, "--memory", mem }));
+        }
+
+        // ================= 取消 =================
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_running) return;
+            Http.CancelRequested = true;
+            _cancelReason = "已取消 · 临时文件已清理";
+            StatusText.Text = "正在取消…（当前文件会中断并删除临时文件）";
         }
 
         // ================= 下载 / 加载器 / Java =================
@@ -566,6 +604,8 @@ namespace Mcroute.Wpf
 
         // ================= 后台任务 + 日志 =================
         private bool _running;
+        private bool _gameRunning;
+        private string _cancelReason;
 
         [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
         private static extern IntPtr ILCreateFromPath(string pszPath);
@@ -648,6 +688,8 @@ namespace Mcroute.Wpf
         {
             if (_running) { MessageBox.Show("还有任务在跑", "提示"); return; }
             _running = true;
+            Http.CancelRequested = false;
+            if (CancelButton != null) CancelButton.Visibility = Visibility.Visible;
             StatusText.Text = title + " …";
             CardTitle.Text = title;
             AppendLog("---- " + title + " ----");
@@ -672,7 +714,9 @@ namespace Mcroute.Wpf
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     _running = false;
-                    StatusText.Text = "就绪 · " + title + " 结束（退出码 " + code + "）";
+                    Http.CancelRequested = false;
+                    if (CancelButton != null) CancelButton.Visibility = Visibility.Collapsed;
+                    StatusText.Text = (_cancelReason != null ? _cancelReason : "就绪 · " + title + " 结束（退出码 " + code + "）");
                     CardTitle.Text = "准备就绪";
                     SetProgress(0);
                     if (onDone != null) { try { onDone(); } catch { } }

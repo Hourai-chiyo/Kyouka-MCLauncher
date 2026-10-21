@@ -488,6 +488,9 @@
                                 <Border x:Name="ProgressFill" HorizontalAlignment="Left" Width="0" Height="6"
                                         CornerRadius="3" Background="{StaticResource Primary}"/>
                             </Grid>
+                            <Button x:Name="CancelButton" Content="取消" Width="80" Height="28"
+                                    HorizontalAlignment="Right" Margin="0,10,0,0" Visibility="Collapsed"
+                                    Style="{StaticResource GhostButton}" Click="CancelButton_Click"/>
                         </StackPanel>
                     </Border>
 

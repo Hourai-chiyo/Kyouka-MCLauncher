@@ -45,6 +45,17 @@ jobs:
           & $exe --selftest-security
           if ($LASTEXITCODE -ne 0) { throw "安全自测失败（Zip Slip 防护）" }
 
+      # 同时构建 WPF 界面（和 WinForms 版共用 Core，链接编译）
+      - name: Build mcroute-wpf (WPF)
+        run: dotnet build csharp-wpf/mcroute-wpf.csproj -c Release -o build-wpf --nologo
+
+      - name: Sanity check (WPF)
+        shell: pwsh
+        run: |
+          $exe = "build-wpf/mcroute-wpf.exe"
+          if (-not (Test-Path $exe)) { throw "WPF 构建产物不存在: $exe" }
+          Write-Host "WPF 产物: $((Get-Item $exe).Length) 字节"
+
       # 1) 把未签名的 exe 作为 artifact 上传（SignPath 从 artifact 里取）
       - name: Upload unsigned artifact
         id: unsigned
@@ -93,6 +104,14 @@ jobs:
           fail_on_unmatched_files: true
 
       # 5) 手动触发时也能下载签名结果
+      - name: Upload WPF artifact (unsigned, for manual runs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcroute-wpf-unsigned
+          path: build-wpf/mcroute-wpf.exe
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload signed artifact (for manual runs)
         uses: actions/upload-artifact@v4
         with:

@@ -408,6 +408,8 @@ namespace Mcroute
         }
 
         // ================= launch =================
+        /// <summary>启动成功后回调（GUI 用来跟踪"游戏运行中/已退出"）。</summary>
+        public static Action<Process> OnProcessStarted;
         public static int Launch(string[] a)
         {
             string ver = Positional(a, 1);
@@ -445,16 +447,54 @@ namespace Mcroute
             string cmdline = string.Join(" ", argv.Skip(1).Select(Quote));
             Console.WriteLine("[启动] " + ver + "  （工作目录 " + plan.GameDir + "）");
 
+            // 注意：java 是控制台程序。UseShellExecute=false 且不设 CreateNoWindow 时，
+            // 系统会给它开一个黑色命令提示符窗口（用户看到的那个）。
+            // 这里一律 CreateNoWindow + 输出重定向到日志文件，界面上不再弹黑框。
+            bool consoleMode = Has(a, "--console");
+            string logDir = Path.Combine(plan.GameDir, "logs");
+            try { Directory.CreateDirectory(logDir); } catch { }
+            string logFile = Path.Combine(logDir, "mcroute-launch.log");
+
             var psi = new ProcessStartInfo(plan.Java, cmdline)
             {
                 WorkingDirectory = plan.GameDir,
                 UseShellExecute = false,
-                RedirectStandardOutput = Has(a, "--console"),
-                RedirectStandardError = Has(a, "--console"),
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
             };
+
             var proc = Process.Start(psi);
             if (proc == null) { Console.WriteLine("[错误] 启动失败"); return 1; }
+
+            try
+            {
+                var writer = new StreamWriter(logFile, false, new UTF8Encoding(false)) { AutoFlush = true };
+                proc.OutputDataReceived += (s2, e2) =>
+                {
+                    if (e2.Data == null) return;
+                    try { writer.WriteLine(e2.Data); } catch { }
+                    if (consoleMode) Console.WriteLine(e2.Data);
+                };
+                proc.ErrorDataReceived += (s2, e2) =>
+                {
+                    if (e2.Data == null) return;
+                    try { writer.WriteLine(e2.Data); } catch { }
+                    if (consoleMode) Console.WriteLine(e2.Data);
+                };
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+                proc.EnableRaisingEvents = true;
+            }
+            catch { }
+
             Console.WriteLine("[启动] PID = " + proc.Id);
+            Console.WriteLine("[启动] 游戏日志: " + logFile);
+
+            try { if (OnProcessStarted != null) OnProcessStarted(proc); } catch { }
+
             if (Has(a, "--wait")) proc.WaitForExit();
             return 0;
         }

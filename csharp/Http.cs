@@ -142,6 +142,8 @@ namespace Mcroute
                     int n;
                     while ((n = net.Read(buf, 0, buf.Length)) > 0)
                     {
+                        if (CancelRequested)
+                            throw new OperationCanceledException("用户取消下载");
                         file.Write(buf, 0, n);
                         sha.TransformBlock(buf, 0, n, null, 0);
                     }
@@ -163,6 +165,12 @@ namespace Mcroute
                 if (File.Exists(dest)) File.Delete(dest);
                 File.Move(part, dest);
                 return true;
+            }
+            catch (OperationCanceledException)
+            {
+                reason = "已取消";
+                try { if (File.Exists(part)) File.Delete(part); } catch { }
+                return false;
             }
             catch (Exception ex)
             {
@@ -204,6 +212,9 @@ namespace Mcroute
             return "fail";
         }
 
+        /// <summary>置为 true 后，正在进行的下载会尽快停下并清理 .part 文件。</summary>
+        public static volatile bool CancelRequested;
+
         /// <summary>下载进度回调：格式化文本, 已完成数, 总数（GUI 用来画进度条）。</summary>
         public static Action<string, int, int> Progress;
 
@@ -229,6 +240,7 @@ namespace Mcroute
             var options = new ParallelOptions { MaxDegreeOfParallelism = workers };
             System.Threading.Tasks.Parallel.ForEach(jobs, options, job =>
             {
+                if (CancelRequested) return;
                 string info;
                 long before = File.Exists(job.Item2) ? new FileInfo(job.Item2).Length : 0;
                 string status = Download(job.Item1, job.Item2, job.Item3, out info);
