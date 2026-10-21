@@ -334,17 +334,32 @@ namespace Mcroute
             task.Start();
         }
 
+        private const string CfConsoleUrl = "https://console.curseforge.com/";
+
         private void OpenCfConsole_Click(object sender, RoutedEventArgs e)
         {
+            // 说明：从受限环境（沙箱 / 受限 token）启动时，打开浏览器可能被系统拒绝，
+            // 所以这里把「复制链接」和「尝试打开」绑在一起，保证一定给用户反馈。
+            try { Clipboard.SetText(CfConsoleUrl); } catch { }
+
             try
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName = "https://console.curseforge.com/?#/api-keys",
+                    FileName = CfConsoleUrl,
                     UseShellExecute = true,
                 });
+                StatusText.Text = "链接已复制（" + CfConsoleUrl + "）；浏览器没弹出来的话，手动粘到地址栏即可";
             }
-            catch (Exception ex) { MessageBox.Show("打不开浏览器：" + ex.Message + "\n\n请手动访问 https://console.curseforge.com", "提示"); }
+            catch (Exception ex)
+            {
+                StatusText.Text = "打不开浏览器，链接已复制到剪贴板";
+                MessageBox.Show(
+                    "启动器没能调起浏览器（当前环境的系统调用被限制）。\n\n" +
+                    "链接已经复制到剪贴板，手动粘到浏览器即可：\n" + CfConsoleUrl + "\n\n" +
+                    "详细错误：" + ex.Message,
+                    "获取 API Key");
+            }
         }
 
         private void SaveCfKey_Click(object sender, RoutedEventArgs e)
