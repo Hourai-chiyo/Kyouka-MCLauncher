@@ -35,6 +35,15 @@ namespace Mcroute.Wpf
                 RefreshJava();
                 LoadBackground();
                 AppendLog("数据目录：" + _baseDir);
+                try
+                {
+                    var id = System.Security.Principal.WindowsIdentity.GetCurrent();
+                    bool admin = new System.Security.Principal.WindowsPrincipal(id)
+                        .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+                    AppendLog("进程自检：用户=" + id.Name + "  管理员=" + admin +
+                              "  会话=" + System.Diagnostics.Process.GetCurrentProcess().SessionId);
+                }
+                catch { }
                 // 数据目录已经在 ResolveDataDir 里自动挑好了：
                 //   · 有版本 -> 直接用（并写进配置，下次不再问）
                 //   · 完全没版本 + 没配置 -> 才引导选目录
@@ -614,12 +623,17 @@ namespace Mcroute.Wpf
             }
             catch (Exception ex) { errors.Add("ShellExecute: " + Describe(ex)); }
 
-            // 3) 兜底：复制路径
+            // 3) 兜底：复制路径 + 给出排查提示
             try { Clipboard.SetText(dir); } catch { }
             AppendLog("打开目录失败：" + string.Join(" | ", errors));
             MessageBox.Show(
                 "打开目录失败：\n" + string.Join("\n", errors) + "\n\n" +
-                "路径已复制到剪贴板，可以手动粘到资源管理器地址栏。\n" + dir,
+                "路径已复制到剪贴板，可以直接粘到资源管理器地址栏。\n" + dir + "\n\n" +
+                "诊断：当前进程会话 = " + Process.GetCurrentProcess().SessionId + "\n" +
+                "（正常交互会话通常是 1）\n\n" +
+                "原因很可能是：mcroute 是从 AI 工具 / 沙箱窗口里启动的，\n" +
+                "和你的资源管理器不在同一个 Windows 会话，shell 调用因此被拒。\n" +
+                "请到资源管理器里双击 mcroute-wpf.exe 再试一次。",
                 "提示");
         }
 
