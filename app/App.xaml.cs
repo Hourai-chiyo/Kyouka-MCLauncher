@@ -131,7 +131,7 @@ namespace Mcroute.Wpf
                 catch (Exception ex)
                 {
                     ShotTrace("异常: " + ex);
-                    try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "mcroute-wpf-crash.log"), ex.ToString()); } catch { }
+                    try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "KyoukaMCLauncher-crash.log"), ex.ToString()); } catch { }
                 }
                 Shutdown(0);
                 return;
@@ -148,7 +148,7 @@ namespace Mcroute.Wpf
         {
             try
             {
-                File.AppendAllText(Path.Combine(Path.GetTempPath(), "mcroute-shot.log"),
+                File.AppendAllText(Path.Combine(Path.GetTempPath(), "KyoukaMCLauncher-shot.log"),
                     DateTime.Now.ToString("HH:mm:ss.fff") + "  " + msg + "\r\n");
             }
             catch { }
@@ -244,14 +244,14 @@ namespace Mcroute.Wpf
             {
                 LogCrash(ex.Exception);
                 MessageBox.Show("出错了：" + ex.Exception.Message + "\n\n详情：" + CrashLogPath(),
-                    "mcroute WPF 原型", MessageBoxButton.OK, MessageBoxImage.Error);
+                    "Kyouka MCLauncher", MessageBoxButton.OK, MessageBoxImage.Error);
                 ex.Handled = true;
             };
         }
 
         private static string CrashLogPath()
         {
-            return Path.Combine(Path.GetTempPath(), "mcroute-wpf-crash.log");
+            return Path.Combine(Path.GetTempPath(), "KyoukaMCLauncher-crash.log");
         }
 
         private static void LogCrash(Exception ex)

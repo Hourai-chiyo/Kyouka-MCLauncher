@@ -4,7 +4,7 @@
 param([string]$Version = "1.19.2")
 
 $ErrorActionPreference = 'Stop'
-$exe = "csharp\out\mcroute.exe"
+$exe = "legacy\winforms\out\mcroute.exe"
 $data = "mcdata"
 if (-not (Test-Path $exe)) { throw "先 dotnet build csharp\mcroute.csproj -c Release -o csharp\out" }
 

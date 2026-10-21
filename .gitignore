@@ -83,3 +83,10 @@ legacy/dist/
 legacy/build/
 legacy/__pycache__/
 legacy/*.spec
+app/out/
+app/obj/
+app/bin/
+core/obj/
+legacy/winforms/out/
+legacy/winforms/obj/
+build-legacy/

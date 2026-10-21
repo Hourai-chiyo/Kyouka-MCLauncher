@@ -1,7 +1,7 @@
 name: Build and sign
 
 # 什么时候跑：
-#   1) 打 tag（v0.1.x）时 —— 构建 + 签名 + 把签名后的 exe 传到 GitHub Release
+#   1) 打 tag（v*）时 —— 构建 + 安全自测 + 签名 + 把签名后的 exe 传到 GitHub Release
 #   2) 手动触发（Actions 页面点 Run workflow）—— 只构建 + 签名，产出 artifact 供下载
 on:
   push:
@@ -25,52 +25,47 @@ jobs:
         with:
           dotnet-version: '8.x'
 
-      # 需要 .NET Framework 4.8 的参考程序集（windows-latest 自带，这里只是显式声明）
-      - name: Build mcroute (net48)
-        run: dotnet build csharp/mcroute.csproj -c Release -o build --nologo
+      # ---- 1) 主版本：Kyouka MCLauncher（WPF）----
+      - name: Build Kyouka MCLauncher
+        run: dotnet build app/KyoukaMCLauncher.csproj -c Release -o build --nologo
 
-      - name: Sanity check
+      # ---- 2) 自测宿主：legacy 的 WinForms/CLI 工程提供 --selftest-* 命令 ----
+      - name: Build legacy CLI (for self-tests)
+        run: dotnet build legacy/winforms/McrouteWinForms.csproj -c Release -o build-legacy --nologo
+
+      - name: Sanity check + self-tests
         shell: pwsh
         run: |
-          $exe = "build/mcroute.exe"
+          $exe = "build/KyoukaMCLauncher.exe"
           if (-not (Test-Path $exe)) { throw "构建产物不存在: $exe" }
           $size = (Get-Item $exe).Length
-          Write-Host "产物大小: $size 字节"
-          if ($size -lt 50000) { throw "产物太小，构建可能失败了" }
-          # 冒烟测试：窗口能构造出来（不显示）
-          & $exe --selftest
-          if ($LASTEXITCODE -ne 0) { throw "selftest 失败（退出码 $LASTEXITCODE）" }
+          Write-Host "主产物: $size 字节"
+          if ($size -lt 80000) { throw "产物太小，构建可能失败了" }
+
+          $cli = "build-legacy/mcroute.exe"
+          if (-not (Test-Path $cli)) { throw "自测宿主不存在: $cli" }
 
           # 安全自测：防 Zip Slip
-          & $exe --selftest-security
+          & $cli --selftest-security
           if ($LASTEXITCODE -ne 0) { throw "安全自测失败（Zip Slip 防护）" }
 
-      # 同时构建 WPF 界面（和 WinForms 版共用 Core，链接编译）
-      - name: Build mcroute-wpf (WPF)
-        run: dotnet build csharp-wpf/mcroute-wpf.csproj -c Release -o build-wpf --nologo
+          # 流式下载 + SHA-1 校验
+          & $cli --selftest-download "https://libraries.minecraft.net/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar" "119ea2b2bc205b138974d351777b20f02b92704b"
+          if ($LASTEXITCODE -ne 0) { throw "下载自测失败" }
 
-      - name: Sanity check (WPF)
-        shell: pwsh
-        run: |
-          $exe = "build-wpf/mcroute-wpf.exe"
-          if (-not (Test-Path $exe)) { throw "WPF 构建产物不存在: $exe" }
-          Write-Host "WPF 产物: $((Get-Item $exe).Length) 字节"
-
-      # 1) 把未签名的 exe 作为 artifact 上传（SignPath 从 artifact 里取）
       - name: Upload unsigned artifact
         id: unsigned
         uses: actions/upload-artifact@v4
         with:
-          name: mcroute-unsigned
-          path: build/mcroute.exe
+          name: kyouka-unsigned
+          path: build/KyoukaMCLauncher.exe
           if-no-files-found: error
           retention-days: 7
 
-      # 2) 提交签名请求给 SignPath
+      # ---- 3) 提交签名请求给 SignPath ----
       #    需要仓库 Secrets：
       #      SIGNPATH_API_TOKEN        —— SignPath 网站 → User settings → API tokens
       #      SIGNPATH_ORGANIZATION_ID  —— SignPath 网站 → Organization settings 里的 ID
-      #    其余三个 slug 见 docs/signing.md 里的「SignPath 配置清单」
       - name: Submit signing request to SignPath
         id: sign
         uses: signpath/github-action-submit-signing-request@v1
@@ -84,38 +79,30 @@ jobs:
           wait-for-completion: true
           output-artifact-directory: signed
 
-      # 3) 验证签名真的生效（Status 必须是 Valid）
+      # ---- 4) 验证签名真的生效（Status 必须是 Valid）----
       - name: Verify signature
         shell: pwsh
         run: |
-          $exe = Get-ChildItem signed -Recurse -Filter mcroute.exe | Select-Object -First 1
+          $exe = Get-ChildItem signed -Recurse -Filter KyoukaMCLauncher.exe | Select-Object -First 1
           if (-not $exe) { throw "没拿到签名后的文件" }
           $sig = Get-AuthenticodeSignature $exe.FullName
           Write-Host "签名状态: $($sig.Status)"
           Write-Host "签名者  : $($sig.SignerCertificate.Subject)"
           if ($sig.Status -ne 'Valid') { throw "签名无效: $($sig.Status) / $($sig.StatusMessage)" }
 
-      # 4) 打 tag 时，把签名后的 exe 传上 Release
+      # ---- 5) 打 tag 时，把签名后的 exe 传上 Release ----
       - name: Upload signed exe to Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: signed/**/mcroute.exe
+          files: signed/**/KyoukaMCLauncher.exe
           fail_on_unmatched_files: true
 
-      # 5) 手动触发时也能下载签名结果
-      - name: Upload WPF artifact (unsigned, for manual runs)
-        uses: actions/upload-artifact@v4
-        with:
-          name: mcroute-wpf-unsigned
-          path: build-wpf/mcroute-wpf.exe
-          if-no-files-found: error
-          retention-days: 7
-
+      # ---- 6) 手动触发时也能下载签名结果 ----
       - name: Upload signed artifact (for manual runs)
         uses: actions/upload-artifact@v4
         with:
-          name: mcroute-signed
-          path: signed/**/mcroute.exe
+          name: kyouka-signed
+          path: signed/**/KyoukaMCLauncher.exe
           if-no-files-found: error
           retention-days: 7

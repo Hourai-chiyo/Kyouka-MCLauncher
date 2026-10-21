@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>KyoukaMCLauncher</AssemblyName>
+    <RootNamespace>Mcroute.Wpf</RootNamespace>
+    <ApplicationIcon>..\legacy\winforms\app.ico</ApplicationIcon>
+    <ApplicationManifest>..\legacy\winforms\app.manifest</ApplicationManifest>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Product>mcroute — Minecraft Java 启动器（WPF 原型）</Product>
+    <Company>Hourai-chiyo</Company>
+    <Description>WPF 视觉原型：只做界面壳，功能逻辑复用 csharp/ 下的 Core</Description>
+    <Copyright>MIT License © 2026 Hourai-chiyo</Copyright>
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- 复用现有 Core：除了 WinForms 的 MainForm / Program，其它全部链接进来 -->
+  <ItemGroup>
+    <Compile Include="..\core\Commands.cs"   Link="Core\Commands.cs" />
+    <Compile Include="..\core\ExtraCommands.cs" Link="Core\ExtraCommands.cs" />
+    <Compile Include="..\core\Http.cs"       Link="Core\Http.cs" />
+    <Compile Include="..\core\Java.cs"       Link="Core\Java.cs" />
+    <Compile Include="..\core\JavaSources.cs" Link="Core\JavaSources.cs" />
+    <Compile Include="..\core\Json.cs"       Link="Core\Json.cs" />
+    <Compile Include="..\core\Loader.cs"     Link="Core\Loader.cs" />
+    <Compile Include="..\core\Meta.cs"       Link="Core\Meta.cs" />
+    <Compile Include="..\core\Packs.cs"      Link="Core\Packs.cs" />
+    <Compile Include="..\core\SafeZip.cs"    Link="Core\SafeZip.cs" />
+    <Compile Include="..\core\Mirrors.cs"    Link="Core\Mirrors.cs" />
+    <Compile Include="..\core\Mods.cs"        Link="Core\Mods.cs" />
+    <Compile Include="..\core\Modrinth.cs"    Link="Core\Modrinth.cs" />
+    <Compile Include="..\core\CurseForge.cs"  Link="Core\CurseForge.cs" />
+    <Compile Include="..\core\Version.cs"    Link="Core\Version.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+</Project>

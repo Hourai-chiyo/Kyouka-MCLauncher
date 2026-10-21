@@ -5,35 +5,34 @@
 
 ***
 
-# mcroute
+# Kyouka MCLauncher
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
-> 本项目已进入beta版本，为主镜像源崩溃时的紧急预案。如有bug，请提交至QQ:3849596108或者邮箱2084619997@qq.com
-> 主版本为 **C# 单文件（157 KB）**；Python 版已归档到 `legacy/`（冻结维护）。安装失败可直接重试，已装好的内容会自动跳过。
+> Kyouka MCLauncher 1.0.0 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
+> 主版本为 **Kyouka MCLauncher**（WPF，约 250 KB 单文件）；WinForms 版与 Python 版已归档到 `legacy/`（冻结维护）。
 
-[![Release](https://img.shields.io/github/v/release/Hourai-chiyo/mcroute?label=release)](https://github.com/Hourai-chiyo/mcroute/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/Hourai-chiyo/mcroute/total)](https://github.com/Hourai-chiyo/mcroute/releases)
+[![Release](https://img.shields.io/github/v/release/Hourai-chiyo/Kyouka-MCLauncher?label=release)](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Hourai-chiyo/Kyouka-MCLauncher/total)](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 一个面向中国大陆网络环境的 **Minecraft: Java Edition 启动器**，重点是「下载源可靠」和「离线可自持」。
 
-![界面截图](docs/gui-csharp-launch.png)
+![界面截图](docs/gui-wpf-launch.png)
 
 ---
 
-## 两个版本
+## 版本结构
 
-这个仓库现在同时提供两个版本，**推荐用 C# 版**：
-
-| | **mcroute**（主版本） | **mcroute-legacy**（历史版本） |
+| | **Kyouka MCLauncher**（主版本） | **legacy/**（历史版本） |
 |---|---|---|
-| 实现 | C# · .NET Framework 4.8 | Python 3 + tkinter |
-| 体积 | 157 KB 单文件 | 30 MB（内嵌运行时） |
-| 界面 | WinForms / WPF 两套新界面 | tkinter 四页（旧稿） |
+| 实现 | C# · WPF · .NET Framework 4.8 | WinForms / Python / CLI |
+| 体积 | **约 250 KB 单文件** | 200 KB（WinForms）/ 30 MB（Python） |
+| 界面 | 侧栏导航 + 深浅色 + 玻璃面板 + 背景图 | WinForms 四页 / tkinter 四页 |
 | 状态 | **主推、继续更新** | **冻结**，只做兼容性修复 |
-| 位置 | `csharp/`（WinForms）、`csharp-wpf/`（WPF） | `legacy/` |
-| 特别之处 | 免安装、零依赖、启动快 | 保留最初实现，含 `login` 正版登录命令 |
+| 位置 | `app/`（界面）+ `core/`（共享核心） | `legacy/winforms/`、`legacy/`（Python） |
+
+> `core/` 是下载器、加载器、整合包、Mod、版本解析等共享逻辑，两套界面都用它。
 
 > 为什么要留 legacy：Python 版是最初能跑通的实现，逻辑注释最全，
 > 万一 C# 版遇到诡异兼容问题，可以拿它当对照实现。
@@ -42,7 +41,7 @@
 
 ## 关于「未知发布者」安全警告
 
-双击 `mcroute.exe` 时 Windows 可能提示：
+双击 `KyoukaMCLauncher.exe` 时 Windows 可能提示：
 
 > 无法验证发布者。你确定要运行此软件吗？
 
@@ -52,7 +51,7 @@
 想确认文件没被篡改，可以核对 Release 里的 `SHA256SUMS.txt`：
 
 ```powershell
-Get-FileHash .\mcroute.exe -Algorithm SHA256
+Get-FileHash .\KyoukaMCLauncher.exe -Algorithm SHA256
 ```
 
 ### 如果想彻底消除提示
@@ -76,14 +75,14 @@ Get-FileHash .\mcroute.exe -Algorithm SHA256
 
 | 下载 | 大小 | 说明 |
 |---|---|---|
-| **[mcroute.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute.exe)** | **157 KB** | WinForms 界面，双击即用，零依赖 |
-| **[mcroute-wpf.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-wpf.exe)** | **157 KB** | WPF 新界面（无边框 + 顶部导航 + 自定义背景图） |
+| **[KyoukaMCLauncher.exe](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/releases/latest/download/KyoukaMCLauncher.exe)** | **约 250 KB** | WPF 界面，双击即用，零依赖 |
 
-两者功能一致，都复用同一套 Core；区别只是界面。**不需要安装、不写注册表。**
+
+**不需要安装、不写注册表。** 源码全在仓库，可自行 `dotnet build` 编译。
 
 ### 历史版本（Python，已冻结）
 
-到 [legacy Release](https://github.com/Hourai-chiyo/mcroute/releases/tag/legacy-v0.1.25) 下载：
+到 [legacy Release](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/releases/tag/legacy-v0.1.25) 下载：
 
 | 下载 | 大小 | 说明 |
 |---|---|---|
@@ -96,12 +95,12 @@ Get-FileHash .\mcroute.exe -Algorithm SHA256
 
 ```bat
 :: 主版本（C#）
-dotnet build csharp\mcroute.csproj -c Release -o csharp\out
-csharp\out\mcroute.exe
+dotnet build app\KyoukaMCLauncher.csproj -c Release -o app\out
+app\out\KyoukaMCLauncher.exe
 
 :: WPF 界面
-dotnet build csharp-wpf\mcroute-wpf.csproj -c Release -o csharp-wpf\out
-csharp-wpf\out\mcroute-wpf.exe
+dotnet build legacy\winforms\McrouteWinForms.csproj -c Release -o legacy\winforms\out
+app\out\KyoukaMCLauncher.exe
 
 :: 历史版本（Python）
 cd legacy
@@ -191,7 +190,11 @@ mcroute.exe loader forge 1.19.2 --no-mirror
 1. 下载或克隆本仓库
 2. 双击 `run_gui.bat`（图形界面），或在终端里用命令行
 
-### 命令行（主版本 mcroute.exe）
+### 命令行（已归档到 legacy）
+
+> 1.0.0 起主版本是图形界面，命令行工具保留在 `legacy/winforms`：
+> `dotnet build legacy\winforms\McrouteWinForms.csproj -c Release -o legacy\winforms\out`
+> 下面的 `mcroute.exe` 指 `legacy\winforms\out\mcroute.exe`。
 
 ```bat
 mcroute.exe manifest                 :: 版本清单
@@ -214,33 +217,36 @@ mcroute.exe java install 17          :: 自动下载 Java
 ## 目录结构
 
 ```
-mcroute/
-├── csharp/                 ★ 主版本（C# / WinForms）
-│   ├── Commands.cs         下载 / 拼参数 / 启动
-│   ├── Loader.cs           6 种加载器安装
-│   ├── Packs.cs            3 种整合包安装
-│   ├── JavaSources.cs      Java 自动下载（Adoptium→Azul→Corretto）
-│   ├── Meta.cs             下载源路由（镜像优先 / 官方兜底）
-│   ├── Version.cs          版本 json 合并 / rules / 变量替换
-│   ├── Json.cs             自写 JSON 解析（不依赖 System.Web）
-│   └── MainForm.cs         WinForms 界面
+Kyouka-MCLauncher/
+├── app/                    ★ 主版本界面（WPF）
+│   ├── MainWindow.xaml     侧栏导航 / 启动页
+│   ├── ModsBrowserWindow   下载 Mod（Modrinth + CurseForge + 链接安装）
+│   ├── ModsWindow          本地 Mod 管理
+│   ├── FileBrowserWindow   应用内文件浏览（shell 不可用时的兜底）
+│   ├── Theme.cs            深浅色主题
+│   └── KyoukaMCLauncher.csproj
 │
-├── csharp-wpf/             ★ WPF 新界面（复用 csharp/ 的 Core，链接编译）
+├── core/                    共享核心（两套界面共用）
+│   ├── Commands.cs          下载 / 拼参数 / 启动
+│   ├── Loader.cs            6 种加载器
+│   ├── Packs.cs             3 种整合包
+│   ├── Mods.cs / Modrinth.cs / CurseForge.cs   Mod 相关
+│   ├── JavaSources.cs       Java 自动下载
+│   ├── Mirrors.cs           镜像源 + 测速
+│   ├── Http.cs              流式下载 / 分段 / 校验
+│   ├── SafeZip.cs           防 Zip Slip
+│   └── Version.cs           版本 json 合并 / rules
 │
-├── legacy/                 ☆ 历史版本（Python，已冻结）
-│   ├── mcroute.py
-│   ├── mcroute_gui.py
-│   ├── installer/          C# 写的 exe 安装器 + WiX MSI
-│   └── packaging/          vbs 启动器 / 卸载脚本
+├── legacy/                  ☆ 历史版本（冻结）
+│   ├── winforms/            WinForms 界面 + CLI
+│   ├── mcroute.py           Python 版
+│   └── ...
 │
-├── tools/
-│   ├── test-fallback.ps1   镜像失效演练
-│   └── sign-local.ps1      本地自签名（仅本机有效）
-│
-└── docs/                   截图 / 路由表 / 测速报告 / 签名指南
+├── tools/                   演练脚本 / 本地签名
+└── docs/                    截图 / 路由表 / 测速报告 / 签名指南
 ```
 
-### 镜像实测（2026-10-21 晚，同一个 2.97 MB 文件）
+## 镜像实测（2026-10-21 晚，同一个 2.97 MB 文件）
 
 | 镜像 | 地址 | 速度 | 默认 |
 |---|---|---|---|
@@ -364,20 +370,17 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ## 图形界面
 
-### C# 版（137 KB，主推）
+### 主版本（WPF，约 250 KB）
 
-![启动页](docs/gui-csharp-launch.png)
-
-| 标签页 | 能干什么 |
+| 页面 | 能干什么 |
 |---|---|
-| **启动** | 本地版本列表、下载原版、选 Java、设内存、启动 |
-| **加载器** | fabric / quilt / legacyfabric / forge / neoforge 一键装（自动下原版 + 补库） |
-| **整合包** | 选文件安装，自动识别 mrpack / MultiMC / CurseForge |
-| **管理** | 所有本地版本（原版 / 整合包 / 外部）：体检、测试启动、生成启动器、打开目录 |
+| **启动** | 侧栏版本列表、搜索、开始游戏、日志、进程状态 |
+| **下载** | 原版 / 加载器 / Java 自动安装 |
+| **整合包** | mrpack / MultiMC / CurseForge 三格式 |
+| **管理** | 体检、测试启动、生成启动器、打开目录、本地 Mod、下载 Mod |
+| **设置** | 主题、背景图、玻璃面板、内存、Java、镜像测速、分段下载 |
 
-![加载器页](docs/gui-csharp-loader.png)
-![整合包页](docs/gui-csharp-packs.png)
-![管理页](docs/gui-csharp-manage.png)
+界面截图见下方「界面」章节。
 
 ### 历史版本（Python / tkinter）
 
@@ -389,15 +392,15 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ## 界面重构（WPF）
 
-`csharp-wpf/` 是新界面：无边框窗口 + **DSH 风格侧栏**（品牌行 / 置顶「开始游戏」/ 导航 / 版本搜索 / 底部账号）+ 背景图 + 玻璃面板 + 卡片，
-**复用 `csharp/` 下的全部 Core**（下载 / 加载器 / 整合包 / Java 一行没改，编译时链接进来）。
+`app/` 是新界面：无边框窗口 + **DSH 风格侧栏**（品牌行 / 置顶「开始游戏」/ 导航 / 版本搜索 / 底部账号）+ 背景图 + 玻璃面板 + 卡片，
+**复用 `core/` 下的全部 Core**（下载 / 加载器 / 整合包 / Java 一行没改，编译时链接进来）。
 
 已经接真实数据：本地版本列表、启动、下载原版、装加载器、装整合包、下 Java、数据目录切换、日志面板。
 
 ```bat
-dotnet build csharp-wpf\mcroute-wpf.csproj -c Release -o csharp-wpf\out
-csharp-wpf\out\mcroute-wpf.exe
-csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
+dotnet build legacy\winforms\McrouteWinForms.csproj -c Release -o legacy\winforms\out
+app\out\KyoukaMCLauncher.exe
+app\out\KyoukaMCLauncher.exe --shot out.png 1180 760 0
 ```
 
 | 启动 | 下载 |
@@ -484,7 +487,7 @@ build_msi.bat        :: WiX 生成 MSI
 主版本（C#）不需要打包脚本，`dotnet build` 出来的就是单文件 exe：
 
 ```bat
-dotnet build csharp\mcroute.csproj -c Release -o csharp\out
+dotnet build app\KyoukaMCLauncher.csproj -c Release -o app\out
 ```
 
 ## MSI 安装包（企业 / 批量部署）
@@ -646,14 +649,14 @@ mcroute.exe loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 |---|---|---|
 | **[QQ 邮箱 2084619977@qq.com](mailto:2084619977@qq.com)** | 所有人（推荐） | 没有 GitHub 账号也能发 |
 | QQ：3849596108 | 所有人 | 急事直接戳 |
-| **[GitHub Issue](https://github.com/Hourai-chiyo/mcroute/issues/new/choose)** | 有 GitHub 账号的 | 会引导你填版本 / 系统 / 复现步骤 / 日志，修得最快 |
+| **[GitHub Issue](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/issues/new/choose)** | 有 GitHub 账号的 | 会引导你填版本 / 系统 / 复现步骤 / 日志，修得最快 |
 
 报问题时最好附上：
 
 - 版本号（设置页右下角，或 `mcroute.exe --help`）
-- 哪个界面（`mcroute.exe` / `mcroute-wpf.exe`）
+- 哪个版本（`KyoukaMCLauncher.exe` / legacy 版）
 - 游戏启动日志：`<游戏目录>/logs/mcroute-launch.log`
-- 崩溃日志：`%TEMP%\mcroute-wpf-crash.log`
+- 崩溃日志：`%TEMP%\KyoukaMCLauncher-crash.log`
 
 > 未签名 exe，Windows 首次运行会提示「未知发布者」——点「更多信息 → 仍要运行」即可。
 
