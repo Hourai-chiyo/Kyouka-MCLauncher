@@ -246,12 +246,16 @@ namespace Mcroute
                 Json = vj,
                 AssetsDir = Path.Combine(baseDir, "assets"),
                 NativesDir = Path.Combine(baseDir, "natives", ver),
+                // 版本隔离（默认开启）：工作目录 = versions/<版本>，
+                // 这样 <数据目录>/versions/<版本>/mods 才是游戏真正读的 mods 目录。
+                // 之前默认用 instances/<版本>，导致「装了 160 个 mod 游戏只读 2 个」。
                 GameDir = !string.IsNullOrEmpty(gameDirArg)
                     ? Path.GetFullPath(gameDirArg)
-                    : (File.Exists(Path.Combine(baseDir, "versions", ver, "instance.json"))
-                        ? Path.Combine(baseDir, "versions", ver)
-                        : Path.Combine(baseDir, "instances", ver)),
+                    : Path.Combine(baseDir, "versions", ver),
             };
+
+            // 把旧的 instances/<ver> 内容搬过来（一次性，幂等）
+            try { MigrateLegacyInstanceDir(baseDir, ver, plan.GameDir); } catch { }
 
             string libRoot = Path.Combine(baseDir, "libraries");
 
@@ -394,6 +398,34 @@ namespace Mcroute
         }
 
         // ================= build =================
+        /// <summary>把旧的 instances/<ver> 内容搬到 versions/<ver>（只搬 mods/saves/configs/logs 等常见目录）。</summary>
+        private static void MigrateLegacyInstanceDir(string baseDir, string ver, string newGameDir)
+        {
+            string oldDir = Path.Combine(baseDir, "instances", ver);
+            if (!Directory.Exists(oldDir) || string.Equals(Path.GetFullPath(oldDir), Path.GetFullPath(newGameDir), StringComparison.OrdinalIgnoreCase))
+                return;
+
+            Directory.CreateDirectory(newGameDir);
+            foreach (string name in new[] { "mods", "saves", "config", "logs", "resourcepacks", "shaderpacks", "options.txt", "servers.dat" })
+            {
+                string src = Path.Combine(oldDir, name);
+                string dst = Path.Combine(newGameDir, name);
+                bool srcIsDir = Directory.Exists(src);
+                bool srcIsFile = File.Exists(src);
+                if (!srcIsDir && !srcIsFile) continue;
+
+                if (srcIsDir && !Directory.Exists(dst))
+                {
+                    Directory.Move(src, dst);
+                }
+                else if (srcIsFile && !File.Exists(dst))
+                {
+                    File.Move(src, dst);
+                }
+            }
+        }
+
+
         public static int Build(string[] a)
         {
             string ver = Positional(a, 1);
