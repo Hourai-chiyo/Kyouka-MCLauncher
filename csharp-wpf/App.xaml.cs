@@ -16,8 +16,13 @@ namespace Mcroute.Wpf
             // 不依赖窗口显示，用 RenderTargetBitmap 直接渲染（也方便 CI 出图）
             if (e.Args.Length >= 2 && e.Args[0] == "--shot")
             {
-                try { Shot(e.Args[1], e.Args.Length >= 3 ? int.Parse(e.Args[2]) : 1180,
-                                           e.Args.Length >= 4 ? int.Parse(e.Args[3]) : 760); }
+                try
+                {
+                    int w = e.Args.Length >= 3 ? int.Parse(e.Args[2]) : 1180;
+                    int h = e.Args.Length >= 4 ? int.Parse(e.Args[3]) : 760;
+                    int page = e.Args.Length >= 5 ? int.Parse(e.Args[4]) : 0;
+                    Shot(e.Args[1], w, h, page);
+                }
                 catch (Exception ex)
                 {
                     try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "mcroute-wpf-crash.log"), ex.ToString()); } catch { }
@@ -33,7 +38,7 @@ namespace Mcroute.Wpf
             win.Show();
         }
 
-        private void Shot(string outputPath, int width, int height)
+        private void Shot(string outputPath, int width, int height, int page = 0)
         {
             var win = new MainWindow
             {
@@ -45,6 +50,7 @@ namespace Mcroute.Wpf
                 ShowInTaskbar = false,
             };
             win.Show();
+            win.SetPage(page);
             win.UpdateLayout();
             Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
 
