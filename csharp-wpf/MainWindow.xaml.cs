@@ -923,7 +923,14 @@ namespace Mcroute.Wpf
                 File.Copy(dlg.FileName, target, true);
                 ApplyBackgroundBrush(target);
                 SetBgPathText(dlg.FileName);      // 显示原图名，而不是内部 background.img
+                ApplyBackgroundScope(_bgAll);     // 重新应用显示范围
                 AppendLog("已设置背景图：" + dlg.FileName);
+
+                // 设置页看不到背景 —— 自动切回启动页，让用户立刻看到效果
+                if (NavLaunch != null) NavLaunch.IsChecked = true;
+                CardTitle.Text = "背景已更新";
+                CardDetail.Text = System.IO.Path.GetFileName(dlg.FileName) + " · 暗度 " +
+                                  (int)Math.Round(BgDimSlider.Value) + "% · 模糊 " + (int)Math.Round(BgBlurSlider.Value);
             }
             catch (Exception ex)
             {
@@ -975,9 +982,13 @@ namespace Mcroute.Wpf
 
         private void ApplyBackgroundBrush(string file)
         {
+            // 关键：背景图总是复制到同一个路径（background.img），
+            // WPF 会按 Uri 缓存图片 → 换图后还是显示旧图。
+            // IgnoreImageCache + OnLoad 强制重新解码。
             var bmp = new System.Windows.Media.Imaging.BitmapImage();
             bmp.BeginInit();
             bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.CreateOptions = System.Windows.Media.Imaging.BitmapCreateOptions.IgnoreImageCache;
             bmp.UriSource = new Uri(file, UriKind.Absolute);
             bmp.EndInit();
             bmp.Freeze();
