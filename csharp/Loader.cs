@@ -143,9 +143,26 @@ namespace Mcroute
             if (version == null) return 1;
             if (version != ver) Console.WriteLine("[提示] 版本自动补全: " + ver + " -> " + version);
 
-            string url = kind == "forge"
-                ? "https://maven.minecraftforge.net/net/minecraftforge/forge/" + version + "/forge-" + version + "-installer.jar"
-                : "https://neoforged.forgecdn.net/releases/net/neoforged/neoforge/" + version + "/neoforge-" + version + "-installer.jar";
+            // NeoForge 用 maven.neoforged.net（在镜像前缀里，能吃到大学镜像），
+            // 镜像不行时 URL_REWRITES 会自动改写为 neoforged.forgecdn.net
+            // 特例：1.20.1 的 NeoForge 发布在 net.neoforged:forge 下，版本号是 "1.20.1-47.1.x"
+            string url;
+            if (kind == "forge")
+            {
+                url = "https://maven.minecraftforge.net/net/minecraftforge/forge/" + version +
+                      "/forge-" + version + "-installer.jar";
+            }
+            else if (version.StartsWith("1.20.1-") || IsNeoForge1201(version))
+            {
+                string v1201 = version.StartsWith("1.20.1-") ? version : "1.20.1-" + version;
+                url = "https://maven.neoforged.net/releases/net/neoforged/forge/" + v1201 +
+                      "/forge-" + v1201 + "-installer.jar";
+            }
+            else
+            {
+                url = "https://maven.neoforged.net/releases/net/neoforged/neoforge/" + version +
+                      "/neoforge-" + version + "-installer.jar";
+            }
 
             Console.WriteLine("加载器  : " + kind + " " + version);
             Console.WriteLine("[1/3] 下载 installer ...");
@@ -337,6 +354,12 @@ namespace Mcroute
             Console.WriteLine("  mcroute fetch  " + id);
             Console.WriteLine("  mcroute launch " + id);
             return 0;
+        }
+
+        /// <summary>NeoForge 1.20.1 用 47.x/45.x 版本号，发布在 net.neoforged:forge 下。</summary>
+        private static bool IsNeoForge1201(string version)
+        {
+            return version.StartsWith("47.") || version.StartsWith("45.");
         }
 
         /// <summary>把 "1.7.10" 这种只写 MC 版本的情况补全成完整 Forge 版本号。</summary>
