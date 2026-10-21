@@ -119,6 +119,19 @@ namespace Mcroute
         private static void ReportCrash(Exception ex)
         {
             string message = ex == null ? "未知错误（null）" : ex.ToString();
+
+            // 拖拽注册这类异常不影响使用，只记日志，别打扰用户
+            if (ex is InvalidOperationException && ex.Message != null &&
+                (ex.Message.Contains("DragDrop") || ex.Message.Contains("拖放")))
+            {
+                try
+                {
+                    File.AppendAllText(Path.Combine(Path.GetTempPath(), "mcroute-crash.log"),
+                        "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] 无害(拖拽): " + ex.Message + "\r\n");
+                }
+                catch { }
+                return;
+            }
             var candidates = new List<string>
             {
                 Path.Combine(Path.GetTempPath(), "mcroute-crash.log"),

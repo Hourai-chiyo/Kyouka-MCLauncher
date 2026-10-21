@@ -78,8 +78,8 @@ namespace Mcroute
             // 注意：不能在构造函数里 BeginInvoke（窗口句柄还没建），用 Shown 事件
             Shown += (s2, e2) =>
             {
-                EnablePackDragDrop();
-                if (_versionList.Items.Count == 0) FirstRunGuide();
+                try { EnablePackDragDrop(); } catch (Exception ex) { Program.Trace("拖拽启用失败(忽略): " + ex.Message); }
+                try { if (_versionList.Items.Count == 0) FirstRunGuide(); } catch (Exception ex) { Program.Trace("引导失败: " + ex.Message); }
             };
         }
 
@@ -407,15 +407,44 @@ namespace Mcroute
         /// 拖拽注册必须在窗口句柄建好之后做，否则抛 "DragDrop 注册失败"。
         /// 某些环境（远程桌面/OLE 受限）本来就注册不上，所以失败也不能影响启动。
         /// </summary>
+        private bool _dragDropTried;
+
         private void EnablePackDragDrop()
         {
+            // 未激活标签页里的控件句柄那时还没建，设 AllowDrop 会推迟到切页时抛
+            // "DragDrop 注册失败"，所以要等句柄真的有了再设；失败就放弃拖拽，绝不影响使用。
+            if (_packPathBox == null || _packPathBox.AllowDrop) return;
+
+            var timer = new System.Windows.Forms.Timer { Interval = 400 };
+            timer.Tick += (s2, e2) =>
+            {
+                timer.Stop();
+                timer.Dispose();
+                TrySetAllowDrop();
+            };
+            timer.Start();
+
+            // 切到「整合包」页时再试一次
+            _tabs.SelectedIndexChanged += (s2, e2) =>
+            {
+                if (_tabs.SelectedIndex == 2) TrySetAllowDrop();
+            };
+        }
+
+        private void TrySetAllowDrop()
+        {
+            if (_dragDropTried || _packPathBox == null || _packPathBox.AllowDrop) return;
             try
             {
-                if (_packPathBox != null) _packPathBox.AllowDrop = true;
+                if (!_packPathBox.IsHandleCreated) return;   // 句柄还没建，等下次
+                _packPathBox.AllowDrop = true;
+                _dragDropTried = true;
+                Program.Trace("拖拽已启用");
             }
             catch (Exception ex)
             {
-                Program.Trace("拖拽不可用: " + ex.Message);
+                _dragDropTried = true;
+                Program.Trace("拖拽不可用(忽略): " + ex.Message);
             }
         }
 
