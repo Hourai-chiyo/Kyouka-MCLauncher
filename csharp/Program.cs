@@ -153,6 +153,22 @@ namespace Mcroute
                         return Modrinth.CommandSearch(q, mc, ld, lim);
                     }
 
+                    case "mods-install-url":
+                    {
+                        string u = args.Length > 1 && !args[1].StartsWith("--") ? args[1] : null;
+                        if (string.IsNullOrEmpty(u))
+                        {
+                            Console.WriteLine("用法: mods-install-url <直链> --version <实例> [--dir <数据目录>]");
+                            return 1;
+                        }
+                        string dir = Version.BaseDir(ArgOf(args, "--dir"));
+                        string verName = ArgOf(args, "--version");
+                        string msg;
+                        bool ok = Mods.InstallFromUrl(dir, verName, u, out msg);
+                        Console.WriteLine((ok ? "[完成] " : "[失败] ") + msg);
+                        return ok ? 0 : 1;
+                    }
+
                     case "mods-install-cf":
                     {
                         string idText = args.Length > 1 && !args[1].StartsWith("--") ? args[1] : null;

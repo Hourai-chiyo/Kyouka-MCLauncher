@@ -295,6 +295,34 @@ namespace Mcroute
             task.Start();
         }
 
+        private void InstallFromLink_Click(object sender, RoutedEventArgs e)
+        {
+            string url = LinkBox.Text.Trim();
+            if (url.Length == 0) { StatusText.Text = "先把直链粘到下面输入框"; return; }
+            if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                StatusText.Text = "链接要以 http:// 或 https:// 开头";
+                return;
+            }
+
+            StatusText.Text = "正在从链接安装…";
+            InstallBtn.IsEnabled = false;
+
+            var task = new System.Threading.Tasks.Task(() =>
+            {
+                string msg;
+                bool ok = Mods.InstallFromUrl(_baseDir, _version, url, out msg);
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    InstallBtn.IsEnabled = true;
+                    StatusText.Text = msg;
+                    if (ok) LinkBox.Clear();
+                    else MessageBox.Show(msg, "安装失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }));
+            });
+            task.Start();
+        }
+
         private void OpenModsDir_Click(object sender, RoutedEventArgs e)
         {
             try

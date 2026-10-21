@@ -215,6 +215,140 @@ namespace Mcroute
             }
         }
 
+        /// <summary>
+        /// 从任意直链安装一个 mod（支持的典型场景：mcmod 过验证码后拿到的 key 直链、
+        /// 网盘直链、Modrinth CDN 直链……）。
+        ///
+        /// 文件名处理：优先 Content-Disposition，其次 URL 末段；都没有就下成临时文件，
+        /// 读 jar 元数据后用「id-version.jar」重命名。
+        /// </summary>
+        public static bool InstallFromUrl(string baseDir, string verName, string url, out string message)
+        {
+            message = "";
+            if (string.IsNullOrEmpty(url) || !(url.StartsWith("http://") || url.StartsWith("https://")))
+            {
+                message = "链接不合法（需要 http/https 直链）";
+                return false;
+            }
+            if (string.IsNullOrEmpty(verName))
+            {
+                message = "没有指定实例版本";
+                return false;
+            }
+
+            string modsDir = Path.Combine(baseDir, "versions", verName, "mods");
+            string filename = null;
+            try
+            {
+                Directory.CreateDirectory(modsDir);
+
+                // 先探一下响应头，拿文件名
+                filename = GuessFileName(url);
+
+                string dest;
+                string tmp;
+                if (!string.IsNullOrEmpty(filename))
+                {
+                    dest = Path.Combine(modsDir, filename);
+                    tmp = dest;
+                }
+                else
+                {
+                    tmp = Path.Combine(modsDir, ".download-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".jar");
+                    dest = tmp;
+                }
+
+                string info;
+                string status = Http.Download(url, tmp, null, out info, true);
+                if (status == "fail" && !string.IsNullOrEmpty(filename))
+                {
+                    // 镜像候选对未知域名无效，这里直接报错
+                    message = "下载失败：" + info;
+                    return false;
+                }
+                if (!File.Exists(tmp)) { message = "下载失败：没有生成文件"; return false; }
+
+                // 校验是不是真的 jar/zip
+                byte[] head = new byte[4];
+                using (var fs = File.OpenRead(tmp))
+                {
+                    if (fs.Read(head, 0, 4) < 4) { try { File.Delete(tmp); } catch { } message = "文件太小，不像 jar"; return false; }
+                }
+                if (head[0] != 0x50 || head[1] != 0x4B)
+                {
+                    try { File.Delete(tmp); } catch { }
+                    message = "下到的不是 jar（可能是网页/验证页），请确认链接是直接下载地址";
+                    return false;
+                }
+
+                // 没有文件名就按元数据重命名
+                if (string.IsNullOrEmpty(filename))
+                {
+                    var probe = new ModInfo { FilePath = tmp, FileName = Path.GetFileName(tmp), Size = new FileInfo(tmp).Length };
+                    try { FillFromJarPublic(probe, tmp); } catch { }
+                    string nice = (!string.IsNullOrEmpty(probe.Name) && probe.Name != "-")
+                        ? probe.Name.Replace(" ", "-").ToLowerInvariant()
+                        : "mod-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                    string ver = string.IsNullOrEmpty(probe.Version) || probe.Version == "-" ? "" : "-" + probe.Version;
+                    string target = Path.Combine(modsDir, nice + ver + ".jar");
+                    int n = 1;
+                    while (File.Exists(target)) target = Path.Combine(modsDir, nice + ver + "-" + (n++) + ".jar");
+                    File.Move(tmp, target);
+                    message = "已安装 " + Path.GetFileName(target) + "（" + probe.Name + " " + probe.Version + "）";
+                    return true;
+                }
+
+                message = "已安装 " + filename + "（" + (new FileInfo(dest).Length / 1024) + " KB）";
+                return true;
+            }
+            catch (Exception ex)
+            {
+                message = "安装失败：" + ex.Message;
+                return false;
+            }
+        }
+
+        /// <summary>从响应头 / URL 猜文件名，猜不到返回 null。</summary>
+        private static string GuessFileName(string url)
+        {
+            try
+            {
+                var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+                req.Method = "GET";
+                req.UserAgent = Http.UA;
+                req.Timeout = 20000;
+                req.AddRange(0, 0);
+                using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
+                {
+                    string cd = resp.Headers["Content-Disposition"];
+                    if (!string.IsNullOrEmpty(cd))
+                    {
+                        var m = System.Text.RegularExpressions.Regex.Match(cd, @"filename\*?=(?:UTF-8'')?""?([^"";]+)""?",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (m.Success) return Uri.UnescapeDataString(m.Groups[1].Value);
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                var uri = new Uri(url);
+                string last = uri.AbsolutePath.Split('/').LastOrDefault();
+                if (!string.IsNullOrEmpty(last) && last.IndexOf('.') > 0 &&
+                    (last.EndsWith(".jar", StringComparison.OrdinalIgnoreCase) ||
+                     last.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
+                    return Uri.UnescapeDataString(last);
+            }
+            catch { }
+            return null;
+        }
+
+        private static void FillFromJarPublic(ModInfo info, string jarPath)
+        {
+            FillFromJar(info, jarPath);
+        }
+
         /// <summary>命令行：mcroute.exe mods &lt;版本&gt;</summary>
         public static int Command(string baseDir, string ver)
         {
