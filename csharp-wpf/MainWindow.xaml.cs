@@ -33,6 +33,8 @@ namespace Mcroute.Wpf
             {
                 RefreshVersions();
                 RefreshJava();
+                Mirrors.ContextBaseDir = _baseDir;
+                Mirrors.Invalidate();
                 RefreshMirrors();
                 LoadBackground();
                 try

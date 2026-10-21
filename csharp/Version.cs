@@ -15,7 +15,7 @@ namespace Mcroute
         /// </summary>
         public static string BaseDir(string argBase)
         {
-            if (!string.IsNullOrEmpty(argBase)) return Path.GetFullPath(argBase);
+            if (!string.IsNullOrEmpty(argBase)) { var __r = Path.GetFullPath(argBase); Mirrors.ContextBaseDir = __r; return __r; }
 
             string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             var candidates = new List<string>
@@ -29,17 +29,17 @@ namespace Mcroute
             // 第一轮：已经装了版本的数据目录优先（哪怕只读，至少能启动）
             foreach (string dir in candidates)
             {
-                try { if (Directory.Exists(Path.Combine(dir, "versions"))) return dir; } catch { }
+                try { if (Directory.Exists(Path.Combine(dir, "versions"))) { var __r = dir; Mirrors.ContextBaseDir = __r; return __r; } } catch { }
             }
 
             // 第二轮：找一个能写的目录
             foreach (string dir in candidates)
             {
-                if (CanWrite(dir)) return dir;
+                if (CanWrite(dir)) { var __r = dir; Mirrors.ContextBaseDir = __r; return __r; }
             }
 
             // 全都不行：只能返回第一个（后续操作会报具体错误，但程序能开起来提示用户）
-            return candidates[0];
+            { var __r = candidates[0]; Mirrors.ContextBaseDir = __r; return __r; }
         }
 
         /// <summary>目录能不能建/写（不抛异常）。</summary>

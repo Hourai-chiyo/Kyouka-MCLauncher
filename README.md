@@ -240,6 +240,22 @@ mcroute/
 └── docs/                   截图 / 路由表 / 测速报告 / 签名指南
 ```
 
+### 镜像实测（2026-10-21，2.9 MB 探针）
+
+| 镜像 | 地址 | 速度 | 默认 |
+|---|---|---|---|
+| HIT 哈工大 | `mirrors.hit.edu.cn/bmclapi/` | **7.89 MB/s** | ✅ |
+| HA 河南大学 | `mirrors.ha.edu.cn/bmclapi/` | 4.07 MB/s | ✅ |
+| NYIST 南阳理工 | `mirror.nyist.edu.cn/bmclapi/` | 3.68 MB/s | ✅ |
+| QLU 齐鲁工大 | `mirrors.qlu.edu.cn/bmclapi/` | 3.05 MB/s | ✅ |
+| NJU 南京大学 | `mirror.nju.edu.cn/bmclapi/` | 3.05 MB/s | ✅ |
+| JCUT 荆楚理工 | `mirrors.jcut.edu.cn/bmclapi/` | 1.25 MB/s | ✅ |
+| ZJU 浙江大学 | `mirrors.zju.edu.cn/bmclapi/` | 极慢（2.9MB 数分钟） | ❌ 禁用 |
+| USTC 中科大 | `mirrors.ustc.edu.cn/bmclapi/` | 403 Forbidden | ❌ |
+| SJTU 上海交大 | `mirror.sjtu.edu.cn/bmclapi/` | 403 Forbidden | ❌ |
+
+> 测速有波动，`mcroute.exe sources` 可以随时重测；配置文件是 `<数据目录>/mirrors.json`。
+
 ## 下载源管理（可配置多镜像）
 
 镜像不再是硬编码：配置文件在 **`<数据目录>/mirrors.json`**，可以自己加。

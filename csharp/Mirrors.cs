@@ -62,27 +62,50 @@ namespace Mcroute
             return Path.Combine(baseDir ?? ".", "mirrors.json");
         }
 
-        /// <summary>默认镜像：只放实测可用的，别塞一堆没验证过的。</summary>
+        /// <summary>
+        /// 默认镜像：2026-10-21 实测（2.9 MB 探针），只放真的能下的。
+        /// 排序按实测速度，快的在前；启动时会再自动测速覆盖。
+        /// </summary>
         public static List<MirrorInfo> Defaults()
         {
             return new List<MirrorInfo>
             {
-                new MirrorInfo { Name = "HIT 哈工大镜像", Base = "https://mirrors.hit.edu.cn/bmclapi/", Enabled = true },
+                new MirrorInfo { Name = "HIT 哈工大",       Base = "https://mirrors.hit.edu.cn/bmclapi/",  Enabled = true,  SpeedMbps = 7.89 },
+                new MirrorInfo { Name = "HA 河南大学",      Base = "https://mirrors.ha.edu.cn/bmclapi/",   Enabled = true,  SpeedMbps = 4.07 },
+                new MirrorInfo { Name = "NYIST 南阳理工",   Base = "https://mirror.nyist.edu.cn/bmclapi/", Enabled = true,  SpeedMbps = 3.68 },
+                new MirrorInfo { Name = "QLU 齐鲁工大",     Base = "https://mirrors.qlu.edu.cn/bmclapi/",  Enabled = true,  SpeedMbps = 3.05 },
+                new MirrorInfo { Name = "NJU 南京大学",     Base = "https://mirror.nju.edu.cn/bmclapi/",   Enabled = true,  SpeedMbps = 3.05 },
+                new MirrorInfo { Name = "JCUT 荆楚理工",    Base = "https://mirrors.jcut.edu.cn/bmclapi/", Enabled = true,  SpeedMbps = 1.25 },
+                // 实测能连上但极慢（2.9MB 下了几分钟），默认禁用，需要时手动打开
+                new MirrorInfo { Name = "ZJU 浙江大学（慢）", Base = "https://mirrors.zju.edu.cn/bmclapi/", Enabled = false, SpeedMbps = 0.01 },
             };
         }
 
         private static List<MirrorInfo> _cache;
 
+        /// <summary>当前数据目录（由 Version.BaseDir / GUI 设置，决定读哪个 mirrors.json）。</summary>
+        public static string ContextBaseDir;
+
         /// <summary>当前生效的镜像列表（按数据目录里的 mirrors.json，带缓存）。</summary>
         public static List<MirrorInfo> Current()
         {
             if (_cache != null) return _cache;
-            try { _cache = Load(Version.BaseDir(null)); }
+            try { _cache = Load(string.IsNullOrEmpty(ContextBaseDir) ? Version.BaseDir(null) : ContextBaseDir); }
             catch { _cache = Defaults(); }
             return _cache;
         }
 
         public static void Invalidate() { _cache = null; }
+
+        private static double ParseSpeed(object raw)
+        {
+            if (raw == null) return 0;
+            string text = raw as string;
+            if (text == null) text = Convert.ToString(raw, System.Globalization.CultureInfo.InvariantCulture);
+            double v;
+            return double.TryParse(text, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out v) ? v : 0;
+        }
 
         public static List<MirrorInfo> Load(string baseDir)
         {
@@ -103,7 +126,7 @@ namespace Mcroute
                             Name = string.IsNullOrEmpty(name) ? @base : name,
                             Base = @base,
                             Enabled = J.Bool(item, "enabled", true),
-                            SpeedMbps = 0,
+                            SpeedMbps = ParseSpeed(J.Get(item, "speed")),
                             LastOk = false,
                         });
                     }
@@ -126,6 +149,7 @@ namespace Mcroute
                     { "name", m.Name ?? "" },
                     { "base", m.Base ?? "" },
                     { "enabled", m.Enabled },
+                    { "speed", m.SpeedMbps.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) },
                 }).ToArray();
                 J.SaveFile(ConfigPath(baseDir), arr);
             }
