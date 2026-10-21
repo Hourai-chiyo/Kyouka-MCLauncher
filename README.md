@@ -75,7 +75,7 @@ Get-FileHash .\KyoukaMCLauncher.exe -Algorithm SHA256
 
 | 下载 | 大小 | 说明 |
 |---|---|---|
-| **[KyoukaMCLauncher.exe](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/releases/latest/download/KyoukaMCLauncher.exe)** | **约 250 KB** | WPF 界面，双击即用，零依赖 |
+| **[KyoukaMCLauncher.exe](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/releases/latest/download/KyoukaMCLauncher.exe)** | **约 250 KB** | 主版本（WPF 界面），双击即用、零依赖 |
 
 
 **不需要安装、不写注册表。** 源码全在仓库，可自行 `dotnet build` 编译。
