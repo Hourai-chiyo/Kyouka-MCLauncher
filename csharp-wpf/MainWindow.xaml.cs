@@ -98,7 +98,8 @@ namespace Mcroute.Wpf
                 case 0: NavLaunch.IsChecked = true; break;
                 case 1: NavDownload.IsChecked = true; break;
                 case 2: NavPacks.IsChecked = true; break;
-                case 3: NavSettings.IsChecked = true; break;
+                case 3: NavManage.IsChecked = true; break;
+                case 4: NavSettings.IsChecked = true; break;
             }
             UpdateLayout();
         }
@@ -119,6 +120,7 @@ namespace Mcroute.Wpf
             PageLaunch.Visibility = Visibility.Collapsed;
             PageDownload.Visibility = Visibility.Collapsed;
             PagePacks.Visibility = Visibility.Collapsed;
+            PageManage.Visibility = Visibility.Collapsed;
             PageSettings.Visibility = Visibility.Collapsed;
             HeroLayer.Visibility = Visibility.Collapsed;
 
@@ -129,6 +131,7 @@ namespace Mcroute.Wpf
                 case "启动": PageLaunch.Visibility = Visibility.Visible; HeroLayer.Visibility = Visibility.Visible; break;
                 case "下载": PageDownload.Visibility = Visibility.Visible; break;
                 case "整合包": PagePacks.Visibility = Visibility.Visible; break;
+                case "管理": PageManage.Visibility = Visibility.Visible; RefreshManageList(); break;
                 case "设置": PageSettings.Visibility = Visibility.Visible; RefreshJava(); break;
             }
             StatusText.Text = "就绪 · " + name + " 页";
@@ -271,6 +274,62 @@ namespace Mcroute.Wpf
                 () => Packs.Install(new[] { "install", path, "--dir", _baseDir }), RefreshVersions);
         }
 
+        // ================= 管理页 =================
+        private void RefreshManage_Click(object sender, RoutedEventArgs e) { RefreshManageList(); }
+
+        private void RefreshManageList()
+        {
+            ManageList.Items.Clear();
+            string root = Path.Combine(_baseDir, "versions");
+            if (!Directory.Exists(root)) { ManageCount.Text = "0 个"; return; }
+
+            foreach (string dir in Directory.GetDirectories(root).OrderBy(x => Path.GetFileName(x)))
+            {
+                string name = Path.GetFileName(dir);
+                string tag = File.Exists(Path.Combine(dir, "instance.json"))
+                    ? "整合包"
+                    : (Directory.Exists(Path.Combine(dir, "mods")) ? "外部" : "原版");
+                ManageList.Items.Add(MakeVersionItem(name, tag));
+            }
+            ManageCount.Text = ManageList.Items.Count + " 个";
+            if (ManageList.Items.Count > 0) ManageList.SelectedIndex = 0;
+        }
+
+        private string SelectedManageVersion()
+        {
+            var item = ManageList.SelectedItem as ListBoxItem;
+            return item == null ? null : (string)item.Tag;
+        }
+
+        private void Verify_Click(object sender, RoutedEventArgs e) { RunManage("verify"); }
+        private void Test_Click(object sender, RoutedEventArgs e) { RunManage("test"); }
+        private void Mkbat_Click(object sender, RoutedEventArgs e) { RunManage("mkbat"); }
+
+        private void RunManage(string cmd)
+        {
+            string ver = SelectedManageVersion();
+            if (ver == null) { MessageBox.Show("先在列表里选一个版本", "提示"); return; }
+
+            string title = cmd == "verify" ? "体检 " + ver
+                         : cmd == "test" ? "测试启动 " + ver
+                         : "生成启动器 " + ver;
+            RunTask(title, () =>
+            {
+                if (cmd == "verify") return ExtraCommands.Verify(new[] { "verify", ver, "--dir", _baseDir });
+                if (cmd == "test") return ExtraCommands.Test(new[] { "test", ver, "--dir", _baseDir });
+                return ExtraCommands.Mkbat(new[] { "mkbat", ver, "--dir", _baseDir });
+            });
+        }
+
+        private void OpenManageDir_Click(object sender, RoutedEventArgs e)
+        {
+            string ver = SelectedManageVersion();
+            string dir = ver == null ? _baseDir : Path.Combine(_baseDir, "versions", ver);
+            if (!Directory.Exists(dir)) dir = _baseDir;
+            try { Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true, Verb = "open" }); }
+            catch (Exception ex) { MessageBox.Show("打开目录失败：" + ex.Message, "提示"); }
+        }
+
         // ================= 设置 =================
         private void PickDataDir_Click(object sender, RoutedEventArgs e)
         {
@@ -406,6 +465,7 @@ namespace Mcroute.Wpf
             lock (_logLock)
             {
                 LogBox.AppendText(text + Environment.NewLine);
+                if (ManageOutput != null) ManageOutput.AppendText(text + Environment.NewLine);
                 // 内容少的时候不要滚到底（会把顶部文字挤出去）
                 if (LogBox.LineCount > 9) LogBox.ScrollToEnd();
                 else LogBox.ScrollToHome();

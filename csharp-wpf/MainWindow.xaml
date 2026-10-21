@@ -203,6 +203,8 @@
                              GroupName="nav" Margin="6,0,0,0" Checked="Nav_Checked"/>
                 <RadioButton x:Name="NavPacks" Style="{StaticResource NavItem}" Content="整合包"
                              GroupName="nav" Margin="6,0,0,0" Checked="Nav_Checked"/>
+                <RadioButton x:Name="NavManage" Style="{StaticResource NavItem}" Content="管理"
+                             GroupName="nav" Margin="6,0,0,0" Checked="Nav_Checked"/>
                 <RadioButton x:Name="NavSettings" Style="{StaticResource NavItem}" Content="设置"
                              GroupName="nav" Margin="6,0,0,0" Checked="Nav_Checked"/>
             </StackPanel>
@@ -356,7 +358,7 @@
                             <TextBox x:Name="LogBox" Grid.Row="1" Margin="12,2,12,8" Padding="0" Background="Transparent"
                                      BorderThickness="0" Foreground="#D6E4F5" FontFamily="Consolas"
                                      FontSize="11" IsReadOnly="True" TextWrapping="NoWrap"
-                                     AcceptsReturn="True" VerticalContentAlignment="Top"
+                                     AcceptsReturn="True" VerticalContentAlignment="Top" MinLines="6"
                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
                         </Grid>
                     </Border>
@@ -438,6 +440,75 @@
                             <TextBlock Text="装完会自动补全依赖，可以直接到「启动」页启动。CurseForge 包需要 API key（写 mcdata\cf_api_key.txt）。"
                                        Margin="0,12,0,0" FontSize="11" Foreground="{StaticResource TextFaint}"/>
                         </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- 管理页 -->
+                <Grid x:Name="PageManage" Background="{StaticResource Bg}" Visibility="Collapsed">
+                    <Border Margin="24" Background="{StaticResource Surface}" CornerRadius="12"
+                            BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="24">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                <TextBlock Text="管理" Style="{StaticResource PageTitle}"/>
+                                <TextBlock Text="所有本地版本：体检 / 测试启动 / 生成双击启动器"
+                                           Margin="0,6,0,16" FontSize="12" Foreground="{StaticResource TextMuted}"/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="1" Margin="0,0,0,10">
+                                <TextBlock Text="版本列表" Style="{StaticResource FieldLabel}" Margin="0"/>
+                                <TextBlock x:Name="ManageCount" Text="" FontSize="11"
+                                           Foreground="{StaticResource TextFaint}" HorizontalAlignment="Right"/>
+                            </Grid>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="320"/>
+                                    <ColumnDefinition Width="14"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <ListBox x:Name="ManageList" Grid.Column="0" Style="{StaticResource PlainListBox}"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+
+                                <Border Grid.Column="2" Background="#0B1524" CornerRadius="8">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="24"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="输出" FontSize="11" Foreground="#8FA8C7"
+                                                   Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="ManageOutput" Grid.Row="1" Margin="12,2,12,10" Padding="0"
+                                                 Background="Transparent" BorderThickness="0" Foreground="#D6E4F5"
+                                                 FontFamily="Consolas" FontSize="11" IsReadOnly="True"
+                                                 AcceptsReturn="True" TextWrapping="NoWrap"
+                                                 VerticalContentAlignment="Top"
+                                                 VerticalScrollBarVisibility="Auto"
+                                                 HorizontalScrollBarVisibility="Disabled"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,14,0,0">
+                                <Button Style="{StaticResource GhostButton}" Content="刷新" Width="80"
+                                        Click="RefreshManage_Click"/>
+                                <Button Style="{StaticResource GhostButton}" Content="体检" Width="80" Margin="8,0,0,0"
+                                        Click="Verify_Click"/>
+                                <Button Style="{StaticResource GhostButton}" Content="测试启动" Width="100" Margin="8,0,0,0"
+                                        Click="Test_Click"/>
+                                <Button Style="{StaticResource GhostButton}" Content="生成启动器" Width="110" Margin="8,0,0,0"
+                                        Click="Mkbat_Click"/>
+                                <Button Style="{StaticResource GhostButton}" Content="打开目录" Width="90" Margin="8,0,0,0"
+                                        Click="OpenManageDir_Click"/>
+                            </StackPanel>
+                        </Grid>
                     </Border>
                 </Grid>
 

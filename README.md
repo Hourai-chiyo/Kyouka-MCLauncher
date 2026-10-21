@@ -61,6 +61,7 @@ Get-FileHash .\mcroute.exe -Algorithm SHA256
 | **[mcroute.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute.exe)** | **137 KB** | **C# 版，双击即用**：零依赖（Win10/11 自带 .NET Framework 4.8）、不需要安装、不写注册表 |
 | [mcroute-setup.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-setup.exe) | 13.3 MB | Python 版安装包（功能最全，含正版登录命令） |
 | [mcroute-portable.zip](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-portable.zip) | 13.3 MB | Python 版免安装（解压后双击 `start-mcroute.vbs`） |
+| [mcroute-wpf.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-wpf.exe) | 157 KB | **WPF 新界面（预览）**：无边框 + 顶部导航，功能与主版对齐 |
 
 > **C# 版和 Python 版的关系**：两者功能基本对等（6 种加载器 + 3 种整合包 + 体检/测试/启动器生成）。
 > C# 版 137 KB、秒开、不被杀软误报；Python 版多一个 `login` 正版登录命令，并且是「参考实现」，
