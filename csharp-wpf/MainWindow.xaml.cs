@@ -33,7 +33,20 @@ namespace Mcroute.Wpf
             {
                 RefreshVersions();
                 RefreshJava();
+                RefreshMirrors();
                 LoadBackground();
+                try
+                {
+                    var asm = typeof(MainWindow).Assembly;
+                    var attr = asm.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+                                  .FirstOrDefault() as System.Reflection.AssemblyInformationalVersionAttribute;
+                    string shown = attr != null ? attr.InformationalVersion : asm.GetName().Version.ToString(3);
+                    int plus = shown.IndexOf('+');
+                    if (plus > 0) shown = shown.Substring(0, plus);
+                    VersionText.Text = "v" + shown + " · WPF";
+                }
+                catch { }
+
                 AppendLog("数据目录：" + _baseDir);
                 try
                 {
@@ -489,6 +502,54 @@ namespace Mcroute.Wpf
         }
 
         private void RefreshJava_Click(object sender, RoutedEventArgs e) { RefreshJava(); }
+
+        // ================= 下载源 =================
+        private void RefreshMirrors()
+        {
+            try
+            {
+                var list = Mirrors.Current();
+                var items = new List<string>();
+                foreach (var m in list.OrderByDescending(x => x.SpeedMbps))
+                {
+                    string speed = m.SpeedMbps > 0 ? m.SpeedMbps.ToString("F2") + " MB/s" : "未测速";
+                    items.Add(string.Format("{0,-16} {1,-10} {2}{3}",
+                        m.Name, speed, m.Normalized(), m.Enabled ? "" : "（已禁用）"));
+                }
+                MirrorList.ItemsSource = items;
+            }
+            catch (Exception ex) { AppendLog("读取镜像配置失败：" + ex.Message); }
+        }
+
+        private void MirrorSpeedTest_Click(object sender, RoutedEventArgs e)
+        {
+            RunTask("镜像测速", () =>
+            {
+                var list = Mirrors.Current();
+                foreach (var m in list)
+                {
+                    if (!m.Enabled) continue;
+                    double mbps = Mirrors.SpeedTest(m);
+                    AppendLog(string.Format("  {0}：{1}", m.Name,
+                        m.LastOk ? mbps.ToString("F2") + " MB/s" : "不可用"));
+                }
+                Mirrors.Save(_baseDir, list);
+                Mirrors.Invalidate();
+                return 0;
+            }, () => { RefreshMirrors(); AppendLog("镜像测速完成（已按速度排序，下载时优先用快的）"); });
+        }
+
+        private void OpenMirrorsCfg_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string cfgDir = Path.GetDirectoryName(Mirrors.ConfigPath(_baseDir));
+                if (!Directory.Exists(cfgDir)) Directory.CreateDirectory(cfgDir);
+                Mirrors.Load(_baseDir);            // 确保文件存在
+                OpenFolderSafe(cfgDir);
+            }
+            catch (Exception ex) { MessageBox.Show("打开失败：" + ex.Message, "提示"); }
+        }
 
         private void RefreshJava()
         {

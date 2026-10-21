@@ -57,14 +57,9 @@ namespace Mcroute
             var list = new List<string>();
             if (!DisableMirror())
             {
-                foreach (string prefix in MirrorPrefixes)
-                {
-                    if (url.StartsWith(prefix, StringComparison.Ordinal))
-                    {
-                        list.Add(HitMirror + url.Substring(prefix.Length));
-                        break;
-                    }
-                }
+                // 镜像列表来自 <数据目录>/mirrors.json（可增删、按测速排序），失败自动回落官方
+                foreach (string candidate in Mirrors.MirrorCandidates(url, Mirrors.Current()))
+                    if (!list.Contains(candidate)) list.Add(candidate);
             }
 
             string rewritten = Rewrite(url);

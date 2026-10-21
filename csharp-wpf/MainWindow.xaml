@@ -659,6 +659,7 @@
                 <Grid x:Name="PageSettings" Background="{StaticResource Bg}" Visibility="Collapsed">
                     <Border Margin="24" Background="{StaticResource Surface}" CornerRadius="12"
                             BorderBrush="{StaticResource Border}" BorderThickness="1" Padding="24">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
                             <TextBlock Text="设置" Style="{StaticResource PageTitle}"/>
 
@@ -688,8 +689,21 @@
                                      Background="#FAFBFC" BorderBrush="{StaticResource Border}"/>
                             <Button Style="{StaticResource GhostButton}" Content="重新检测 Java" Width="120"
                                     Margin="0,8,0,0" HorizontalAlignment="Left" Click="RefreshJava_Click"/>
+
+                            <TextBlock Text="下载源（镜像）" Style="{StaticResource FieldLabel}" Margin="0,22,0,6"/>
+                            <WrapPanel>
+                                <Button Style="{StaticResource GhostButton}" Content="测速" Width="90"
+                                        Click="MirrorSpeedTest_Click"/>
+                                <Button Style="{StaticResource GhostButton}" Content="打开配置" Width="110"
+                                        Margin="8,0,0,0" Click="OpenMirrorsCfg_Click"/>
+                                <TextBlock x:Name="MirrorHint" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           FontSize="11" Foreground="{StaticResource TextFaint}"
+                                           Text="镜像只作优先尝试，失败自动回落官方源"/>
+                            </WrapPanel>
+                            <ListBox x:Name="MirrorList" Height="92" Margin="0,8,0,0"/>
                         </StackPanel>
-                    </Border>
+                    </ScrollViewer>
+                        </Border>
                 </Grid>
             </Grid>
         </Grid>
@@ -700,7 +714,7 @@
             <Grid Margin="18,0">
                 <TextBlock x:Name="StatusText" Text="就绪" FontSize="11"
                            Foreground="{StaticResource TextFaint}" VerticalAlignment="Center"/>
-                <TextBlock Text="v0.2.0 · WPF" FontSize="11" Foreground="{StaticResource TextFaint}"
+                <TextBlock x:Name="VersionText" Text="WPF" FontSize="11" Foreground="{StaticResource TextFaint}"
                            HorizontalAlignment="Right" VerticalAlignment="Center"/>
             </Grid>
         </Border>

@@ -109,6 +109,13 @@ namespace Mcroute
                     case "mkbat": return ExtraCommands.Mkbat(args);
                     case "install": return Packs.Install(args);
                     case "java": return JavaCommand.Run(args);
+                    case "sources":
+                    {
+                        int di = Array.IndexOf(args, "--dir");
+                        string sDir = (di >= 0 && di + 1 < args.Length) ? args[di + 1] : null;
+                        bool probe = Array.IndexOf(args, "--no-probe") < 0;
+                        return Mirrors.Command(Version.BaseDir(sDir), probe);
+                    }
                     case "help":
                     case "--help":
                     case "-h": Guide(); return 0;
@@ -187,6 +194,7 @@ namespace Mcroute
             Console.WriteLine("  mcroute mkbat <版本>                生成双击启动器 launch.bat");
             Console.WriteLine("  mcroute install <整合包>            装 mrpack / MultiMC / CurseForge 包");
             Console.WriteLine("  mcroute java list|install <版本>    查看 / 自动下载 Java（Adoptium→Azul→Corretto）");
+            Console.WriteLine("  mcroute sources [--no-probe]        列出镜像源并测速（配置文件 <数据目录>/mirrors.json）");
             Console.WriteLine();
             Console.WriteLine("公共参数：--dir <数据目录>  --java <java.exe>  --game-dir <游戏目录>");
             Console.WriteLine("演练参数：--no-mirror  只走官方源（模拟镜像失效）");
