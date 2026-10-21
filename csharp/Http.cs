@@ -141,39 +141,67 @@ namespace Mcroute
             return "fail";
         }
 
+        /// <summary>下载进度回调：格式化文本, 已完成数, 总数（GUI 用来画进度条）。</summary>
+        public static Action<string, int, int> Progress;
+
         /// <summary>并发下载一批任务（url, dest, sha1）。</summary>
         public static void DownloadAll(IList<Tuple<string, string, string>> jobs, int workers,
                                        bool verbose = true)
         {
             int total = jobs.Count;
-            if (total == 0) return;
+            if (total == 0)
+            {
+                Console.WriteLine("没有需要下载的文件");
+                if (Progress != null) Progress("没有需要下载的文件", 0, 0);
+                return;
+            }
 
             int ok = 0, skip = 0, fail = 0, done = 0;
+            long bytes = 0;
             var failures = new List<string>();
             var pad = new object();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var lastReport = DateTime.Now;
 
             var options = new ParallelOptions { MaxDegreeOfParallelism = workers };
             System.Threading.Tasks.Parallel.ForEach(jobs, options, job =>
             {
                 string info;
+                long before = File.Exists(job.Item2) ? new FileInfo(job.Item2).Length : 0;
                 string status = Download(job.Item1, job.Item2, job.Item3, out info);
+                long after = File.Exists(job.Item2) ? new FileInfo(job.Item2).Length : 0;
                 lock (pad)
                 {
                     done++;
-                    if (status == "ok") ok++;
+                    if (status == "ok")
+                    {
+                        ok++;
+                        bytes += Math.Max(0, after - before);
+                    }
                     else if (status == "skip") skip++;
                     else
                     {
                         fail++;
                         if (failures.Count < 20) failures.Add(Path.GetFileName(job.Item2) + " -> " + info);
                     }
-                    if (verbose && (done % 100 == 0 || done == total))
-                        Console.WriteLine("  进度 {0}/{1}   新下载 {2}  已存在 {3}  失败 {4}",
-                            done, total, ok, skip, fail);
+
+                    // 每 250ms 汇报一次，避免界面刷新太频繁
+                    if ((DateTime.Now - lastReport).TotalMilliseconds > 250 || done == total)
+                    {
+                        lastReport = DateTime.Now;
+                        double sec = Math.Max(0.001, sw.Elapsed.TotalSeconds);
+                        double rate = bytes / 1024.0 / 1024.0 / sec;
+                        string text = string.Format("{0}/{1}   新下载 {2}  已存在 {3}  失败 {4}   {5:F1} MB  {6:F1} MB/s",
+                            done, total, ok, skip, fail, bytes / 1024.0 / 1024.0, rate);
+                        if (verbose) Console.WriteLine("  " + text);
+                        if (Progress != null) Progress(text, done, total);
+                    }
                 }
             });
 
-            Console.WriteLine("完成：新下载 {0}，跳过 {1}，失败 {2}", ok, skip, fail);
+            string summary = string.Format("完成：新下载 {0}，跳过 {1}，失败 {2}", ok, skip, fail);
+            Console.WriteLine(summary);
+            if (Progress != null) Progress(summary, total, total);
             foreach (string f in failures) Console.WriteLine("  [fail] " + f);
         }
     }

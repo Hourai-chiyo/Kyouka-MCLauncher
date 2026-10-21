@@ -169,6 +169,14 @@ namespace Mcroute
             return File.Exists(Version.VersionJsonPath(baseDir, id));
         }
 
+        /// <summary>装完自动把实例的库/资源补齐 —— 「装完就能启动」的关键一步。</summary>
+        private static void CompleteInstance(string baseDir, string id)
+        {
+            Console.WriteLine();
+            Console.WriteLine("[补全] 检查 " + id + " 的依赖（缺什么下什么，已存在会跳过）...");
+            Commands.Fetch(new[] { "fetch", id, "--dir", baseDir });
+        }
+
         private static void ExtractOverrides(ZipArchive zip, string prefix, string target)
         {
             int count = 0;
@@ -240,9 +248,10 @@ namespace Mcroute
 
             string id = WriteInstanceVersion(baseDir, name, versionId) ?? versionId;
             SaveInstanceMeta(baseDir, name, id, mc, kind, loaderVer, pack);
+            CompleteInstance(baseDir, id);
 
             Console.WriteLine();
-            Console.WriteLine("完成。启动命令：");
+            Console.WriteLine("完成，可以直接启动。命令：");
             Console.WriteLine("  mcroute launch " + id);
             return 0;
         }
@@ -324,14 +333,21 @@ namespace Mcroute
 
             string id = WriteInstanceVersion(baseDir, name, versionId) ?? versionId;
             SaveInstanceMeta(baseDir, name, id, mc, kind, loaderVer, pack);
+            CompleteInstance(baseDir, id);
 
             Console.WriteLine();
-            Console.WriteLine("完成。启动命令：");
+            Console.WriteLine("完成，可以直接启动。命令：");
             Console.WriteLine("  mcroute launch " + id);
             return 0;
         }
 
         // ================= CurseForge zip =================
+        /// <summary>给 GUI 读当前已保存的 key（可能为空）。</summary>
+        public static string ReadCurseForgeKey(string baseDir)
+        {
+            return CurseForgeKey(baseDir);
+        }
+
         private static string CurseForgeKey(string baseDir)
         {
             string env = Environment.GetEnvironmentVariable("CF_API_KEY");
@@ -463,9 +479,10 @@ namespace Mcroute
 
             string id = WriteInstanceVersion(baseDir, name, versionId) ?? versionId;
             SaveInstanceMeta(baseDir, name, id, mc, kind, loaderVer, pack);
+            CompleteInstance(baseDir, id);
 
             Console.WriteLine();
-            Console.WriteLine("完成。启动命令：");
+            Console.WriteLine("完成，可以直接启动。命令：");
             Console.WriteLine("  mcroute launch " + id);
             return 0;
         }

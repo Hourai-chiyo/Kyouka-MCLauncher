@@ -25,6 +25,8 @@ namespace Mcroute
         private TextBox _log;
         private Label _status;
         private TextBox _dataDirBox;
+        private SimpleProgress _progress;
+        private TextBox _cfKeyBox;
         private readonly List<Tuple<string, int>> _javas = new List<Tuple<string, int>>();
 
         public MainForm()
@@ -45,6 +47,23 @@ namespace Mcroute
             BuildUi();
             RefreshAll();
             AppendLog("数据目录：" + _baseDir);
+
+            // 下载进度 -> 进度条 + 状态栏
+            Http.Progress = (text, done, total) =>
+            {
+                if (IsDisposed) return;
+                BeginInvoke(new Action(() =>
+                {
+                    if (total > 0)
+                    {
+                        _progress.Maximum = total;
+                        _progress.Value = Math.Min(done, total);
+                    }
+                    _status.Text = text;
+                }));
+            };
+
+            if (_versionList.Items.Count == 0) BeginInvoke(new Action(FirstRunGuide));
         }
 
         // ---------------- 布局（全部 Dock/TableLayout，窗口放大不会散架） ----------------
@@ -80,6 +99,8 @@ namespace Mcroute
             };
             bottom.Controls.Add(_log);
             bottom.Controls.Add(_status);
+            _progress = new SimpleProgress { Dock = DockStyle.Top, Height = 18 };
+            bottom.Controls.Add(_progress);
 
             var middle = new Panel { Dock = DockStyle.Fill };
             _tabs = new TabControl { Dock = DockStyle.Fill };
@@ -220,8 +241,9 @@ namespace Mcroute
         private TabPage BuildPackTab()
         {
             var page = new TabPage("  整合包  ") { Padding = new Padding(12) };
-            var outer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
+            var outer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5 };
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 40f));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 40f));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 46f));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
@@ -233,6 +255,7 @@ namespace Mcroute
                 ForeColor = Color.DimGray,
             }, 0, 0);
 
+            // 包文件
             var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3 };
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
@@ -250,7 +273,7 @@ namespace Mcroute
             };
             pathRow.Controls.Add(path, 1, 0);
             var browse = new Button { Text = "浏览...", Dock = DockStyle.Fill };
-            browse.Click += (s, e) =>
+            browse.Click += (s2, e2) =>
             {
                 using (var dlg = new OpenFileDialog())
                 {
@@ -270,9 +293,25 @@ namespace Mcroute
             pathRow.Controls.Add(browse, 2, 0);
             outer.Controls.Add(pathRow, 0, 1);
 
+            // CurseForge key（只有 Cf 包需要，存在 mcdata/cf_api_key.txt）
+            var keyRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3 };
+            keyRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            keyRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            keyRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90f));
+            keyRow.Controls.Add(new Label { Text = "CF API key", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) }, 0, 0);
+            _cfKeyBox = new TextBox { Dock = DockStyle.Top, UseSystemPasswordChar = true };
+            string existingKey = Packs.ReadCurseForgeKey(_baseDir);
+            if (!string.IsNullOrEmpty(existingKey)) _cfKeyBox.Text = existingKey;
+            keyRow.Controls.Add(_cfKeyBox, 1, 0);
+            var saveKey = new Button { Text = "保存 key", Dock = DockStyle.Fill };
+            saveKey.Click += (s2, e2) => SaveCfKey();
+            keyRow.Controls.Add(saveKey, 2, 0);
+            outer.Controls.Add(keyRow, 0, 2);
+
+            // 安装按钮
             var installRow = new FlowLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0) };
             var install = new Button { Text = "安装这个整合包", Width = 150, Height = 30 };
-            install.Click += (s, e) =>
+            install.Click += (s2, e2) =>
             {
                 if (path.Text.Trim().Length == 0) { MessageBox.Show("先选一个整合包文件", "提示"); return; }
                 string file = path.Text.Trim();
@@ -280,7 +319,7 @@ namespace Mcroute
                     () => Packs.Install(new[] { "install", file, "--dir", _baseDir }));
             };
             installRow.Controls.Add(install);
-            outer.Controls.Add(installRow, 0, 2);
+            outer.Controls.Add(installRow, 0, 3);
 
             outer.Controls.Add(new Label
             {
@@ -288,10 +327,10 @@ namespace Mcroute
                 ForeColor = Color.DimGray,
                 Text = "说明：\n" +
                        "· 也可以把整合包文件直接拖到上面的输入框里\n" +
-                       "· 装成标准 versions/<包名>/ 布局，其它启动器也认\n" +
-                       "· CurseForge 包需要 API key：环境变量 CF_API_KEY，或 mcdata\\cf_api_key.txt\n" +
+                       "· 装完会自动补全依赖（缺什么下什么），可以直接启动\n" +
+                       "· 只有 CurseForge 包需要 API key（在 https://console.curseforge.com 申请），存本地不联网\n" +
                        "· 装完到「管理」页体检 / 测试启动",
-            }, 0, 3);
+            }, 0, 4);
 
             page.Controls.Add(outer);
             return page;
@@ -330,6 +369,34 @@ namespace Mcroute
 
             page.Controls.Add(outer);
             return page;
+        }
+
+        /// <summary>第一次打开且没有任何版本时引导一下。</summary>
+        private void FirstRunGuide()
+        {
+            var r = MessageBox.Show(
+                "还没有任何本地版本。\n\n" +
+                "如果以前用过别的启动器（PCL / HMCL / 官方启动器），可以点「是」把它已有的版本目录导进来，\n" +
+                "不用重新下载。\n\n" +
+                "点「否」就留在当前页面，用右上角「开始下载」装一个原版版本。",
+                "mcroute — 第一次使用", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+            if (r == DialogResult.Yes) PickDataDir();
+        }
+
+        private void SaveCfKey()
+        {
+            string key = _cfKeyBox.Text.Trim();
+            if (key.Length == 0) { MessageBox.Show("先把 key 粘贴进来", "提示"); return; }
+            try
+            {
+                File.WriteAllText(Path.Combine(_baseDir, "cf_api_key.txt"), key);
+                AppendLog("已保存 CurseForge API key 到 " + Path.Combine(_baseDir, "cf_api_key.txt"));
+                MessageBox.Show("已保存。以后装 CurseForge 整合包不用再填。", "提示");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("保存失败：" + ex.Message, "提示");
+            }
         }
 
         // ---------------- 数据目录 ----------------
@@ -575,6 +642,12 @@ namespace Mcroute
                     return;
                 }
                 _tabs.SelectedIndex = i;
+                if (i == 0)
+                {
+                    _progress.Maximum = 2300;
+                    _progress.Value = 780;
+                    _status.Text = "示例 780/2300   新下载 612  已存在 120  12.4 MB  5.1 MB/s";
+                }
                 Application.DoEvents();
                 try
                 {
@@ -661,5 +734,49 @@ namespace Mcroute
             }
             catch { }
         }
+    }
+}
+
+/// <summary>自绘进度条：系统 ProgressBar 在浅色主题下 0% 时几乎看不见，这个可以控制颜色。</summary>
+public class SimpleProgress : Control
+{
+    private int _max = 100;
+    private int _value;
+
+    public SimpleProgress()
+    {
+        DoubleBuffered = true;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+    }
+
+    public int Maximum
+    {
+        get { return _max; }
+        set { _max = Math.Max(1, value); Invalidate(); }
+    }
+
+    public int Value
+    {
+        get { return _value; }
+        set { _value = value; Invalidate(); }
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        Graphics g = e.Graphics;
+        g.Clear(SystemColors.Control);
+        var track = new Rectangle(0, 2, Math.Max(0, Width - 1), Math.Max(0, Height - 5));
+        using (var back = new SolidBrush(Color.FromArgb(205, 210, 216)))
+            g.FillRectangle(back, track);
+
+        double ratio = (double)_value / _max;
+        int w = (int)(track.Width * Math.Min(1.0, Math.Max(0.0, ratio)));
+        if (w > 0)
+        {
+            using (var fill = new SolidBrush(Color.FromArgb(62, 138, 200)))
+                g.FillRectangle(fill, new Rectangle(track.X + 1, track.Y + 1, Math.Max(0, w - 2), Math.Max(0, track.Height - 2)));
+        }
+        using (var border = new Pen(Color.FromArgb(150, 156, 164)))
+            g.DrawRectangle(border, track);
     }
 }
