@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>mcroute-wpf</AssemblyName>
+    <RootNamespace>Mcroute.Wpf</RootNamespace>
+    <ApplicationIcon>..\csharp\app.ico</ApplicationIcon>
+    <ApplicationManifest>..\csharp\app.manifest</ApplicationManifest>
+    <Version>0.2.0</Version>
+    <FileVersion>0.2.0.0</FileVersion>
+    <Product>mcroute — Minecraft Java 启动器（WPF 原型）</Product>
+    <Company>Hourai-chiyo</Company>
+    <Description>WPF 视觉原型：只做界面壳，功能逻辑复用 csharp/ 下的 Core</Description>
+    <Copyright>MIT License © 2026 Hourai-chiyo</Copyright>
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- 复用现有 Core：除了 WinForms 的 MainForm / Program，其它全部链接进来 -->
+  <ItemGroup>
+    <Compile Include="..\csharp\Commands.cs"   Link="Core\Commands.cs" />
+    <Compile Include="..\csharp\ExtraCommands.cs" Link="Core\ExtraCommands.cs" />
+    <Compile Include="..\csharp\Http.cs"       Link="Core\Http.cs" />
+    <Compile Include="..\csharp\Java.cs"       Link="Core\Java.cs" />
+    <Compile Include="..\csharp\JavaSources.cs" Link="Core\JavaSources.cs" />
+    <Compile Include="..\csharp\Json.cs"       Link="Core\Json.cs" />
+    <Compile Include="..\csharp\Loader.cs"     Link="Core\Loader.cs" />
+    <Compile Include="..\csharp\Meta.cs"       Link="Core\Meta.cs" />
+    <Compile Include="..\csharp\Packs.cs"      Link="Core\Packs.cs" />
+    <Compile Include="..\csharp\Version.cs"    Link="Core\Version.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+</Project>

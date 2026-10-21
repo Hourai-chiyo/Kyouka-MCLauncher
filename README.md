@@ -282,6 +282,21 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 两个版本调的是**同一套算法**（下载源路由、版本合并、natives 解压、加载器安装、整合包安装），
 所以行为一致，不会出现"GUI 能用 CLI 不能"这种偏差。C# 版就是用 Python 版当参考实现移植过来的。
 
+## 界面重构原型（WPF）
+
+`csharp-wpf/` 是一个**视觉原型**：无边框窗口 + 顶部导航 + 左侧栏 + 背景图 + 卡片，
+复用 `csharp/` 下的全部 Core（Downloads / Loader / Packs / Java 一行没改）。
+
+```bat
+dotnet build csharp-wpf\mcroute-wpf.csproj -c Release -o csharp-wpf\out
+csharp-wpf\out\mcroute-wpf.exe                    :: 打开原型
+csharp-wpf\out\mcroute-wpf.exe --shot out.png     :: 离屏渲染截图
+```
+
+![WPF 原型](docs/gui-wpf-prototype.png)
+
+> 现在接的是假数据（示例版本），启动按钮是演示动画。等确定风格后再把真实逻辑接进去。
+
 ## 打包成 exe（Python 版的打包方式）
 
 ```bat

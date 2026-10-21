@@ -76,3 +76,6 @@ csharp/bin/
 csharp/obj/
 csharp/out/
 release/
+csharp-wpf/bin/
+csharp-wpf/obj/
+csharp-wpf/out/
