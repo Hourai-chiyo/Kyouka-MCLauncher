@@ -8,30 +8,52 @@ namespace Mcroute
     /// <summary>版本 json 的读取 / inheritsFrom 合并 / rules 判定 / 变量替换。</summary>
     public static class Version
     {
+        /// <summary>
+        /// 选数据目录。**永远不抛异常** —— 早版本这里一旦建目录失败就直接崩，
+        /// 用户看到的现象就是"双击没反应"。
+        /// 顺序：有 versions 的既有目录 → exe 旁边 → %LOCALAPPDATA% → %TEMP% → 当前目录。
+        /// </summary>
         public static string BaseDir(string argBase)
         {
             if (!string.IsNullOrEmpty(argBase)) return Path.GetFullPath(argBase);
 
-            // 1) 便携版：exe 旁边已经有 mcdata\versions 就用它
             string exeDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
-            string beside = Path.Combine(exeDir, "mcdata");
-            if (Directory.Exists(Path.Combine(beside, "versions")))
+            var candidates = new List<string>
             {
-                try
-                {
-                    string probe = Path.Combine(beside, "write_test.tmp");
-                    File.WriteAllText(probe, "ok");
-                    File.Delete(probe);
-                    return beside;
-                }
-                catch { }
+                Path.Combine(exeDir, "mcdata"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute", "mcdata"),
+                Path.Combine(Path.GetTempPath(), "mcroute", "mcdata"),
+                Path.Combine(Directory.GetCurrentDirectory(), "mcdata"),
+            };
+
+            // 第一轮：已经装了版本的数据目录优先（哪怕只读，至少能启动）
+            foreach (string dir in candidates)
+            {
+                try { if (Directory.Exists(Path.Combine(dir, "versions"))) return dir; } catch { }
             }
 
-            // 2) 否则用用户目录（安装版 / 只读目录都适用）
-            string user = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute", "mcdata");
-            Directory.CreateDirectory(user);
-            return user;
+            // 第二轮：找一个能写的目录
+            foreach (string dir in candidates)
+            {
+                if (CanWrite(dir)) return dir;
+            }
+
+            // 全都不行：只能返回第一个（后续操作会报具体错误，但程序能开起来提示用户）
+            return candidates[0];
+        }
+
+        /// <summary>目录能不能建/写（不抛异常）。</summary>
+        private static bool CanWrite(string dir)
+        {
+            try
+            {
+                Directory.CreateDirectory(dir);
+                string probe = Path.Combine(dir, "write_test.tmp");
+                File.WriteAllText(probe, "ok");
+                File.Delete(probe);
+                return true;
+            }
+            catch { return false; }
         }
 
         public static string VersionJsonPath(string baseDir, string ver)

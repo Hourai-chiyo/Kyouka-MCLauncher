@@ -28,14 +28,17 @@ namespace Mcroute
         private SimpleProgress _progress;
         private TextBox _cfKeyBox;
         private TextBox _searchBox;
+        private TextBox _packPathBox;
         private readonly List<string> _allVersions = new List<string>();
         private readonly List<Tuple<string, int>> _javas = new List<Tuple<string, int>>();
 
         public MainForm()
         {
+            Program.Trace("MainForm ctor 开始");
             // 文档截图时可以指定数据目录（MCROUTE_DATA），平时走配置 + 默认逻辑
             string fromEnv = Environment.GetEnvironmentVariable("MCROUTE_DATA");
             _baseDir = Version.BaseDir(string.IsNullOrEmpty(fromEnv) ? Config.LoadDataDir() : fromEnv);
+            Program.Trace("数据目录 = " + _baseDir);
 
             // 窗口图标：直接取 exe 内嵌的那个（app.ico 已通过 ApplicationIcon 打进去）
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
@@ -46,26 +49,38 @@ namespace Mcroute
             StartPosition = FormStartPosition.CenterScreen;
             Font = new Font("Microsoft YaHei UI", 9f);
 
+            Program.Trace("开始 BuildUi");
             BuildUi();
+            Program.Trace("BuildUi 完成，开始 RefreshAll");
             RefreshAll();
+            Program.Trace("RefreshAll 完成");
             AppendLog("数据目录：" + _baseDir);
 
             // 下载进度 -> 进度条 + 状态栏
             Http.Progress = (text, done, total) =>
             {
-                if (IsDisposed) return;
-                BeginInvoke(new Action(() =>
+                if (IsDisposed || !IsHandleCreated) return;
+                try
+                {
+                    BeginInvoke(new Action(() =>
                 {
                     if (total > 0)
                     {
                         _progress.Maximum = total;
                         _progress.Value = Math.Min(done, total);
                     }
-                    _status.Text = text;
-                }));
+                        _status.Text = text;
+                    }));
+                }
+                catch (InvalidOperationException) { /* 窗口正在销毁，忽略 */ }
             };
 
-            if (_versionList.Items.Count == 0) BeginInvoke(new Action(FirstRunGuide));
+            // 注意：不能在构造函数里 BeginInvoke（窗口句柄还没建），用 Shown 事件
+            Shown += (s2, e2) =>
+            {
+                EnablePackDragDrop();
+                if (_versionList.Items.Count == 0) FirstRunGuide();
+            };
         }
 
         // ---------------- 布局（全部 Dock/TableLayout，窗口放大不会散架） ----------------
@@ -277,7 +292,8 @@ namespace Mcroute
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90f));
             pathRow.Controls.Add(new Label { Text = "包文件", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 8, 0) }, 0, 0);
-            var path = new TextBox { Dock = DockStyle.Top, AllowDrop = true };
+            var path = new TextBox { Dock = DockStyle.Top };
+            _packPathBox = path;
             path.DragEnter += (s2, e2) =>
             {
                 if (e2.Data.GetDataPresent(DataFormats.FileDrop)) e2.Effect = DragDropEffects.Copy;
@@ -385,6 +401,22 @@ namespace Mcroute
 
             page.Controls.Add(outer);
             return page;
+        }
+
+        /// <summary>
+        /// 拖拽注册必须在窗口句柄建好之后做，否则抛 "DragDrop 注册失败"。
+        /// 某些环境（远程桌面/OLE 受限）本来就注册不上，所以失败也不能影响启动。
+        /// </summary>
+        private void EnablePackDragDrop()
+        {
+            try
+            {
+                if (_packPathBox != null) _packPathBox.AllowDrop = true;
+            }
+            catch (Exception ex)
+            {
+                Program.Trace("拖拽不可用: " + ex.Message);
+            }
         }
 
         /// <summary>第一次打开且没有任何版本时引导一下。</summary>
@@ -669,6 +701,8 @@ namespace Mcroute
 
         private void AppendLog(string text)
         {
+            if (IsDisposed) return;
+            if (!IsHandleCreated) return;      // 句柄还没建好，直接丢弃（启动阶段）
             if (InvokeRequired) { BeginInvoke(new Action<string>(AppendLog), text); return; }
             _log.AppendText(text + Environment.NewLine);
         }

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Windows.Forms;
 
@@ -13,8 +15,25 @@ namespace Mcroute
         private static extern bool AllocConsole();
 
         [STAThread]
+        /// <summary>启动追踪：设置 MCROUTE_TRACE=1 时写 %TEMP%\mcroute_trace.log。</summary>
+        public static void Trace(string msg)
+        {
+            try
+            {
+                if (Environment.GetEnvironmentVariable("MCROUTE_TRACE") != "1") return;
+                string f = Path.Combine(Path.GetTempPath(), "mcroute_trace.log");
+                File.AppendAllText(f, DateTime.Now.ToString("HH:mm:ss.fff") + "  " + msg + "\r\n");
+            }
+            catch { }
+        }
+
         public static int Main(string[] args)
         {
+            Trace("Main 进入, 参数 " + args.Length);
+            // 任何未处理异常都要写日志 + 弹窗，避免"双击没反应"
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += (s2, e2) => ReportCrash(e2.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (s2, e2) => ReportCrash(e2.ExceptionObject as Exception);
             // 文档截图模式：mcroute.exe --shot <目录>
             if (args.Length >= 2 && args[0] == "--shot")
             {
@@ -51,6 +70,24 @@ namespace Mcroute
             string cmd = args[0].ToLowerInvariant();
             try
             {
+                if (cmd == "--selftest")
+                {
+                    Console.WriteLine("构造窗口 ...");
+                    try
+                    {
+                        var f = new MainForm();
+                        f.CreateControl();
+                        Console.WriteLine("OK: 窗口构造成功");
+                        f.Dispose();
+                        return 0;
+                    }
+                    catch (Exception se)
+                    {
+                        Console.WriteLine("FAIL: " + se);
+                        return 9;
+                    }
+                }
+
                 switch (cmd)
                 {
                     case "manifest": return Commands.Manifest(args);
@@ -76,6 +113,40 @@ namespace Mcroute
                 Console.WriteLine("[异常] " + ex.Message);
                 return 3;
             }
+        }
+
+        /// <summary>写崩溃日志（多路径兜底），并尽量弹个窗。</summary>
+        private static void ReportCrash(Exception ex)
+        {
+            string message = ex == null ? "未知错误（null）" : ex.ToString();
+            var candidates = new List<string>
+            {
+                Path.Combine(Path.GetTempPath(), "mcroute-crash.log"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute", "crash.log"),
+                Path.Combine(Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location), "crash.log"),
+            };
+            string logPath = null;
+            foreach (string f in candidates)
+            {
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(f));
+                    File.AppendAllText(f, "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "]\r\n" + message + "\r\n\r\n");
+                    logPath = f;
+                    break;
+                }
+                catch { }
+            }
+
+            try
+            {
+                MessageBox.Show(
+                    "mcroute 启动时出错了：\n\n" +
+                    (ex == null ? "未知错误" : ex.GetType().Name + ": " + ex.Message) + "\n\n" +
+                    (logPath == null ? "（连日志都写不了，请把这个窗口截屏）" : "详细信息：\n" + logPath),
+                    "mcroute 启动失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch { }
         }
 
         private static void Guide()
