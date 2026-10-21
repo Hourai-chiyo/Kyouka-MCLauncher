@@ -197,7 +197,7 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ## 图形界面
 
-### C# 版（72 KB，主推）
+### C# 版（137 KB，主推）
 
 ![启动页](docs/gui-csharp-launch.png)
 
