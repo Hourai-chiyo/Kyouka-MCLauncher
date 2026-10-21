@@ -247,13 +247,12 @@ namespace Mcroute.Wpf
             PagePacks.Visibility = Visibility.Collapsed;
             PageManage.Visibility = Visibility.Collapsed;
             PageSettings.Visibility = Visibility.Collapsed;
-            HeroLayer.Visibility = Visibility.Collapsed;
 
             var rb = sender as RadioButton;
             string name = rb == null ? "启动" : (rb.Content as string ?? "启动");
             switch (name)
             {
-                case "启动": PageLaunch.Visibility = Visibility.Visible; HeroLayer.Visibility = Visibility.Visible; break;
+                case "启动": PageLaunch.Visibility = Visibility.Visible; break;
                 case "下载": PageDownload.Visibility = Visibility.Visible; break;
                 case "整合包": PagePacks.Visibility = Visibility.Visible; break;
                 case "管理": PageManage.Visibility = Visibility.Visible; RefreshManageList(); break;
@@ -797,6 +796,7 @@ namespace Mcroute.Wpf
                 {
                     if (res["SurfaceGlass"] != null) res["Surface"] = res["SurfaceGlass"];
                     if (res["BorderGlass"] != null) res["Border"] = res["BorderGlass"];
+                    if (res["InputBgGlass"] != null) res["InputBg"] = res["InputBgGlass"];
                     if (Sidebar != null) Sidebar.Background = res["SurfaceGlass"] as Brush;
                     if (TopBar != null) TopBar.Background = System.Windows.Media.Brushes.Transparent;
                     PageDownload.Background = System.Windows.Media.Brushes.Transparent;
@@ -1176,6 +1176,12 @@ namespace Mcroute.Wpf
         private void AppendLog(string text)
         {
             if (LogBox == null) return;
+            // 后台线程（下载/测速/安装）也会打日志，必须切回 UI 线程
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => AppendLog(text)));
+                return;
+            }
             lock (_logLock)
             {
                 LogBox.AppendText(text + Environment.NewLine);
