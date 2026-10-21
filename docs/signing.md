@@ -19,9 +19,58 @@
 
 ---
 
-## 二、SignPath 配置清单（你回来照着点）
+## 二、第一步：先申请开源免费签名（SignPath Foundation）
 
-### 1. 注册并创建组织
+> ⚠️ **不要去 `app.signpath.io/.../StartFreeTrial`** —— 那是 30 天商业试用，到期要付费。
+> 开源项目走 **SignPath Foundation**，永久免费。
+
+### 申请地址
+
+https://signpath.org/apply
+
+### 申请内容（直接复制粘贴）
+
+| 字段 | 填写 |
+|---|---|
+| Project name | `mcroute` |
+| Repository URL | `https://github.com/Hourai-chiyo/mcroute` |
+| Download page URL | `https://github.com/Hourai-chiyo/mcroute/releases` |
+| License | `MIT`（单一许可，无商业双许可） |
+| Contact email | `2084619997@qq.com` |
+
+**Project description（英文，可直接粘）**：
+
+```
+mcroute is a Minecraft: Java Edition launcher for users in mainland China.
+
+Its core purpose is reliable download-source routing: mirror-first with official
+fallback, so the launcher keeps working when the community mirror (BMCLAPI) is
+unavailable or unhealthy. It installs Forge / NeoForge / Fabric / Quilt /
+Legacy Fabric and imports Modrinth / MultiMC / CurseForge modpacks, downloading
+only from official endpoints.
+
+The Windows executable (mcroute.exe) is built from source in this repository
+with .NET Framework 4.8 via GitHub Actions
+(.github/workflows/build-and-sign.yml, dotnet build csharp/mcroute.csproj).
+It is a single self-contained 150 KB binary with no bundled third-party
+binaries, no telemetry, no ads and no monetization of any kind.
+
+License: MIT (OSI-approved, no commercial dual-licensing).
+```
+
+### 审核通过后你会拿到
+
+- `app.signpath.io` 上的一个 **Organization**（证书是 SignPath Foundation 的 OV 证书）
+- 然后才继续下面第三步的配置
+
+> 审核通常 1~3 个工作日。签名者显示为 **SignPath Foundation**（不是你的名字），
+> 这已经足够消掉「未知发布者」提示，并且共用 Foundation 的 SmartScreen 信誉。
+
+---
+
+## 三、SignPath 配置清单（审核通过后照着点）
+
+### 1. 用 GitHub 登录并进入组织
 
 1. https://signpath.io → **Sign in with GitHub**（用 `Hourai-chiyo` 账号）
 2. 右上角 **Create organization**
@@ -35,7 +84,7 @@
 2. 选 `Hourai-chiyo/mcroute`
 3. SignPath 会要求装 GitHub App，授权到这个仓库即可
 
-### 3. 创建 Project
+### 2. 创建 Project
 
 Project 页面 → **Create project**
 
@@ -45,7 +94,7 @@ Project 页面 → **Create project**
 | Slug | **`mcroute`** ← 工作流里用的就是这个 |
 | Repository | `Hourai-chiyo/mcroute` |
 
-### 4. 创建 Artifact Configuration
+### 3. 创建 Artifact Configuration
 
 Project → **Artifact configurations** → **Create**
 
@@ -63,7 +112,7 @@ Project → **Artifact configurations** → **Create**
 </artifact-configuration>
 ```
 
-### 5. 创建 Signing Policy
+### 4. 创建 Signing Policy
 
 Project → **Signing policies** → **Create**
 
@@ -71,13 +120,13 @@ Project → **Signing policies** → **Create**
 - 类型：**Automatic approval for open source**（开源项目可以自动批，否则每次要人工点）
 - Artifact configuration：选上一步的 `mcroute-exe`
 
-### 6. 生成 API Token
+### 5. 生成 API Token
 
 右上角头像 → **User settings** → **API tokens** → **Create token**
 
 - 权限：能提交签名请求即可（默认即可）
 
-### 7. 填到 GitHub Secrets
+### 6. 填到 GitHub Secrets
 
 仓库 → Settings → Secrets and variables → Actions → **New repository secret**：
 
@@ -90,7 +139,7 @@ Project → **Signing policies** → **Create**
 
 ---
 
-## 三、验证签名是否生效
+## 四、验证签名是否生效
 
 ```powershell
 # 下载签名后的 exe 后
@@ -108,7 +157,7 @@ Get-AuthenticodeSignature .\mcroute.exe | Format-List Status, StatusMessage, Sig
 
 ---
 
-## 四、本地先试签名（不花一分钱，仅本机有效）
+## 五、本地先试签名（不花一分钱，仅本机有效）
 
 自签名证书可以让**你自己的机器**不再提示，用来验证签名流程是否正常：
 
@@ -129,7 +178,7 @@ powershell -ExecutionPolicy Bypass -File tools\sign-local.ps1 -Trust
 
 ---
 
-## 五、备选方案（如果 SignPath 审核不通过）
+## 六、备选方案（如果 SignPath 审核不通过）
 
 | 方案 | 成本 | 备注 |
 |---|---|---|
@@ -139,7 +188,7 @@ powershell -ExecutionPolicy Bypass -File tools\sign-local.ps1 -Trust
 
 ---
 
-## 六、没有签名时的兜底（现在正在用）
+## 七、没有签名时的兜底（现在正在用）
 
 - Release 附 **`SHA256SUMS.txt`**，用户可自行核对
 - README 里有「关于未知发布者安全警告」章节，解释为什么提示、怎么点
