@@ -360,7 +360,7 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ## 界面重构（WPF）
 
-`csharp-wpf/` 是重写中的新界面：无边框窗口 + 顶部导航 + 左侧栏 + 背景图 + 卡片，
+`csharp-wpf/` 是新界面：无边框窗口 + 顶部导航 + **DSH 风格侧栏**（品牌行 / 置顶「开始游戏」/ 版本搜索 / 底部账号）+ 背景图 + 玻璃面板 + 卡片，
 **复用 `csharp/` 下的全部 Core**（下载 / 加载器 / 整合包 / Java 一行没改，编译时链接进来）。
 
 已经接真实数据：本地版本列表、启动、下载原版、装加载器、装整合包、下 Java、数据目录切换、日志面板。
@@ -378,6 +378,10 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 | 整合包 | 设置 |
 |---|---|
 | ![整合包](docs/gui-wpf-packs.png) | ![设置](docs/gui-wpf-settings.png) |
+
+玻璃面板 + 背景图（侧栏、顶栏、卡片都会透出来）：
+
+![玻璃](docs/gui-wpf-glass.png)
 
 深色模式：
 
