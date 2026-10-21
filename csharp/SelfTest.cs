@@ -240,6 +240,8 @@ namespace Mcroute
 
             string tmp = Path.Combine(Directory.GetCurrentDirectory(),
                                       ".ptest-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".bin");
+            bool oldAllow = Http.AllowParallel;
+            Http.AllowParallel = true;      // 自测就是要测分段，临时打开
             Console.WriteLine("  分段下载: " + url);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             string reason;

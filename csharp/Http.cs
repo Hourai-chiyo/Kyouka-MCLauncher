@@ -124,6 +124,18 @@ namespace Mcroute
         /// 瓶颈在链路总带宽而不是单连接。用 --parallel 或设置页开关可以打开。
         /// </summary>
         public static bool AllowParallel = false;
+        /// <summary>自适应：采样多少字节来测单连接速度。</summary>
+        public static long AdaptiveSampleBytes = 512 * 1024;
+
+        /// <summary>自适应：单连接达到这个速度就不分段（MB/s）。</summary>
+        public static double AdaptiveMinSpeedMbps = 1.0;
+
+        /// <summary>自适应：小于这个大小直接单连接。</summary>
+        public static long AdaptiveMinSize = 8 * 1024 * 1024;
+
+        /// <summary>强制分段（调试用，环境变量 MCROUTE_PARALLEL_FORCE=1）。</summary>
+        public static bool ForceParallel = Environment.GetEnvironmentVariable("MCROUTE_PARALLEL_FORCE") == "1";
+
 
         /// <summary>
         /// 分段并行下载：按字节区间切分，每段写独立临时文件，最后顺序合并并校验 SHA-1。
@@ -135,6 +147,60 @@ namespace Mcroute
         ///
         /// 返回 false 时调用方应退回单连接下载（服务器不支持 Range / 文件太小 / 探测失败）。
         /// </summary>
+        /// <summary>
+        /// 测「单连接」在目标地址上的稳态速度。
+        ///
+        /// 注意坑：只测开头 512KB 会被 TLS 握手 + TCP 慢启动带偏
+        /// （实测采样 0.52 MB/s，同一时刻完整下载却是 4.7 MB/s）。
+        /// 所以先读满 WARMUP 字节不计时，再计后面一段的稳定速度。
+        /// </summary>
+        public static double MeasureSingleSpeed(string url, out string info)
+        {
+            info = "";
+            const long Warmup = 256 * 1024;          // 预热（握手 + 慢启动）
+            long sample = AdaptiveSampleBytes;       // 计时区间
+            if (sample < 1024 * 1024) sample = 1024 * 1024;
+
+            try
+            {
+                var req = (HttpWebRequest)WebRequest.Create(url);
+                req.UserAgent = UA;
+                req.Timeout = 30000;
+                req.ReadWriteTimeout = 30000;
+                req.AddRange(0, Warmup + sample - 1);
+
+                long total = 0, timed = 0;
+                var sw = new System.Diagnostics.Stopwatch();
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                using (var net = resp.GetResponseStream())
+                {
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while (total < Warmup + sample && (n = net.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        total += n;
+                        if (total > Warmup)
+                        {
+                            if (!sw.IsRunning) sw.Start();
+                            timed += (total - Warmup) < n ? (total - Warmup) : n;
+                        }
+                    }
+                }
+                sw.Stop();
+
+                if (timed <= 0 || sw.Elapsed.TotalSeconds <= 0) { info = "采样为 0"; return 0; }
+                double mbps = (timed / 1024.0 / 1024.0) / sw.Elapsed.TotalSeconds;
+                info = string.Format("预热 {0:F0}KB 后测 {1:F0}KB / {2:F2}s = {3:F2} MB/s",
+                                     Warmup / 1024.0, timed / 1024.0, sw.Elapsed.TotalSeconds, mbps);
+                return mbps;
+            }
+            catch (Exception ex)
+            {
+                info = "采样失败: " + ex.Message;
+                return 0;
+            }
+        }
+
         public static bool DownloadParallel(string url, string dest, string expectedSha1, out string reason)
         {
             reason = "";
@@ -180,6 +246,27 @@ namespace Mcroute
             {
                 reason = "文件只有 " + (size / 1024) + " KB，不划算";
                 return false;
+            }
+
+            // ---- 自适应：先测单连接在「这个地址」上的真实速度 ----
+            // 只对够大的文件做（小于 8MB 分段意义不大）；偏保守：测不出就单连接
+            if (!ForceParallel && size >= AdaptiveMinSize)
+            {
+                string sampleInfo;
+                double single = MeasureSingleSpeed(url, out sampleInfo);
+                if (Environment.GetEnvironmentVariable("MCROUTE_SEG_DEBUG") == "1")
+                    Console.WriteLine("    自适应采样: " + sampleInfo + "（阈值 " + AdaptiveMinSpeedMbps + " MB/s）");
+                if (single >= AdaptiveMinSpeedMbps)
+                {
+                    reason = string.Format("自适应：单连接已有 {0:F2} MB/s（{1}），不分段", single, sampleInfo);
+                    return false;
+                }
+                if (single <= 0)
+                {
+                    reason = "自适应：测速失败（" + sampleInfo + "），保守用单连接";
+                    return false;
+                }
+                reason = "";   // 继续走分段
             }
 
             int seg;
