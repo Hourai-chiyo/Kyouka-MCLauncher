@@ -29,6 +29,23 @@ namespace Mcroute.Wpf
                 ShotMode = true;
             }
 
+            // Mods 窗口截图：--shot-mods <版本> <输出.png> [宽 高]
+            if (args.Length >= 3 && args[0] == "--shot-mods")
+            {
+                ShotMode = true;
+                try
+                {
+                    string baseDir = Environment.GetEnvironmentVariable("MCROUTE_DATA");
+                    if (string.IsNullOrEmpty(baseDir)) baseDir = Mcroute.Version.BaseDir(null);
+                    int w = args.Length >= 4 ? int.Parse(args[3]) : 820;
+                    int h = args.Length >= 5 ? int.Parse(args[4]) : 560;
+                    ShotMods(baseDir, args[1], args[2], w, h);
+                }
+                catch (Exception ex) { ShotTrace("shot-mods 异常: " + ex); }
+                Shutdown(0);
+                return;
+            }
+
             if (args.Length >= 2 && args[0] == "--shot")
             {
                 try
@@ -97,6 +114,39 @@ namespace Mcroute.Wpf
             ShotTrace("渲染完成，开始写文件");
             using (var fs = File.Create(outputPath)) encoder.Save(fs);
             ShotTrace("已保存");
+
+            win.Close();
+        }
+
+        private void ShotMods(string baseDir, string version, string outputPath, int width, int height)
+        {
+            // 截图模式下主窗口没跑，主题不会自动应用，这里补一次
+            try { Mcroute.Theme.Apply(Environment.GetEnvironmentVariable("MCROUTE_THEME") ?? "auto"); } catch { }
+
+            ShotTrace("ShotMods " + version + " -> " + outputPath + " " + width + "x" + height);
+            var win = new ModsWindow(baseDir, version)
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual,
+                Left = -10000,
+                Top = -10000,
+                Width = width,
+                Height = height,
+                ShowInTaskbar = false,
+            };
+            win.Show();
+            win.UpdateLayout();
+            Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+
+            var visual = (Visual)win.Content;
+            var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(visual);
+
+            string dir = Path.GetDirectoryName(Path.GetFullPath(outputPath));
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(rtb));
+            using (var fs = File.Create(outputPath)) encoder.Save(fs);
+            ShotTrace("ShotMods 已保存");
 
             win.Close();
         }

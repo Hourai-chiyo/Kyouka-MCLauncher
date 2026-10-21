@@ -385,6 +385,12 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 |---|---|
 | ![启动-深色](docs/gui-wpf-launch-dark.png) | ![设置-深色](docs/gui-wpf-settings-dark.png) |
 
+**本地 Mod 列表**：管理页选中版本 →「Mods」→ 列出 mods 目录里的所有 jar，
+自动识别 Fabric（`fabric.mod.json`）/ Forge·NeoForge（`META-INF/mods.toml`）/ 老 Forge（`mcmod.info`），
+双击即可启用/禁用（`.jar ↔ .jar.disabled`），也能删除：
+
+![Mod 列表](docs/gui-wpf-mods.png)
+
 **玻璃面板**：设置页勾选「玻璃面板」后，所有页面背景变透明、卡片换成半透明，
 背景图从卡片后面透出来（配合模糊滑块就是 Win11 那种观感）：
 
