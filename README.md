@@ -1,5 +1,8 @@
 # mcroute
 
+[图标](docs/app-icon.png)
+催眠你哦~？
+
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
 > 本项目已进入beta版本，为主镜像源崩溃时的紧急预案。如有bug，请提交至QQ:3849596108或者邮箱2084619997@qq.com
