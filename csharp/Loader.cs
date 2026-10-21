@@ -153,7 +153,9 @@ namespace Mcroute
 
             string tmpDir = Path.Combine(baseDir, "_tmp");
             Directory.CreateDirectory(tmpDir);
-            string installer = Path.Combine(tmpDir, kind + "-installer.jar");
+            // 文件名必须带版本号！否则装了 1.7.10 之后再装 1.19.2，
+            // 会因为"文件已存在"直接复用旧安装器 -> 走错分支
+            string installer = Path.Combine(tmpDir, kind + "-" + version + "-installer.jar");
             string info;
             string status = Http.Download(url, installer, null, out info);
             if (status == "fail")
@@ -238,26 +240,40 @@ namespace Mcroute
 
             Console.WriteLine("[3/3] 运行 installer（可能要几分钟）...");
             var java = Java.Find(baseDir, kind == "neoforge" ? 21 : 17, null, out _);
+            // 有些受限环境里 Java 建不了 %TEMP% 下的临时目录（AccessDeniedException），
+            // 直接把 java.io.tmpdir 指到数据目录里自己管
+            string javaTmp = Path.Combine(tmpDir, "javatmp");
+            Directory.CreateDirectory(javaTmp);
+
             var psi = new ProcessStartInfo(java,
-                "/jar \"" + installer + "\" --installClient \"" + baseDir + "\"")
+                "-Djava.io.tmpdir=\"" + javaTmp + "\" -jar \"" + installer +
+                "\" --installClient \"" + baseDir + "\"")
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
             };
+            psi.WorkingDirectory = baseDir;   // 安装器对工作目录敏感
             using (var p = Process.Start(psi))
             {
                 string stdout = p.StandardOutput.ReadToEnd();
                 string stderr = p.StandardError.ReadToEnd();
                 p.WaitForExit();
+
+                // 完整日志落盘，方便排查
+                string logFile = Path.Combine(tmpDir, "installer-" + version + ".log");
+                try { File.WriteAllText(logFile, stdout + "\r\n=== STDERR ===\r\n" + stderr); } catch { }
+
                 if (p.ExitCode != 0)
                 {
-                    Console.WriteLine("      installer 退出码 " + p.ExitCode);
-                    var tail = (stdout + stderr).Split('\n').Where(x => x.Trim().Length > 0).Reverse().Take(8).Reverse();
+                    Console.WriteLine("      installer 退出码 " + p.ExitCode + "（完整日志 " + logFile + "）");
+                    var tail = (stdout + "\n" + stderr).Split('\n')
+                        .Where(x => x.Trim().Length > 0).Reverse().Take(20).Reverse();
                     foreach (string line in tail) Console.WriteLine("      | " + line.Trim());
                     return 1;
                 }
+                Console.WriteLine("      installer 输出已存: " + logFile);
             }
             Console.WriteLine("      installer 完成");
             Console.WriteLine();

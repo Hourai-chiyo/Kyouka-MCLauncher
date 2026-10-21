@@ -104,6 +104,16 @@ run_gui.bat          # 图形界面
 
 ---
 
+## 镜像失效演练
+
+```bat
+:: 完全不走大学镜像，只走官方源（模拟 BMCLAPI/HIT 挂掉的情况）
+mcroute.exe fetch 1.19.2 --no-mirror
+mcroute.exe loader forge 1.19.2 --no-mirror
+```
+
+一键回归脚本：`powershell -File tools\test-fallback.ps1`
+
 ## 快速开始
 
 **要求：** Windows + Python 3.10 以上（本项目只用标准库，**不需要 pip install 任何东西**）。

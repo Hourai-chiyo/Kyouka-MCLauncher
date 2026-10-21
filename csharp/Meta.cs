@@ -42,15 +42,28 @@ namespace Mcroute
         }
 
         /// <summary>下载候选：镜像优先 -> 改写后的官方 -> 跨 maven 兜底。</summary>
+        /// <summary>
+        /// 镜像失效演练开关：设置 MCROUTE_NO_MIRROR=1（或命令行 --no-mirror）
+        /// 就完全不走大学镜像，只用官方源 —— 用来验证"镜像挂了还能不能用"。
+        /// </summary>
+        public static bool DisableMirror()
+        {
+            string v = Environment.GetEnvironmentVariable("MCROUTE_NO_MIRROR");
+            return v == "1" || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
+        }
+
         public static List<string> Candidates(string url)
         {
             var list = new List<string>();
-            foreach (string prefix in MirrorPrefixes)
+            if (!DisableMirror())
             {
-                if (url.StartsWith(prefix, StringComparison.Ordinal))
+                foreach (string prefix in MirrorPrefixes)
                 {
-                    list.Add(HitMirror + url.Substring(prefix.Length));
-                    break;
+                    if (url.StartsWith(prefix, StringComparison.Ordinal))
+                    {
+                        list.Add(HitMirror + url.Substring(prefix.Length));
+                        break;
+                    }
                 }
             }
 

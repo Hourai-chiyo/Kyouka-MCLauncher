@@ -64,6 +64,10 @@ namespace Mcroute
                     Console.SetOut(new System.IO.StreamWriter(stdout, new UTF8Encoding(false)) { AutoFlush = true });
             }
             catch { }
+            // --no-mirror：不碰任何大学镜像，只走官方源（镜像失效演练）
+            if (Array.IndexOf(args, "--no-mirror") >= 0)
+                Environment.SetEnvironmentVariable("MCROUTE_NO_MIRROR", "1");
+
             if (!AttachConsole(-1)) { try { AllocConsole(); } catch { } }
             try { Console.OutputEncoding = Encoding.UTF8; } catch { }
 
@@ -178,6 +182,7 @@ namespace Mcroute
             Console.WriteLine("  mcroute install <整合包>            装 mrpack / MultiMC / CurseForge 包");
             Console.WriteLine();
             Console.WriteLine("公共参数：--dir <数据目录>  --java <java.exe>  --game-dir <游戏目录>");
+            Console.WriteLine("演练参数：--no-mirror  只走官方源（模拟镜像失效）");
             Console.WriteLine();
             Console.WriteLine("示例：");
             Console.WriteLine("  mcroute fetch 1.21.1");

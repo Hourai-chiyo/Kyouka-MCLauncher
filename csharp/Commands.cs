@@ -364,6 +364,15 @@ namespace Mcroute
             if (!plan.JvmArgs.Any(x => x.StartsWith("-Xms"))) plan.JvmArgs.Insert(0, "-Xms512M");
             if (!plan.JvmArgs.Any(x => x.StartsWith("-Xmx"))) plan.JvmArgs.Insert(1, "-Xmx2G");
 
+            // 指定 java.io.tmpdir：有些机器/受限环境里 %TEMP% 不可写，
+            // JNA 之类往临时目录解压 dll 会失败（UnsatisfiedLinkError: jnidispatch.dll）。
+            if (!plan.JvmArgs.Any(x => x.StartsWith("-Djava.io.tmpdir")))
+            {
+                string javaTmp = Path.Combine(baseDir, "_tmp", "game-" + ver);
+                try { Directory.CreateDirectory(javaTmp); } catch { }
+                plan.JvmArgs.Insert(0, "-Djava.io.tmpdir=" + javaTmp);
+            }
+
             return plan;
         }
 
