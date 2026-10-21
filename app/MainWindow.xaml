@@ -874,7 +874,25 @@
                                      Background="{DynamicResource InputBg}"
                                      BorderBrush="{DynamicResource Border}" BorderThickness="1"
                                      FontFamily="Consolas" FontSize="11"/>
-                        </StackPanel>
+                        
+            <TextBlock Text="关于与更新" Style="{StaticResource FieldLabel}" Margin="0,22,0,6"/>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="AboutVersion" Text="Kyouka MCLauncher" FontSize="12"
+                           VerticalAlignment="Center" Foreground="{DynamicResource TextSub}"/>
+                <Button Style="{StaticResource GhostButton}" Content="检查更新" Width="100"
+                        Margin="12,0,0,0" Click="CheckUpdate_Click"/>
+                <TextBlock x:Name="UpdateStatus" Margin="12,0,0,0" VerticalAlignment="Center"
+                           FontSize="11" Foreground="{DynamicResource TextFaint}"/>
+            </StackPanel>
+            <TextBlock Text="自动更新：发现新版本会下载并在重启后替换；失败会保留原程序。"
+                       FontSize="10.5" Margin="0,6,0,0" Foreground="{DynamicResource TextFaint}"/>
+            <TextBlock Text="图标使用 EmoteLab 及其内置资源制作；角色「镜花」为作者自设。"
+                       FontSize="10.5" Margin="0,2,0,0" Foreground="{DynamicResource TextFaint}"
+                       TextWrapping="Wrap"/>
+            <TextBlock Text="NOT AN OFFICIAL MINECRAFT PRODUCT. 与 Mojang / Microsoft 无任何隶属关系。"
+                       FontSize="10.5" Margin="0,2,0,0" Foreground="{DynamicResource TextFaint}"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
                     </ScrollViewer>
                         </Border>
                 </Grid>

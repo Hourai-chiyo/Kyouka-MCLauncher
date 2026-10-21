@@ -709,3 +709,17 @@ Tokens are stored only on the local machine. No telemetry, no ads, no monetizati
 本项目代码采用 **MIT 许可证**，见 [LICENSE](LICENSE)。
 
 Minecraft 及其相关内容的一切权利归 Mojang 与 Microsoft 所有；MIT 许可证仅覆盖本项目的代码，不覆盖通过本项目下载的游戏文件。
+
+---
+
+## 版权与致谢
+
+| 项 | 说明 |
+|---|---|
+| 程序 | © 2026 Hourai-chiyo，MIT License |
+| 角色「镜花（Kyouka）」 | 作者自设角色 |
+| **应用图标** | **使用 EmoteLab 及其内置资源制作**（按 EmoteLab EULA 5.5 条署名；非本人原创绘制） |
+| 背景图 | 程序只内置渐变背景；用户自定义图片仅保存在本地，不随程序分发 |
+| 素材原则 | **不使用来源不明的图片**；不打包任何第三方软件资源 |
+
+> NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.

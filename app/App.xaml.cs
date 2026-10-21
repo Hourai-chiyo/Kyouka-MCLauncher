@@ -142,6 +142,7 @@ namespace Mcroute.Wpf
             var win = new MainWindow();
             MainWindow = win;
             win.Show();
+            try { win.SilentUpdateCheck(); } catch { }
         }
 
         private static void ShotTrace(string msg)
@@ -152,6 +153,33 @@ namespace Mcroute.Wpf
                     DateTime.Now.ToString("HH:mm:ss.fff") + "  " + msg + "\r\n");
             }
             catch { }
+        }
+
+        /// <summary>截图用：把设置页滚到底，露出「关于与更新」。</summary>
+        private static void ScrollSettingsToEnd(MainWindow win)
+        {
+            try
+            {
+                var page = win.FindName("PageSettings") as DependencyObject;
+                if (page == null) return;
+                var sv = FindChild<System.Windows.Controls.ScrollViewer>(page);
+                if (sv != null) sv.ScrollToEnd();
+            }
+            catch { }
+        }
+
+        private static T FindChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            int n = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < n; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                var hit = child as T;
+                if (hit != null) return hit;
+                var deeper = FindChild<T>(child);
+                if (deeper != null) return deeper;
+            }
+            return null;
         }
 
         private void Shot(string outputPath, int width, int height, int page = 0)
@@ -174,6 +202,7 @@ namespace Mcroute.Wpf
             Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
 
             ShotTrace("布局完成");
+            if (page == 4) { ScrollSettingsToEnd(win); PumpFor(TimeSpan.FromMilliseconds(500)); }
             var visual = (Visual)win.Content;
             ShotTrace("visual=" + (visual == null ? "null" : visual.GetType().Name));
             var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);

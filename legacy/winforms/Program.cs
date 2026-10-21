@@ -123,6 +123,19 @@ namespace Mcroute
                     case "mkbat": return ExtraCommands.Mkbat(args);
                     case "install": return Packs.Install(args);
                     case "java": return JavaCommand.Run(args);
+                    case "--selftest-update":
+                    {
+                        Console.WriteLine("当前版本: " + Update.CurrentVersion());
+                        string tag, url, err;
+                        bool ok = Update.CheckLatest(out tag, out url, out err);
+                        if (!ok) { Console.WriteLine("[FAIL] 检查失败: " + err); return 1; }
+                        Console.WriteLine("GitHub 最新: " + tag);
+                        Console.WriteLine("下载地址: " + (url ?? "(无)"));
+                        bool newer = Update.IsNewer(tag, Update.CurrentVersion());
+                        Console.WriteLine(newer ? "[INFO] 有新版本" : "[PASS] 已是最新");
+                        return 0;
+                    }
+
                     case "mods-search":
                     {
                         string q = args.Length > 1 && !args[1].StartsWith("--") ? args[1] : "";

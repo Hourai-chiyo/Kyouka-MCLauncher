@@ -48,6 +48,7 @@
     <Compile Include="..\..\core\SafeZip.cs" Link="Core\SafeZip.cs" />
     <Compile Include="..\..\core\SelfTest.cs" Link="Core\SelfTest.cs" />
     <Compile Include="..\..\core\Version.cs" Link="Core\Version.cs" />
+    <Compile Include="..\..\core\Update.cs" Link="Core\Update.cs" />
   </ItemGroup>
 
 </Project>

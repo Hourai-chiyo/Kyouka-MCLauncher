@@ -29,6 +29,8 @@ namespace Mcroute.Wpf
 
             Http.Progress = OnHttpProgress;
 
+            try { if (AboutVersion != null) AboutVersion.Text = "Kyouka MCLauncher v" + Update.CurrentVersion(); } catch { }
+
             Loaded += (s, e) =>
             {
                 RefreshVersions();
@@ -1307,6 +1309,101 @@ namespace Mcroute.Wpf
             if (grid == null) return;
             double width = Math.Max(0, grid.ActualWidth) * Math.Max(0, Math.Min(1, ratio));
             ProgressFill.Width = width;
+        }
+
+        // ===== 自动更新 =====
+        private bool _updateChecking;
+
+        /// <summary>启动时静默检查（后台，不弹窗；只在发现新版本时提示）。</summary>
+        public void SilentUpdateCheck()
+        {
+            var task = new System.Threading.Tasks.Task(() =>
+            {
+                try { Update.CleanupLeftovers(); } catch { }
+                Dispatcher.BeginInvoke(new Action(() => RunUpdateCheck(false)));
+            });
+            task.Start();
+        }
+
+        private void CheckUpdate_Click(object sender, RoutedEventArgs e) { RunUpdateCheck(true); }
+
+        /// <summary>检查更新；interactive=true 时即使已是最新也提示。</summary>
+        private void RunUpdateCheck(bool interactive)
+        {
+            if (_updateChecking) return;
+            _updateChecking = true;
+            if (UpdateStatus != null) UpdateStatus.Text = "检查中…";
+
+            var task = new System.Threading.Tasks.Task(() =>
+            {
+                string tag, url, err;
+                bool ok = Update.CheckLatest(out tag, out url, out err);
+                string current = Update.CurrentVersion();
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _updateChecking = false;
+                    if (!ok)
+                    {
+                        if (UpdateStatus != null) UpdateStatus.Text = "检查失败：网络不可用";
+                        if (interactive)
+                            MessageBox.Show("检查更新失败：\n" + err, "检查更新", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    bool newer = Update.IsNewer(tag, current);
+                    if (UpdateStatus != null)
+                        UpdateStatus.Text = newer ? ("发现新版本 " + tag) : ("已是最新（v" + current + "）");
+                    AppendLog("[更新] 当前 v" + current + "，最新 " + tag);
+
+                    if (!newer)
+                    {
+                        if (interactive)
+                            MessageBox.Show("已经是最新版本（v" + current + "）。", "检查更新",
+                                MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+
+                    if (string.IsNullOrEmpty(url))
+                    {
+                        if (UpdateStatus != null) UpdateStatus.Text = "新版本没有可下载的 exe";
+                        return;
+                    }
+
+                    var ask = MessageBox.Show(
+                        string.Format("发现新版本 {0}（当前 v{1}）。\n\n现在下载并自动重启更新吗？", tag, current),
+                        "发现更新", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (ask != MessageBoxResult.Yes) return;
+
+                    if (UpdateStatus != null) UpdateStatus.Text = "正在下载更新…";
+                    var dl = new System.Threading.Tasks.Task(() =>
+                    {
+                        string derr;
+                        string newExe = Update.Download(url, out derr);
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            if (newExe == null)
+                            {
+                                if (UpdateStatus != null) UpdateStatus.Text = "下载失败";
+                                MessageBox.Show("下载更新失败：\n" + derr, "更新失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                return;
+                            }
+                            string serr;
+                            if (!Update.SpawnUpdater(newExe, out serr))
+                            {
+                                MessageBox.Show("启动更新程序失败：\n" + serr, "更新失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                                return;
+                            }
+                            if (UpdateStatus != null) UpdateStatus.Text = "更新程序已启动，即将重启…";
+                            AppendLog("[更新] 已下载，准备重启替换");
+                            System.Threading.Tasks.Task.Delay(800).ContinueWith(_ =>
+                                Dispatcher.BeginInvoke(new Action(() => Application.Current.Shutdown())));
+                        }));
+                    });
+                    dl.Start();
+                }));
+            });
+            task.Start();
         }
 
         private void ClearLog_Click(object sender, RoutedEventArgs e) { LogBox.Clear(); }
