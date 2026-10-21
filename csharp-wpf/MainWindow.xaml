@@ -305,7 +305,7 @@
             <!-- 右侧内容 -->
             <Grid Grid.Column="1" ClipToBounds="True">
 
-                <!-- 启动页背景 -->
+                <!-- 启动页背景：默认是矢量山形；也可以在设置里换成自己的图片 -->
                 <Grid x:Name="HeroLayer">
                     <Grid.Background>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -314,10 +314,27 @@
                             <GradientStop Color="#3F6B9E" Offset="1"/>
                         </LinearGradientBrush>
                     </Grid.Background>
-                    <Path Data="M0,520 L200,360 L380,470 L560,300 L760,450 L1000,280 L1180,430 L1180,700 L0,700 Z"
-                          Fill="#16304F" Opacity="0.55" Stretch="Fill"/>
-                    <Path Data="M0,600 L180,470 L360,570 L540,430 L740,560 L940,420 L1180,520 L1180,700 L0,700 Z"
-                          Fill="#0F2340" Opacity="0.8" Stretch="Fill"/>
+
+                    <!-- 自定义背景图（默认隐藏） -->
+                    <Border x:Name="HeroImageLayer" Visibility="Collapsed"/>
+
+                    <!-- 默认矢量山形 -->
+                    <Grid x:Name="HeroMountains">
+                        <Path Data="M0,520 L200,360 L380,470 L560,300 L760,450 L1000,280 L1180,430 L1180,700 L0,700 Z"
+                              Fill="#16304F" Opacity="0.55" Stretch="Fill"/>
+                        <Path Data="M0,600 L180,470 L360,570 L540,430 L740,560 L940,420 L1180,520 L1180,700 L0,700 Z"
+                              Fill="#0F2340" Opacity="0.8" Stretch="Fill"/>
+                    </Grid>
+
+                    <!-- 图片模式的暗色蒙版（保证白字可读） -->
+                    <Border x:Name="HeroScrim" Visibility="Collapsed">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#8C1B2A4A" Offset="0"/>
+                                <GradientStop Color="#D90B1524" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
                 </Grid>
 
                 <!-- 启动页 -->
@@ -525,6 +542,17 @@
                                 <Button Style="{StaticResource GhostButton}" Content="选择..." Width="90"
                                         Margin="8,0,0,0" Click="PickDataDir_Click"/>
                             </StackPanel>
+
+                            <TextBlock Text="启动页背景" Style="{StaticResource FieldLabel}" Margin="0,18,0,6"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox x:Name="BgPathText" Width="400" IsReadOnly="True"/>
+                                <Button Style="{StaticResource GhostButton}" Content="选择图片..." Width="100"
+                                        Margin="8,0,0,0" Click="PickBackground_Click"/>
+                                <Button Style="{StaticResource GhostButton}" Content="恢复默认" Width="90"
+                                        Margin="8,0,0,0" Click="ResetBackground_Click"/>
+                            </StackPanel>
+                            <TextBlock Text="支持 jpg / png / bmp；图片只保存在本地数据目录，不会打包进程序"
+                                       Margin="0,6,0,0" FontSize="11" Foreground="{StaticResource TextFaint}"/>
 
                             <TextBlock Text="最大内存（例如 2G / 4G / 8192M）" Style="{StaticResource FieldLabel}" Margin="0,18,0,6"/>
                             <TextBox x:Name="MemoryBox" Text="2G" Width="140" HorizontalAlignment="Left"/>

@@ -33,6 +33,7 @@ namespace Mcroute.Wpf
             {
                 RefreshVersions();
                 RefreshJava();
+                LoadBackground();
                 AppendLog("数据目录：" + _baseDir);
             };
         }
@@ -396,6 +397,94 @@ namespace Mcroute.Wpf
                 }
             }
             AppendLog("检测到 " + JavaList.Items.Count + " 个 Java");
+        }
+
+        // ================= 启动页背景 =================
+        private string BackgroundFile()
+        {
+            return Path.Combine(_baseDir, "background.img");
+        }
+
+        private void LoadBackground()
+        {
+            try
+            {
+                string file = BackgroundFile();
+                if (File.Exists(file))
+                {
+                    ApplyBackgroundBrush(file);
+                    BgPathText.Text = file;
+                }
+                else
+                {
+                    BgPathText.Text = "（默认矢量背景）";
+                }
+            }
+            catch (Exception ex) { AppendLog("加载背景失败：" + ex.Message); }
+        }
+
+        private void PickBackground_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "图片|*.jpg;*.jpeg;*.png;*.bmp;*.gif|所有文件|*.*",
+                Title = "选择启动页背景图",
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                Directory.CreateDirectory(_baseDir);
+                string target = BackgroundFile();
+                File.Copy(dlg.FileName, target, true);
+                ApplyBackgroundBrush(target);
+                BgPathText.Text = target;
+                AppendLog("已设置背景图：" + dlg.FileName);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("设置背景图失败：" + ex.Message, "提示");
+            }
+        }
+
+        private void ResetBackground_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string file = BackgroundFile();
+                if (File.Exists(file)) File.Delete(file);
+                HeroImageLayer.Background = null;
+                HeroImageLayer.Visibility = Visibility.Collapsed;
+                HeroScrim.Visibility = Visibility.Collapsed;
+                HeroMountains.Visibility = Visibility.Visible;
+                BgPathText.Text = "（默认矢量背景）";
+                AppendLog("已恢复默认背景");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("恢复默认失败：" + ex.Message, "提示");
+            }
+        }
+
+        private void ApplyBackgroundBrush(string file)
+        {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.UriSource = new Uri(file, UriKind.Absolute);
+            bmp.EndInit();
+            bmp.Freeze();
+
+            var brush = new System.Windows.Media.ImageBrush(bmp)
+            {
+                Stretch = System.Windows.Media.Stretch.UniformToFill,
+                AlignmentX = AlignmentX.Center,
+                AlignmentY = AlignmentY.Center,
+            };
+            HeroImageLayer.Background = brush;
+            HeroImageLayer.Visibility = Visibility.Visible;
+            HeroMountains.Visibility = Visibility.Collapsed;   // 图片模式不叠山形
+            HeroScrim.Visibility = Visibility.Visible;         // 暗色蒙版，保证白字可读
         }
 
         // ================= 后台任务 + 日志 =================

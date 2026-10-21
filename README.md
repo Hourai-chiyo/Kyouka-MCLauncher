@@ -304,6 +304,9 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 |---|---|
 | ![整合包](docs/gui-wpf-packs.png) | ![设置](docs/gui-wpf-settings.png) |
 
+**自定义背景图**：设置页 → 启动页背景 → 选择图片，图片只拷到本地数据目录（`<数据目录>\background.img`），
+不打包进程序、不随发布分发；点「恢复默认」回到矢量山形背景。图片模式会自动叠一层暗色蒙版，保证白字可读。
+
 ## 打包成 exe（Python 版的打包方式）
 
 ```bat
