@@ -186,9 +186,7 @@ namespace Mcroute
                 if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
                 if (name.EndsWith("/")) continue;
                 string rel = name.Substring(prefix.Length);
-                string dest = Path.Combine(target, rel.Replace('/', '\\'));
-                Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                entry.ExtractToFile(dest, true);
+                SafeZip.ExtractRelative(entry, target, rel);   // 防 Zip Slip
                 count++;
             }
             Console.WriteLine("[4/4] 已铺开 " + prefix + "：" + count + " 个文件");
@@ -323,9 +321,7 @@ namespace Mcroute
                     if (!n.StartsWith(".minecraft/", StringComparison.OrdinalIgnoreCase)) continue;
                     if (n.EndsWith("/")) continue;
                     string rel = n.Substring(".minecraft/".Length);
-                    string dest = Path.Combine(instDir, rel.Replace('/', '\\'));
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                    entry.ExtractToFile(dest, true);
+                    SafeZip.ExtractRelative(entry, instDir, rel);   // 防 Zip Slip
                     count++;
                 }
             }

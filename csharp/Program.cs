@@ -74,6 +74,11 @@ namespace Mcroute
             string cmd = args[0].ToLowerInvariant();
             try
             {
+                if (cmd == "--selftest-security") return SelfTest.Security();
+                if (cmd == "--selftest-download")
+                    return SelfTest.DownloadTest(args.Length > 1 ? args[1] : null,
+                                                 args.Length > 2 ? args[2] : null);
+
                 if (cmd == "--selftest")
                 {
                     Console.WriteLine("构造窗口 ...");
@@ -185,6 +190,7 @@ namespace Mcroute
             Console.WriteLine();
             Console.WriteLine("公共参数：--dir <数据目录>  --java <java.exe>  --game-dir <游戏目录>");
             Console.WriteLine("演练参数：--no-mirror  只走官方源（模拟镜像失效）");
+            Console.WriteLine("自测参数：--selftest-security  --selftest-download <url> [sha1]");
             Console.WriteLine();
             Console.WriteLine("示例：");
             Console.WriteLine("  mcroute fetch 1.21.1");

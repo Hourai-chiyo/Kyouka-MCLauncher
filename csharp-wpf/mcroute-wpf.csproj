@@ -30,6 +30,7 @@
     <Compile Include="..\csharp\Loader.cs"     Link="Core\Loader.cs" />
     <Compile Include="..\csharp\Meta.cs"       Link="Core\Meta.cs" />
     <Compile Include="..\csharp\Packs.cs"      Link="Core\Packs.cs" />
+    <Compile Include="..\csharp\SafeZip.cs"    Link="Core\SafeZip.cs" />
     <Compile Include="..\csharp\Version.cs"    Link="Core\Version.cs" />
   </ItemGroup>
 

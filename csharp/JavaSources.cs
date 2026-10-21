@@ -159,9 +159,13 @@ namespace Mcroute
             {
                 try
                 {
-                    byte[] data = Http.GetBytes(pkg.Url, 1800);
-                    File.WriteAllBytes(zipPath, data);
-                    Console.WriteLine("  已下载 " + (data.Length / 1024 / 1024) + " MB");
+                    string info;
+                    if (!Http.StreamToFile(pkg.Url, zipPath, null, out info))
+                    {
+                        Console.WriteLine("[错误] 下载失败: " + info);
+                        return null;
+                    }
+                    Console.WriteLine("  已下载 " + (new FileInfo(zipPath).Length / 1024 / 1024) + " MB");
                 }
                 catch (Exception ex)
                 {
@@ -186,7 +190,8 @@ namespace Mcroute
 
             try
             {
-                ZipFile.ExtractToDirectory(zipPath, target);
+                using (var zip = ZipFile.OpenRead(zipPath))
+                    SafeZip.ExtractAll(zip, target);          // 防 Zip Slip
                 Console.WriteLine("  已解压到 " + target);
             }
             catch (Exception ex)

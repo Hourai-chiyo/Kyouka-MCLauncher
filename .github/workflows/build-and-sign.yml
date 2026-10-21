@@ -41,6 +41,10 @@ jobs:
           & $exe --selftest
           if ($LASTEXITCODE -ne 0) { throw "selftest 失败（退出码 $LASTEXITCODE）" }
 
+          # 安全自测：防 Zip Slip
+          & $exe --selftest-security
+          if ($LASTEXITCODE -ne 0) { throw "安全自测失败（Zip Slip 防护）" }
+
       # 1) 把未签名的 exe 作为 artifact 上传（SignPath 从 artifact 里取）
       - name: Upload unsigned artifact
         id: unsigned

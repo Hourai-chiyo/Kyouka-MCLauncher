@@ -47,8 +47,10 @@ namespace Mcroute
             try
             {
                 var task = Client.GetStringAsync(url);
+                // 注意：所有调用都发生在后台线程；这里用 GetAwaiter 拿结果，
+                // 避免 .Result 把超时/网络异常包成 AggregateException。
                 if (!task.Wait(TimeSpan.FromSeconds(timeoutSeconds))) return null;
-                return task.Result;
+                return task.GetAwaiter().GetResult();
             }
             catch
             {
@@ -72,7 +74,7 @@ namespace Mcroute
                 var task = Client.GetByteArrayAsync(url);
                 if (!task.Wait(TimeSpan.FromSeconds(timeoutSeconds)))
                     throw new TimeoutException("timeout");
-                return task.Result;
+                return task.GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -104,6 +106,73 @@ namespace Mcroute
         }
 
         /// <summary>
+        /// 流式下载到文件：边下边写边算 SHA1，校验通过才落到最终路径。
+        ///
+        /// 为什么不用 GetBytes：那会把整个文件读进内存（Java 安装包 100MB+、整合包上 GB），
+        /// 大文件时会明显吃内存。这里固定 80KB 缓冲，内存占用与文件大小无关。
+        /// </summary>
+        public static bool StreamToFile(string url, string dest, string expectedSha1, out string reason)
+        {
+            reason = "";
+            string part = dest + ".part";
+            try
+            {
+                string dir = Path.GetDirectoryName(dest);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+                var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+                req.UserAgent = UA;
+                req.Timeout = 60000;
+                req.ReadWriteTimeout = 60000;
+                req.AllowAutoRedirect = true;
+
+                string actualSha1;
+                using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
+                using (var net = resp.GetResponseStream())
+                using (var file = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 81920))
+                using (var sha = System.Security.Cryptography.SHA1.Create())
+                {
+                    if (resp.StatusCode != System.Net.HttpStatusCode.OK)
+                    {
+                        reason = "HTTP " + (int)resp.StatusCode;
+                        return false;
+                    }
+
+                    byte[] buf = new byte[81920];
+                    int n;
+                    while ((n = net.Read(buf, 0, buf.Length)) > 0)
+                    {
+                        file.Write(buf, 0, n);
+                        sha.TransformBlock(buf, 0, n, null, 0);
+                    }
+                    sha.TransformFinalBlock(new byte[0], 0, 0);
+
+                    var sb = new System.Text.StringBuilder();
+                    foreach (byte b in sha.Hash) sb.Append(b.ToString("x2"));
+                    actualSha1 = sb.ToString();
+                }
+
+                if (!string.IsNullOrEmpty(expectedSha1) &&
+                    !string.Equals(actualSha1, expectedSha1, StringComparison.OrdinalIgnoreCase))
+                {
+                    reason = "sha1 不符（期望 " + expectedSha1.Substring(0, 8) + "…，实际 " + actualSha1.Substring(0, 8) + "…）";
+                    try { File.Delete(part); } catch { }
+                    return false;
+                }
+
+                if (File.Exists(dest)) File.Delete(dest);
+                File.Move(part, dest);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = ex.Message;
+                try { if (File.Exists(part)) File.Delete(part); } catch { }
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 下载一个文件到 dest（先试镜像/改写地址，再试官方）。
         /// expectedSha1 为空时跳过校验。返回 ok / skip / fail。
         /// </summary>
@@ -122,15 +191,9 @@ namespace Mcroute
             {
                 try
                 {
-                    byte[] data = GetBytes(url2);
-                    if (!string.IsNullOrEmpty(expectedSha1) && Sha1Bytes(data) != expectedSha1)
-                    {
-                        last = "sha1 不符: " + url2;
-                        continue;
-                    }
-                    Directory.CreateDirectory(Path.GetDirectoryName(dest));
-                    File.WriteAllBytes(dest, data);
-                    return "ok";
+                    string reason;
+                    if (StreamToFile(url2, dest, expectedSha1, out reason)) return "ok";
+                    last = reason;
                 }
                 catch (Exception ex)
                 {
