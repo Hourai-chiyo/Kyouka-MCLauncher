@@ -180,14 +180,11 @@ namespace Mcroute
             if (!string.IsNullOrEmpty(mc) && rest.StartsWith(mc + "-", StringComparison.Ordinal))
                 rest = rest.Substring(mc.Length + 1);
 
-            foreach (string prefix in new[] { "forge-", "neoforge-", "fabric-loader-", "quilt-loader-", "quilt-" })
-            {
-                if (rest.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    rest = rest.Substring(prefix.Length);
-                    break;
-                }
-            }
+            // 官方启动器的名字可能是 1.18.2-Forge_40.3.12 / 26.1.2-NeoForge_26.1.2.106
+            // 所以分隔符既可能是 - 也可能是 _
+            var m = Regex.Match(rest, @"^(neoforge|forge|fabric-loader|fabric|quilt-loader|quilt)[-_]",
+                                RegexOptions.IgnoreCase);
+            if (m.Success) rest = rest.Substring(m.Length);
             // fabric-loader-0.19.5-1.19.2 -> 0.19.5
             if (!string.IsNullOrEmpty(mc) && rest.EndsWith("-" + mc, StringComparison.Ordinal))
                 rest = rest.Substring(0, rest.Length - mc.Length - 1);

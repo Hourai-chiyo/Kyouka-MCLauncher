@@ -312,7 +312,12 @@ namespace Mcroute.Wpf
             foreach (string dir in Directory.GetDirectories(root).OrderBy(x => Path.GetFileName(x)))
             {
                 string name = Path.GetFileName(dir);
+                // 过滤掉 versions 下的杂项目录（官方启动器会塞 libraries 之类的东西）
+                string jsonPath = Path.Combine(dir, name + ".json");
                 bool isPack = File.Exists(Path.Combine(dir, "instance.json"));
+                bool hasJson = File.Exists(jsonPath);
+                if (!hasJson && !isPack && !Directory.Exists(Path.Combine(dir, "mods")))
+                    continue;
                 bool hasMods = Directory.Exists(Path.Combine(dir, "mods"));
 
                 string mc, loader, loaderVer;
@@ -584,6 +589,12 @@ namespace Mcroute.Wpf
             foreach (string dir in Directory.GetDirectories(root).OrderBy(x => Path.GetFileName(x)))
             {
                 string name = Path.GetFileName(dir);
+                string jsonPath = Path.Combine(dir, name + ".json");
+                if (!File.Exists(jsonPath) &&
+                    !File.Exists(Path.Combine(dir, "instance.json")) &&
+                    !Directory.Exists(Path.Combine(dir, "mods")))
+                    continue;
+
                 string mc, loader, loaderVer;
                 string tag = Version.Describe(_baseDir, name, out mc, out loader, out loaderVer);
                 if (File.Exists(Path.Combine(dir, "instance.json"))) tag += " · 整合包";
