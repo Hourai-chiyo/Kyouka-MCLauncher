@@ -22,6 +22,24 @@
 
 ---
 
+## 两个版本
+
+这个仓库现在同时提供两个版本，**推荐用 C# 版**：
+
+| | **mcroute**（主版本） | **mcroute-legacy**（历史版本） |
+|---|---|---|
+| 实现 | C# · .NET Framework 4.8 | Python 3 + tkinter |
+| 体积 | 157 KB 单文件 | 30 MB（内嵌运行时） |
+| 界面 | WinForms / WPF 两套新界面 | tkinter 四页（旧稿） |
+| 状态 | **主推、继续更新** | **冻结**，只做兼容性修复 |
+| 位置 | `csharp/`（WinForms）、`csharp-wpf/`（WPF） | `legacy/` |
+| 特别之处 | 免安装、零依赖、启动快 | 保留最初实现，含 `login` 正版登录命令 |
+
+> 为什么要留 legacy：Python 版是最初能跑通的实现，逻辑注释最全，
+> 万一 C# 版遇到诡异兼容问题，可以拿它当对照实现。
+
+---
+
 ## 关于「未知发布者」安全警告
 
 双击 `mcroute.exe` 时 Windows 可能提示：
@@ -54,27 +72,40 @@ Get-FileHash .\mcroute.exe -Algorithm SHA256
 
 ## 下载与安装
 
-**方式一：直接下载（推荐）**
+### 主版本（C#，推荐）
 
 | 下载 | 大小 | 说明 |
 |---|---|---|
-| **[mcroute.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute.exe)** | **137 KB** | **C# 版，双击即用**：零依赖（Win10/11 自带 .NET Framework 4.8）、不需要安装、不写注册表 |
-| [mcroute-setup.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-setup.exe) | 13.3 MB | Python 版安装包（功能最全，含正版登录命令） |
-| [mcroute-portable.zip](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-portable.zip) | 13.3 MB | Python 版免安装（解压后双击 `start-mcroute.vbs`） |
-| [mcroute-wpf.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-wpf.exe) | 157 KB | **WPF 新界面（预览）**：无边框 + 顶部导航，功能与主版对齐 |
+| **[mcroute.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute.exe)** | **157 KB** | WinForms 界面，双击即用，零依赖 |
+| **[mcroute-wpf.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-wpf.exe)** | **157 KB** | WPF 新界面（无边框 + 顶部导航 + 自定义背景图） |
 
-> **C# 版和 Python 版的关系**：两者功能基本对等（6 种加载器 + 3 种整合包 + 体检/测试/启动器生成）。
-> C# 版 137 KB、秒开、不被杀软误报；Python 版多一个 `login` 正版登录命令，并且是「参考实现」，
-> 逻辑注释更全。数据目录都兼容（`versions/<名字>/` 标准布局）。
+两者功能一致，都复用同一套 Core；区别只是界面。**不需要安装、不写注册表。**
 
-**方式二：源码运行**
+### 历史版本（Python，已冻结）
 
-需要 Windows + Python 3.10 以上（只用标准库，**不需要 pip install 任何东西**）：
+到 [legacy Release](https://github.com/Hourai-chiyo/mcroute/releases/tag/legacy-v0.1.25) 下载：
 
-```bash
-git clone https://github.com/Hourai-chiyo/mcroute.git
-cd mcroute
-run_gui.bat          # 图形界面
+| 下载 | 大小 | 说明 |
+|---|---|---|
+| `mcroute-legacy-setup.exe` | 13.3 MB | 安装包（Python 版） |
+| `mcroute-legacy-portable.zip` | 13.3 MB | 免安装（解压后双击 `start-mcroute.vbs`） |
+
+源码也保留在仓库的 [`legacy/`](legacy/) 目录里。
+
+### 源码运行
+
+```bat
+:: 主版本（C#）
+dotnet build csharp\mcroute.csproj -c Release -o csharp\out
+csharp\out\mcroute.exe
+
+:: WPF 界面
+dotnet build csharp-wpf\mcroute-wpf.csproj -c Release -o csharp-wpf\out
+csharp-wpf\out\mcroute-wpf.exe
+
+:: 历史版本（Python）
+cd legacy
+python mcroute_gui.py
 ```
 
 ## 它解决什么问题
@@ -95,7 +126,7 @@ run_gui.bat          # 图形界面
 | 版本清单 | Mojang 官方 → Modrinth → Minecraft Wiki 三级兜底 |
 | 下载 | 客户端 / 库 / natives / assets，全部 sha1 校验、可断点续传、并发下载 |
 | 启动 | 原版 / **NeoForge** / **Forge** / **Fabric** / **Quilt** / **Legacy Fabric**；`--memory 6G` 调内存 |
-| Java 检测 | 扫描 PATH 与常见安装目录，按版本要求自动匹配（`python mcroute.py java` 列出全部） |
+| Java 检测 | 扫描 PATH 与常见安装目录，按版本要求自动匹配（`mcroute.exe java list` 列出全部） |
 | **整合包** | 自动识别 Modrinth `.mrpack` / MultiMC·Prism 实例包 / CurseForge zip（CF 需要免费 API key） |
 | 本地缓存 | 内容寻址（`assets/objects/<h2>/<hash>`），天然去重 |
 | 图形界面 | tkinter，零依赖，下载 / 启动 / 登录状态 / 日志 |
@@ -144,55 +175,54 @@ mcroute.exe loader forge 1.19.2 --no-mirror
 1. 下载或克隆本仓库
 2. 双击 `run_gui.bat`（图形界面），或在终端里用命令行
 
-### 命令行
+### 命令行（主版本 mcroute.exe）
 
-```bash
-python mcroute.py                    # 查看全部用法
-python mcroute.py fetch 1.21.1       # 下载完整闭包（client + 库 + assets，约 800MB）
-python mcroute.py launch 1.21.1      # 启动
-python mcroute.py loader neoforge 21.1.264   # 一条命令装好 NeoForge
-python mcroute.py loader forge 1.20.1-47.2.0 # 或 Forge（版本写成 <MC版本>-<Forge版本>）
-python mcroute.py sources            # 所有下载源测速
-python mcroute.py wiki 1.12.2        # 用 Wiki 索引兜底查版本
-python mcroute.py install "pack.mrpack"   # 安装整合包（自动识别格式）
-python mcroute.py verify TestPack      # 体检：缺什么文件（相当于「补全文件」）
-python mcroute.py verify TestPack --fix   # 体检完直接补齐
-python mcroute.py test TestPack        # 测试启动：拉到初始化完成就自动关掉
-python mcroute.py mkbat TestPack       # 在实例目录生成 launch.bat（双击启动）
+```bat
+mcroute.exe manifest                 :: 版本清单
+mcroute.exe fetch 1.21.1             :: 下载完整闭包（client + 库 + assets，约 800MB）
+mcroute.exe launch 1.21.1            :: 启动
+mcroute.exe loader neoforge 21.1.264 :: 一条命令装好 NeoForge
+mcroute.exe loader forge 1.20.1-47.2.0
+mcroute.exe loader fabric 1.20.1
+mcroute.exe install "pack.mrpack"    :: 装整合包（mrpack / MultiMC / CurseForge 自动识别）
+mcroute.exe verify TestPack          :: 体检
+mcroute.exe verify TestPack --fix    :: 体检并补齐
+mcroute.exe test TestPack            :: 测试启动（到初始化完成自动关）
+mcroute.exe mkbat TestPack           :: 生成双击启动器
+mcroute.exe java list                :: 本机 Java
+mcroute.exe java install 17          :: 自动下载 Java
 ```
 
-`fetch` 可以随时中断、重复执行：已完成且 sha1 校验通过的文件会自动跳过。
-
----
+> 历史版本（Python）的命令在 `legacy/` 下用 `python mcroute.py <命令>`，参数基本一致。
 
 ## 目录结构
 
 ```
 mcroute/
-├── mcroute.py          核心逻辑：源路由 / 下载 / 启动 / 登录
-├── mcroute_gui.py      图形界面（复用上面的逻辑，不重写）
-├── run.bat             命令行入口（菜单式）
-├── run_gui.bat         图形界面入口（双击即可）
-├── build_exe.bat       打包成 exe（PyInstaller）
-├── build_installer.bat 打包成安装包（csc，Windows 自带编译器）
-├── installer/
-│   └── McrouteSetup.cs 安装器源码（解压 / 快捷方式 / 卸载项）
-├── ROADMAP.md          下一步计划与「明确不做」的平台
-├── docs/
-│   ├── 路由表-v1.md          下载源分级、实测数据、兜底顺序
-│   ├── 下载源实测报告.md      BMCLAPI 故障定位与各源测速原始数据
-│   └── gui-tabs.png          界面截图
-└── mcdata/             数据目录（不入版本库）
-    ├── versions/       版本 JSON + client.jar
-    ├── libraries/      库文件
-    ├── assets/         资源索引 + 内容寻址资源对象
-    ├── instances/      游戏运行目录（存档在这里）
-    └── auth.json       登录凭据（明文，仅本机使用）
+├── csharp/                 ★ 主版本（C# / WinForms）
+│   ├── Commands.cs         下载 / 拼参数 / 启动
+│   ├── Loader.cs           6 种加载器安装
+│   ├── Packs.cs            3 种整合包安装
+│   ├── JavaSources.cs      Java 自动下载（Adoptium→Azul→Corretto）
+│   ├── Meta.cs             下载源路由（镜像优先 / 官方兜底）
+│   ├── Version.cs          版本 json 合并 / rules / 变量替换
+│   ├── Json.cs             自写 JSON 解析（不依赖 System.Web）
+│   └── MainForm.cs         WinForms 界面
+│
+├── csharp-wpf/             ★ WPF 新界面（复用 csharp/ 的 Core，链接编译）
+│
+├── legacy/                 ☆ 历史版本（Python，已冻结）
+│   ├── mcroute.py
+│   ├── mcroute_gui.py
+│   ├── installer/          C# 写的 exe 安装器 + WiX MSI
+│   └── packaging/          vbs 启动器 / 卸载脚本
+│
+├── tools/
+│   ├── test-fallback.ps1   镜像失效演练
+│   └── sign-local.ps1      本地自签名（仅本机有效）
+│
+└── docs/                   截图 / 路由表 / 测速报告 / 签名指南
 ```
-
-**代码约 150 KB（2700 行），数据约 900 MB。** `mcdata/` 可以整个删除、迁移、备份，删了重新 `fetch` 即可。
-
----
 
 ## 下载源与加速
 
@@ -232,7 +262,7 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ---
 
-## 微软登录（可选）
+## 微软登录（可选，仅 legacy 版）
 
 登录用于在线游玩。**离线模式下单人游戏不受影响。**
 
@@ -275,10 +305,10 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 ![整合包页](docs/gui-csharp-packs.png)
 ![管理页](docs/gui-csharp-manage.png)
 
-### Python 版（tkinter，功能最全）
+### 历史版本（Python / tkinter）
 
-![Python 版启动页](docs/gui-tabs.png)
-![Python 版实例页](docs/gui-tab-instances.png)
+旧界面的截图放在 [`legacy/docs/`](legacy/docs/)，功能与主版本基本一致，
+但已经冻结；除非有兼容性问题，不再更新。
 
 两个版本调的是**同一套算法**（下载源路由、版本合并、natives 解压、加载器安装、整合包安装），
 所以行为一致，不会出现"GUI 能用 CLI 不能"这种偏差。C# 版就是用 Python 版当参考实现移植过来的。
@@ -307,28 +337,22 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 **自定义背景图**：设置页 → 启动页背景 → 选择图片，图片只拷到本地数据目录（`<数据目录>\background.img`），
 不打包进程序、不随发布分发；点「恢复默认」回到矢量山形背景。图片模式会自动叠一层暗色蒙版，保证白字可读。
 
-## 打包成 exe（Python 版的打包方式）
+## Legacy 版打包（Python）
+
+在 `legacy/` 目录里：
 
 ```bat
-build_exe.bat
+cd legacy
+build_exe.bat        :: PyInstaller -> legacy\dist\mcroute\（约 30 MB）
+build_installer.bat  :: csc 编译 exe 安装器
+build_msi.bat        :: WiX 生成 MSI
 ```
 
-产物在 `dist\mcroute\`（约 30 MB）：
+主版本（C#）不需要打包脚本，`dotnet build` 出来的就是单文件 exe：
 
-| 文件 | 作用 |
-|---|---|
-| `mcroute.exe` | 主程序 |
-| `_internal\` | 运行库（别删） |
-| **`start-mcroute.vbs`** | **双击这个启动**，不会弹黑窗口 |
-
-![exe 版界面](docs/gui-exe.png)
-
-整个文件夹拷到任意位置即可，首次运行会在 exe 旁边建 `mcdata\` 放游戏文件。
-
-> 为什么要个 vbs：PyInstaller 的 `--windowed` 模式在本机会**静默退出**（没控制台、没日志，
-> 连崩溃日志都写不出来），`--onefile` 则报 `Could not create temporary directory`。
-> 所以改成 `--console` 打包 + 用 vbs 把控制台窗口隐藏，效果一样但稳定得多。
-> 直接双击 `mcroute.exe` 也能用，只是会多一个黑色控制台窗口（还能顺便看日志）。
+```bat
+dotnet build csharp\mcroute.csproj -c Release -o csharp\out
+```
 
 ## MSI 安装包（企业 / 批量部署）
 
@@ -416,10 +440,10 @@ mcdata/
 对应 PCL2 的「补全文件 / 测试游戏 / 导出启动脚本」，但都是命令 + GUI 按钮。
 
 ```bash
-python mcroute.py verify TestPack          # 只体检
-python mcroute.py verify TestPack --fix    # 体检完补齐缺失文件
-python mcroute.py test TestPack            # 真启动一次，验证能跑
-python mcroute.py mkbat TestPack           # 生成 versions/<名字>/launch.bat
+mcroute.exe verify TestPack          # 只体检
+mcroute.exe verify TestPack --fix    # 体检完补齐缺失文件
+mcroute.exe test TestPack            # 真启动一次，验证能跑
+mcroute.exe mkbat TestPack           # 生成 versions/<名字>/launch.bat
 ```
 
 | 命令 | 做什么 | 实测 |
@@ -445,25 +469,25 @@ GUI 的「实例」页对应加了三个按钮：**体检 / 测试启动 / 生�
 一条命令完成：
 
 ```bash
-python mcroute.py loader neoforge 21.1.264
-python mcroute.py fetch  neoforge-21.1.264
-python mcroute.py launch neoforge-21.1.264
+mcroute.exe loader neoforge 21.1.264
+mcroute.exe fetch  neoforge-21.1.264
+mcroute.exe launch neoforge-21.1.264
 
 # Forge（版本格式是 <MC版本>-<Forge版本>，与官方 maven 路径一致）
-python mcroute.py fetch  1.20.1                       # 先准备原版
-python mcroute.py loader forge 1.20.1-47.2.0
-python mcroute.py fetch  1.20.1-forge-47.2.0
-python mcroute.py launch 1.20.1-forge-47.2.0
+mcroute.exe fetch  1.20.1                       # 先准备原版
+mcroute.exe loader forge 1.20.1-47.2.0
+mcroute.exe fetch  1.20.1-forge-47.2.0
+mcroute.exe launch 1.20.1-forge-47.2.0
 
 # Fabric（不需要安装器，直接从官方 meta 合成）
-python mcroute.py loader fabric 1.20.1          # 自动挑最新 stable loader
-python mcroute.py loader fabric 1.20.1-0.19.5   # 或指定 loader 版本
-python mcroute.py fetch  fabric-loader-0.19.5-1.20.1
-python mcroute.py launch fabric-loader-0.19.5-1.20.1
+mcroute.exe loader fabric 1.20.1          # 自动挑最新 stable loader
+mcroute.exe loader fabric 1.20.1-0.19.5   # 或指定 loader 版本
+mcroute.exe fetch  fabric-loader-0.19.5-1.20.1
+mcroute.exe launch fabric-loader-0.19.5-1.20.1
 
 # Quilt / Legacy Fabric：同一套流程，换加载器名即可
-python mcroute.py loader quilt 1.20.1
-python mcroute.py loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
+mcroute.exe loader quilt 1.20.1
+mcroute.exe loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 ```
 
 `loader` 内部做的事（自己实现也很容易，但顺序不能错）：
@@ -502,7 +526,7 @@ python mcroute.py loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 - 申请地址：<https://aka.ms/mce-reviewappid>
 - 这与账号、网络、加速器都无关，纯粹是等待审批
 - 审批通过前只能用**离线模式**（可单机游玩，进不了正版服务器）
-- 通过后只需再跑一次 `python mcroute.py login`，之后靠 refresh token 自动续期
+- 通过后只需再跑一次 `cd legacy && python mcroute.py login`（**只有 legacy 版有这个命令**），之后靠 refresh token 自动续期
 
 ### 其他
 

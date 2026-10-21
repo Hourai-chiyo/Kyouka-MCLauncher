@@ -79,3 +79,7 @@ release/
 csharp-wpf/bin/
 csharp-wpf/obj/
 csharp-wpf/out/
+legacy/dist/
+legacy/build/
+legacy/__pycache__/
+legacy/*.spec
