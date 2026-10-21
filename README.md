@@ -28,12 +28,12 @@
 
 | 下载 | 大小 | 说明 |
 |---|---|---|
-| **[mcroute.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute.exe)** | **72 KB** | **C# 版，双击即用**：零依赖（Win10/11 自带 .NET Framework 4.8）、不需要安装、不写注册表 |
+| **[mcroute.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute.exe)** | **137 KB** | **C# 版，双击即用**：零依赖（Win10/11 自带 .NET Framework 4.8）、不需要安装、不写注册表 |
 | [mcroute-setup.exe](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-setup.exe) | 13.3 MB | Python 版安装包（功能最全，含正版登录命令） |
 | [mcroute-portable.zip](https://github.com/Hourai-chiyo/mcroute/releases/latest/download/mcroute-portable.zip) | 13.3 MB | Python 版免安装（解压后双击 `start-mcroute.vbs`） |
 
 > **C# 版和 Python 版的关系**：两者功能基本对等（6 种加载器 + 3 种整合包 + 体检/测试/启动器生成）。
-> C# 版 72 KB、秒开、不被杀软误报；Python 版多一个 `login` 正版登录命令，并且是「参考实现」，
+> C# 版 137 KB、秒开、不被杀软误报；Python 版多一个 `login` 正版登录命令，并且是「参考实现」，
 > 逻辑注释更全。数据目录都兼容（`versions/<名字>/` 标准布局）。
 
 **方式二：源码运行**
