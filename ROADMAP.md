@@ -77,3 +77,16 @@
 关于 mcmod.cn 的说明：它是**资料库不是文件托管**，所以合理用法是
 「中文搜索 / 中文简介 / 跳转到原下载页」，而不是把它当下载源。
 站点有反爬策略，接入时要遵守 robots.txt，且只做跳转、不做镜像。
+
+## 待办：Cleanroom（1.12.2 现代生态）
+
+1.12.2 的 Cleanroom（Java 21 + LWJGL3）通过 **Cleanroom Relauncher** 把 Forge 实例升级运行。
+启动器需要：识别 Cleanroom 实例、自动选 Java 21、修复跨机器的 `cleanroom_relauncher.cfg` 路径。
+
+- Cleanroom：<https://download.cleanroommc.com/> · [GitHub](https://github.com/CleanroomMC/Cleanroom)
+- Scalar：<https://github.com/CleanroomMC/Scalar>
+- Fugue：<https://github.com/CleanroomMC/Fugue>
+- Relauncher：<https://github.com/CleanroomMC/CleanroomRelauncher>
+- Relauncher Unofficial：<https://github.com/kappa-maintainer/Cleanroom-Relauncher>
+
+> 注意：Cleanroom 的 maven 不在 BMCLAPI 镜像范围内，只能直连。
