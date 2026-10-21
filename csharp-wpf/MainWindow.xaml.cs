@@ -62,6 +62,8 @@ namespace Mcroute.Wpf
                 // 数据目录已经在 ResolveDataDir 里自动挑好了：
                 //   · 有版本 -> 直接用（并写进配置，下次不再问）
                 //   · 完全没版本 + 没配置 -> 才引导选目录
+                if (!App.ShotMode) RestoreWindowState();
+
                 if (!App.ShotMode && string.IsNullOrEmpty(LoadConfigDir()) && _versions.Count > 0)
                 {
                     SaveConfig();
@@ -111,21 +113,30 @@ namespace Mcroute.Wpf
         }
 
         // ================= 配置 =================
-        private static string ConfigPath()
+        /// <summary>
+        /// 配置写入位置（按顺序尝试）：%LOCALAPPDATA% → exe 旁 → %TEMP%。
+        /// 受限环境（沙箱/只读目录）下前面的写不了就退到后面，避免设置全部丢失。
+        /// </summary>
+        private static string[] ConfigPaths()
         {
-            string dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute");
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "wpf.json");
+            return new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mcroute", "wpf.json"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wpf.json"),
+                Path.Combine(Path.GetTempPath(), "mcroute-wpf.json"),
+            };
         }
 
         private static Dictionary<string, object> LoadConfig()
         {
             try
             {
-                string p = ConfigPath();
-                if (!File.Exists(p)) return new Dictionary<string, object>();
-                return J.Obj(J.ParseFile(p)) ?? new Dictionary<string, object>();
+                foreach (string p in ConfigPaths())
+                {
+                    if (!File.Exists(p)) continue;
+                    return J.Obj(J.ParseFile(p)) ?? new Dictionary<string, object>();
+                }
+                return new Dictionary<string, object>();
             }
             catch { return new Dictionary<string, object>(); }
         }
@@ -154,11 +165,31 @@ namespace Mcroute.Wpf
         {
             try
             {
-                J.SaveFile(ConfigPath(), new Dictionary<string, object>
+                var bounds = WindowState == WindowState.Normal
+                    ? new Rect(Left, Top, Width, Height)
+                    : RestoreBounds;
+                var data = new Dictionary<string, object>
                 {
                     { "data_dir", _baseDir },
                     { "memory", MemoryBox.Text.Trim() },
-                });
+                    { "win_w", (int)Math.Round(bounds.Width) },
+                    { "win_h", (int)Math.Round(bounds.Height) },
+                    { "win_l", (int)Math.Round(bounds.Left) },
+                    { "win_t", (int)Math.Round(bounds.Top) },
+                    { "page", _page },
+                };
+
+                foreach (string cfgPath in ConfigPaths())
+                {
+                    try
+                    {
+                        string dir = Path.GetDirectoryName(cfgPath);
+                        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                        J.SaveFile(cfgPath, data);
+                        return;      // 写成功一个就够了
+                    }
+                    catch { }
+                }
             }
             catch { }
         }
@@ -207,6 +238,8 @@ namespace Mcroute.Wpf
                 case "管理": PageManage.Visibility = Visibility.Visible; RefreshManageList(); break;
                 case "设置": PageSettings.Visibility = Visibility.Visible; RefreshJava(); break;
             }
+
+            _page = name == "启动" ? 0 : name == "下载" ? 1 : name == "整合包" ? 2 : name == "管理" ? 3 : 4;
             StatusText.Text = "就绪 · " + name + " 页";
         }
 
@@ -241,9 +274,14 @@ namespace Mcroute.Wpf
             foreach (string dir in Directory.GetDirectories(root).OrderBy(x => Path.GetFileName(x)))
             {
                 string name = Path.GetFileName(dir);
-                string tag = File.Exists(Path.Combine(dir, "instance.json"))
-                    ? "整合包"
-                    : (Directory.Exists(Path.Combine(dir, "mods")) ? "外部" : "原版");
+                bool isPack = File.Exists(Path.Combine(dir, "instance.json"));
+                bool hasMods = Directory.Exists(Path.Combine(dir, "mods"));
+
+                string mc, loader, loaderVer;
+                string tag = Version.Describe(_baseDir, name, out mc, out loader, out loaderVer);
+                if (isPack) tag += " · 整合包";
+                else if (hasMods && string.IsNullOrEmpty(loader)) tag += " · 外部";
+
                 _versions.Add(name);
                 VersionList.Items.Add(MakeVersionItem(name, tag));
             }
@@ -276,6 +314,11 @@ namespace Mcroute.Wpf
             return new ListBoxItem { Content = panel, Tag = name };
         }
 
+        private void VersionList_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (SelectedVersion() != null) Play_Click(sender, new RoutedEventArgs());
+        }
+
         private void VersionList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (CardDetail == null) return;
@@ -298,6 +341,33 @@ namespace Mcroute.Wpf
             if (ver == null) { MessageBox.Show("先在左边选一个版本", "提示"); return; }
             if (_running) { MessageBox.Show("还有任务在跑，等它结束", "提示"); return; }
             if (_gameRunning) { MessageBox.Show("游戏已经在运行了", "提示"); return; }
+
+            // 启动前预检：先把「肯定起不来」的情况显示在界面上，而不是弹窗一闪而过
+            try
+            {
+                var plan = Commands.PlanLaunch(_baseDir, ver, null, null);
+                if (plan == null)
+                {
+                    CardTitle.Text = "启动失败";
+                    CardDetail.Text = "版本文件缺失或损坏：versions\\" + ver + "\\" + ver + ".json";
+                    StatusText.Text = "就绪 · 启动失败（版本文件有问题）";
+                    AppendLog("[启动失败] 无法解析版本：" + ver);
+                    return;
+                }
+                if (plan.Missing.Count > 0)
+                {
+                    CardTitle.Text = "缺少 " + plan.Missing.Count + " 个文件";
+                    CardDetail.Text = string.Join("、", plan.Missing.Take(3)) +
+                                      (plan.Missing.Count > 3 ? " 等" : "") + " —— 请到「下载」页补齐";
+                    StatusText.Text = "就绪 · 缺少依赖文件";
+                    AppendLog("[启动失败] 缺 " + plan.Missing.Count + " 个文件，先下载或体检补齐");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog("[预检异常] " + ex.Message);
+            }
 
             string mem = MemoryBox.Text.Trim();
             CardTitle.Text = "正在启动";
@@ -333,6 +403,36 @@ namespace Mcroute.Wpf
 
             RunTask("启动 " + ver, () =>
                 Commands.Launch(new[] { "launch", ver, "--dir", _baseDir, "--memory", mem }));
+        }
+
+        /// <summary>恢复上次的窗口大小/位置/页签（越界时夹回屏幕内）。</summary>
+        private void RestoreWindowState()
+        {
+            try
+            {
+                var cfg = LoadConfig();
+                int w = J.Int(cfg, "win_w", 0), h = J.Int(cfg, "win_h", 0);
+                int l = J.Int(cfg, "win_l", 0), t = J.Int(cfg, "win_t", 0);
+
+                if (w >= 900 && h >= 600)
+                {
+                    var wa = SystemParameters.WorkArea;
+                    Left = Math.Max(wa.Left - 8, Math.Min(l, wa.Right - 240));
+                    Top = Math.Max(wa.Top - 8, Math.Min(t, wa.Bottom - 160));
+                    Width = Math.Min(w, wa.Width);
+                    Height = Math.Min(h, wa.Height);
+                }
+
+                int page = J.Int(cfg, "page", 0);
+                if (page > 0 && page <= 4) SetPage(page);
+            }
+            catch { }
+        }
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            try { SaveConfig(); } catch { }
+            base.OnClosing(e);
         }
 
         // ================= 取消 =================
@@ -667,6 +767,7 @@ namespace Mcroute.Wpf
 
         // ================= 后台任务 + 日志 =================
         private bool _running;
+        private int _page;
         private bool _gameRunning;
         private string _cancelReason;
 

@@ -11,9 +11,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>0.3.2</Version>
-    <FileVersion>0.3.2.0</FileVersion>
-    <AssemblyVersion>0.3.2.0</AssemblyVersion>
+    <Version>0.3.4</Version>
+    <FileVersion>0.3.4.0</FileVersion>
+    <AssemblyVersion>0.3.4.0</AssemblyVersion>
     <Product>mcroute — Minecraft Java 启动器</Product>
     <Company>Hourai-chiyo</Company>
     <Description>面向中国大陆网络环境的 Minecraft Java 启动器，重点是下载源路由与离线可自持。</Description>

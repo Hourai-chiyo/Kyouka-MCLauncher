@@ -62,6 +62,154 @@ namespace Mcroute
         }
 
         /// <summary>读版本 json 并处理 inheritsFrom（递归合并）。失败返回 null。</summary>
+        /// <summary>
+        /// 从版本 json 推断「MC 版本 + 加载器」，给界面显示用（如 "1.20.1 · Forge 47.1.106"）。
+        /// 识别顺序：库名（最可靠）→ mainClass。
+        /// </summary>
+        public static string Describe(string baseDir, string ver, out string mcVersion,
+                                      out string loaderName, out string loaderVersion)
+        {
+            mcVersion = null; loaderName = null; loaderVersion = null;
+            try
+            {
+                var json = Load(baseDir, ver);
+                if (json == null) return ver;
+
+                string id = J.Str(json, "id");
+                string inherits = J.Str(json, "inheritsFrom");
+                string mainClass = J.Str(json, "mainClass") ?? "";
+
+                mcVersion = !string.IsNullOrEmpty(inherits) ? inherits : GuessMcVersion(id ?? ver);
+
+                var names = new List<string>();
+                foreach (object lib in AsList(J.Get(json, "libraries")))
+                    names.Add(J.Str(lib, "name"));
+
+                string fabric = FindLib(names, "net.fabricmc:fabric-loader:");
+                string quilt = FindLib(names, "org.quiltmc:quilt-loader:");
+                string neo = FindLib(names, "net.neoforged:neoforge:");
+                string neoFml = FindLib(names, "net.neoforged.fancymodloader:loader");
+                string forge = FindLib(names, "net.minecraftforge:forge:");
+                string fml = FindLib(names, "net.minecraftforge:fmlloader:");
+
+                if (fabric != null)
+                {
+                    loaderName = IsLegacyMc(mcVersion) ? "Legacy Fabric" : "Fabric";
+                    loaderVersion = VersionAfter(fabric);
+                }
+                else if (quilt != null)
+                {
+                    loaderName = "Quilt";
+                    loaderVersion = VersionAfter(quilt);
+                }
+                else if (neo != null)
+                {
+                    loaderName = "NeoForge";
+                    loaderVersion = StripMc(VersionAfter(neo), mcVersion);
+                }
+                else if (neoFml != null)
+                {
+                    // NeoForge 1.20.1 只装 fancymodloader，版本号从 id 里取（neoforge 47.x）
+                    loaderName = "NeoForge";
+                    loaderVersion = DeriveFromId(id, mcVersion);
+                }
+                else if (forge != null)
+                {
+                    loaderName = "Forge";
+                    loaderVersion = StripMc(VersionAfter(forge), mcVersion);
+                }
+                else if (fml != null)
+                {
+                    loaderName = "Forge";
+                    loaderVersion = StripMc(VersionAfter(fml), mcVersion);
+                }
+                else if (mainClass.IndexOf("BootstrapLauncher", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    loaderName = "Forge";
+                    loaderVersion = DeriveFromId(id, mcVersion);
+                }
+                else if (mainClass.IndexOf("launchwrapper", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    loaderName = "Forge";
+                    loaderVersion = DeriveFromId(id, mcVersion);
+                }
+
+                if (loaderName != null && string.IsNullOrEmpty(loaderVersion))
+                    loaderVersion = DeriveFromId(id, mcVersion);
+
+                string sub = mcVersion ?? ver;
+                if (!string.IsNullOrEmpty(loaderName))
+                    sub += " · " + loaderName + (string.IsNullOrEmpty(loaderVersion) ? "" : " " + loaderVersion);
+                return sub;
+            }
+            catch
+            {
+                return ver;
+            }
+        }
+
+        private static string FindLib(List<string> names, string prefix)
+        {
+            foreach (string n in names)
+                if (n != null && n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return n;
+            return null;
+        }
+
+        /// <summary>"net.fabricmc:fabric-loader:0.19.5" -> "0.19.5"</summary>
+        private static string VersionAfter(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return "";
+            int i = name.LastIndexOf(':');
+            return i >= 0 && i + 1 < name.Length ? name.Substring(i + 1) : "";
+        }
+
+        /// <summary>"1.12.2-14.23.5.2864" -> "14.23.5.2864"</summary>
+        private static string StripMc(string ver, string mc)
+        {
+            if (string.IsNullOrEmpty(ver)) return ver;
+            if (!string.IsNullOrEmpty(mc) && ver.StartsWith(mc + "-", StringComparison.Ordinal))
+                return ver.Substring(mc.Length + 1);
+            return ver;
+        }
+
+        /// <summary>从 id 里抠加载器版本：1.12.2-forge-14.23.5.2864 -> 14.23.5.2864</summary>
+        private static string DeriveFromId(string id, string mc)
+        {
+            if (string.IsNullOrEmpty(id)) return "";
+            string rest = id;
+            if (!string.IsNullOrEmpty(mc) && rest.StartsWith(mc + "-", StringComparison.Ordinal))
+                rest = rest.Substring(mc.Length + 1);
+
+            foreach (string prefix in new[] { "forge-", "neoforge-", "fabric-loader-", "quilt-loader-", "quilt-" })
+            {
+                if (rest.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    rest = rest.Substring(prefix.Length);
+                    break;
+                }
+            }
+            // fabric-loader-0.19.5-1.19.2 -> 0.19.5
+            if (!string.IsNullOrEmpty(mc) && rest.EndsWith("-" + mc, StringComparison.Ordinal))
+                rest = rest.Substring(0, rest.Length - mc.Length - 1);
+            return rest;
+        }
+
+        /// <summary>从 id（如 1.20.1-forge-47.1.106）里猜 MC 版本。</summary>
+        private static string GuessMcVersion(string id)
+        {
+            var m = Regex.Match(id ?? "", @"^\d+\.\d+(\.\d+)?");
+            return m.Success ? m.Value : null;
+        }
+
+        private static bool IsLegacyMc(string mc)
+        {
+            if (string.IsNullOrEmpty(mc)) return false;
+            var m = Regex.Match(mc, @"^1\.(\d+)");
+            if (!m.Success) return false;
+            int minor;
+            return int.TryParse(m.Groups[1].Value, out minor) && minor <= 13;
+        }
+
         public static Dictionary<string, object> Load(string baseDir, string ver, int depth = 0)
         {
             string path = VersionJsonPath(baseDir, ver);
