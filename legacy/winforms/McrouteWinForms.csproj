@@ -49,6 +49,7 @@
     <Compile Include="..\..\core\SelfTest.cs" Link="Core\SelfTest.cs" />
     <Compile Include="..\..\core\Version.cs" Link="Core\Version.cs" />
     <Compile Include="..\..\core\Update.cs" Link="Core\Update.cs" />
+    <Compile Include="..\..\core\CleanroomFix.cs" Link="Core\CleanroomFix.cs" />
   </ItemGroup>
 
 </Project>

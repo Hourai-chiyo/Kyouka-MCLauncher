@@ -12,6 +12,7 @@ namespace Mcroute
     {
         public string Base, Version, MainClass, Java, GameDir, NativesDir, AssetsDir, AssetIndex;
         public int JavaMajor;
+        public string FixNote;   // 启动前自动修复的说明（无则 null）
         public Dictionary<string, object> Json;
         public List<string> Classpath = new List<string>();
         public List<string> NativesJars = new List<string>();
@@ -254,6 +255,9 @@ namespace Mcroute
                     : Path.Combine(baseDir, "versions", ver),
             };
 
+            // 自动修复：别人的整合包常带写死路径的 Cleanroom Relauncher 配置
+            plan.FixNote = CleanroomFix.HealIfNeeded(plan.GameDir, baseDir);
+
             // 把旧的 instances/<ver> 内容搬过来（一次性，幂等）
             try { MigrateLegacyInstanceDir(baseDir, ver, plan.GameDir); } catch { }
 
@@ -494,6 +498,7 @@ namespace Mcroute
 
             // argv[0] 是 java 自己，作为 FileName 传了，命令行里不能重复
             string cmdline = string.Join(" ", argv.Skip(1).Select(Quote));
+            if (!string.IsNullOrEmpty(plan.FixNote)) Console.WriteLine("[修复] " + plan.FixNote);
             Console.WriteLine("[启动] " + ver + "  （工作目录 " + plan.GameDir + "）");
 
             // 注意：java 是控制台程序。UseShellExecute=false 且不设 CreateNoWindow 时，

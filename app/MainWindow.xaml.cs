@@ -426,6 +426,7 @@ namespace Mcroute.Wpf
             try
             {
                 var plan = Commands.PlanLaunch(_baseDir, ver, null, null);
+            if (!string.IsNullOrEmpty(plan.FixNote)) AppendLog("[修复] " + plan.FixNote);
                 if (plan == null)
                 {
                     CardTitle.Text = "启动失败";
