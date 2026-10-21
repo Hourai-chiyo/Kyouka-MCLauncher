@@ -193,21 +193,51 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0">
-                        <TextBlock Text="CurseForge 需要 API Key（官方控制台目前只能用 Google 登录，国内通常打不开）"
-                                   FontSize="11" Foreground="{DynamicResource TextSub}" TextWrapping="Wrap"/>
-                        <TextBlock Text="没有 Key 也不影响：Modrinth 免 Key 可直接搜；别的来源可以用底部「从链接安装」。"
-                                   FontSize="10.5" Margin="0,3,0,0"
-                                   Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap"/>
+                        <TextBlock Text="CurseForge 需要 API Key" FontSize="11.5" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Text}"/>
                         <TextBox x:Name="KeyBox" Height="28" Margin="0,6,0,0"
-                                 ToolTip="从 console.curseforge.com 复制的 API Key"/>
+                                 ToolTip="从 console.curseforge.com 复制的 API Key（60 位，通常以 $2a$10$ 开头）"/>
+
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Text="这是什么" FontSize="10.5" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSub}"/>
+                            <TextBlock FontSize="10.5" Margin="0,2,0,0" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="· CurseForge 的开发者 API Key：用它的官方接口搜 mod、取下载地址；官方按 Key 限流。"/>
+
+                            <TextBlock Text="怎么拿到" FontSize="10.5" FontWeight="SemiBold" Margin="0,6,0,0"
+                                       Foreground="{DynamicResource TextSub}"/>
+                            <TextBlock FontSize="10.5" Margin="0,2,0,0" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="· console.curseforge.com → API Keys → 复制一串 60 位字符。&#10;· ⚠ 这个控制台目前只支持 Google 登录，国内网络通常打不开——申请不到很正常。"/>
+
+                            <TextBlock Text="填进来之后" FontSize="10.5" FontWeight="SemiBold" Margin="0,6,0,0"
+                                       Foreground="{DynamicResource TextSub}"/>
+                            <TextBlock FontSize="10.5" Margin="0,2,0,0" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="· 只保存在本机 &lt;数据目录&gt;/cf_api_key.txt，不会上传到任何服务器。&#10;· 想换机器/分享给别人时，把文件拷过去即可（不建议公开分享，会被滥用）。"/>
+
+                            <TextBlock Text="为什么启动器不帮你内置" FontSize="10.5" FontWeight="SemiBold" Margin="0,6,0,0"
+                                       Foreground="{DynamicResource TextSub}"/>
+                            <TextBlock FontSize="10.5" Margin="0,2,0,0" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="· Key 与申请人绑定，公开分发违反条款；exe 里一行 strings 就能提取；配额被所有人共用会很快 429；被滥用封的是申请人的号。"/>
+
+                            <TextBlock Text="没有 Key 也能用" FontSize="10.5" FontWeight="SemiBold" Margin="0,6,0,0"
+                                       Foreground="{DynamicResource TextSub}"/>
+                            <TextBlock FontSize="10.5" Margin="0,2,0,0" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Text="· 来源切回 Modrinth（免 Key，直接搜）；或用底部「从链接安装」（mcmod 过验证码拿到链接、网盘直链都行）。"/>
+                        </StackPanel>
                     </StackPanel>
-                    <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="获取 Key" Width="90"
-                            Height="28" Margin="8,20,0,0" Click="OpenCfConsole_Click"/>
-                    <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Content="保存" Width="70"
-                            Height="28" Margin="8,20,0,0" Click="SaveCfKey_Click"/>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="10,2,0,0">
+                        <Button Style="{StaticResource GhostButton}" Content="获取 Key" Width="90" Height="28"
+                                Click="OpenCfConsole_Click"/>
+                        <Button Style="{StaticResource PrimaryButton}" Content="保存" Width="90" Height="28"
+                                Margin="0,8,0,0" Click="SaveCfKey_Click"/>
+                    </StackPanel>
                 </Grid>
             </Border>
 
