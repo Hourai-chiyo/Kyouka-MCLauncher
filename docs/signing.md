@@ -28,6 +28,61 @@
 
 https://signpath.org/apply
 
+### 逐字段填写（SignPath Foundation 申请表单）
+
+| 字段 | 填什么 |
+|---|---|
+| **Project Name*** | `mcroute` |
+| **Repository URL*** | `https://github.com/Hourai-chiyo/mcroute` |
+| **Homepage URL*** | `https://github.com/Hourai-chiyo/mcroute`（没有独立官网就用仓库页） |
+| **Download URL** | `https://github.com/Hourai-chiyo/mcroute/releases` |
+| **Privacy Policy URL** | 留空（本项目不收集任何用户数据；如果表单强制要求，用仓库 README 的「合规说明」锚点） |
+| **Wikipedia URL** | 留空 |
+| **Tagline*** | `Mirror-first Minecraft Java launcher for mainland China — keeps working when the community mirror is down.` |
+| **Category*** | 选 **Games**（没有的话选 Utilities / Developer Tools，挑最接近的） |
+| **Description*** | 见下方「Description 文案」 |
+| **Reputation*** | 见下方「Reputation 文案」 |
+| **Maintainer Type*** | **Individual**（个人开发者） |
+| **Build System*** | **GitHub Actions** |
+| **First Name / Last Name*** | 填你的真实姓名（SignPath 账号会用） |
+| **Email*** | `2084619997@qq.com` |
+| **Company Name** | 留空 |
+| **Primary Discovery Channel*** | 选最接近的（如 Search engine / Other） |
+| **Please specify the exact source** | 可填 `GitHub search / project README` |
+
+**Description 文案**（短段落，直接粘）：
+
+```
+mcroute is a Minecraft: Java Edition launcher for users in mainland China.
+
+Its core purpose is reliable download-source routing: mirror-first (HIT mirror)
+with official fallback, so the launcher keeps working when the BMCLAPI community
+mirror is unavailable. It installs Forge / NeoForge / Fabric / Quilt / Legacy
+Fabric, and imports Modrinth / MultiMC / CurseForge modpacks — always downloading
+from official endpoints.
+
+The Windows executable is a single self-contained 150 KB binary built from
+source with .NET Framework 4.8 (no bundled third-party binaries, no telemetry,
+no ads, no monetization). MIT licensed, no commercial dual-licensing.
+```
+
+**Reputation 文案**（新项目要如实写，并突出"完整度"）：
+
+```
+Newly published (repository created 2026-10-20) but already feature-complete:
+73 commits, 13 tagged releases, a C# (.NET Framework 4.8) implementation plus a
+Python reference implementation, a GitHub Actions workflow, and documentation
+including measured mirror throughput (docs/下载源实测报告.md) and a download-source
+routing spec (docs/路由表-v1.md).
+
+Motivation: the project was written as a contingency for outages of the BMCLAPI
+mirror, which many Chinese players depend on to download Minecraft and mods.
+It redistributes no game files and downloads everything from official endpoints.
+```
+
+> 说明：SignPath Foundation 会很看重「项目是否被广泛使用」，新项目如实写即可，
+> 被拒是正常的 —— 积累一段时间的 star / 下载量后再申请通过率会高很多。
+
 ### 申请内容（直接复制粘贴）
 
 | 字段 | 填写 |
