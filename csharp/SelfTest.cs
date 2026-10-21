@@ -158,6 +158,29 @@ namespace Mcroute
             return 0;
         }
 
+        /// <summary>调试用：打印一个 JSON 配置文件的解析结果。</summary>
+        public static int ConfigDump(string path)
+        {
+            try
+            {
+                object o = J.ParseFile(path);
+                var d = J.Obj(o);
+                Console.WriteLine("  解析成功，顶层键数 " + (d == null ? 0 : d.Count));
+                if (d != null)
+                    foreach (var kv in d)
+                        Console.WriteLine("    " + kv.Key + " = " + (kv.Value ?? "<null>") +
+                                          "  (" + (kv.Value == null ? "null" : kv.Value.GetType().Name) + ")");
+                Console.WriteLine("  J.Int glass = " + J.Int(o, "glass", -1));
+                Console.WriteLine("  J.Int bg_dim = " + J.Int(o, "bg_dim", -1));
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("  [FAIL] " + ex.GetType().Name + ": " + ex.Message);
+                return 1;
+            }
+        }
+
         private static void WriteEntry(ZipArchive zip, string name, string content)
         {
             var entry = zip.CreateEntry(name);

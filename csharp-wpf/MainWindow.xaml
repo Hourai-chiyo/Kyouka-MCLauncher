@@ -731,6 +731,11 @@
                                 <ComboBoxItem Content="深色" Tag="dark"/>
                             </ComboBox>
 
+                            <CheckBox x:Name="GlassBox" Margin="0,12,0,0"
+                                      Content="玻璃面板（卡片半透明，透出背景图）"
+                                      Foreground="{DynamicResource TextSub}"
+                                      Checked="GlassBox_Changed" Unchecked="GlassBox_Changed"/>
+
                             <TextBlock Text="启动页背景" Style="{StaticResource FieldLabel}" Margin="0,18,0,6"/>
                             <StackPanel Orientation="Horizontal">
                                 <TextBox x:Name="BgPathText" Width="400" IsReadOnly="True"/>

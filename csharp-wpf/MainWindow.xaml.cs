@@ -66,11 +66,20 @@ namespace Mcroute.Wpf
 
                 try
                 {
-                    string theme = LoadConfig("theme", "auto");
+                    // 先把配置读进内存：设 ThemeBox 会触发 SelectionChanged，
+                    // 那里会 SaveConfig，如果先设控件就会把还没读的 key 覆盖掉。
+                    var cfg = LoadConfig();
+                    string theme = J.Str(cfg, "theme", "auto");
                     string forced = Environment.GetEnvironmentVariable("MCROUTE_THEME");
                     if (!string.IsNullOrEmpty(forced)) theme = forced;   // 截图/调试用
-                    ThemeBox.SelectedIndex = theme == "dark" ? 2 : theme == "light" ? 1 : 0;
+                    int glass = J.Int(cfg, "glass", 0);
+
+                    _initializing = true;
+                    try { ThemeBox.SelectedIndex = theme == "dark" ? 2 : theme == "light" ? 1 : 0; }
+                    finally { _initializing = false; }
+
                     Theme.Apply(theme);
+                    ApplyGlass(glass == 1, true);
                 }
                 catch { }
 
@@ -178,17 +187,17 @@ namespace Mcroute.Wpf
                 var bounds = WindowState == WindowState.Normal
                     ? new Rect(Left, Top, Width, Height)
                     : RestoreBounds;
-                var data = new Dictionary<string, object>
-                {
-                    { "data_dir", _baseDir },
-                    { "memory", MemoryBox.Text.Trim() },
-                    { "win_w", (int)Math.Round(bounds.Width) },
-                    { "win_h", (int)Math.Round(bounds.Height) },
-                    { "win_l", (int)Math.Round(bounds.Left) },
-                    { "win_t", (int)Math.Round(bounds.Top) },
-                    { "page", _page },
-                    { "theme", CurrentTheme() },
-                };
+                var data = LoadConfig();          // 保留已有键（bg_dim / bg_blur 等）
+                if (data == null) data = new Dictionary<string, object>();
+                data["data_dir"] = _baseDir;
+                data["memory"] = MemoryBox.Text.Trim();
+                data["win_w"] = (int)Math.Round(bounds.Width);
+                data["win_h"] = (int)Math.Round(bounds.Height);
+                data["win_l"] = (int)Math.Round(bounds.Left);
+                data["win_t"] = (int)Math.Round(bounds.Top);
+                data["page"] = _page;
+                data["theme"] = CurrentTheme();
+                data["glass"] = (GlassBox != null && GlassBox.IsChecked == true) ? 1 : 0;
 
                 foreach (string cfgPath in ConfigPaths())
                 {
@@ -713,12 +722,14 @@ namespace Mcroute.Wpf
         // ================= 主题 =================
         private void ThemeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (_initializing) return;
             try
             {
                 var item = ThemeBox.SelectedItem as ComboBoxItem;
                 if (item == null) return;
                 string mode = (item.Tag as string) ?? "auto";
                 Theme.Apply(mode);
+                ApplyGlass(_glassOn, false);
                 SaveConfig();
                 AppendLog("主题：" + (mode == "auto" ? "跟随系统（当前 " + (Theme.Effective == "dark" ? "深色" : "浅色") + "）"
                                         : mode == "dark" ? "深色" : "浅色"));
@@ -734,6 +745,51 @@ namespace Mcroute.Wpf
                 return item == null ? "auto" : ((item.Tag as string) ?? "auto");
             }
             catch { return "auto"; }
+        }
+
+        // ================= 玻璃面板 =================
+        private bool _glassOn;
+
+        /// <summary>
+        /// 玻璃面板：页面背景改透明（露出背景图），卡片画刷换成半透明。
+        /// 关掉时恢复标准调色板。
+        /// </summary>
+        private void ApplyGlass(bool on, bool updateBox)
+        {
+            _glassOn = on;
+            try
+            {
+                var res = Application.Current.Resources;
+                Theme.Apply(CurrentTheme());        // 先把调色板重置成标准色
+
+                if (on)
+                {
+                    if (res["SurfaceGlass"] != null) res["Surface"] = res["SurfaceGlass"];
+                    if (res["BorderGlass"] != null) res["Border"] = res["BorderGlass"];
+                    PageDownload.Background = System.Windows.Media.Brushes.Transparent;
+                    PagePacks.Background = System.Windows.Media.Brushes.Transparent;
+                    PageManage.Background = System.Windows.Media.Brushes.Transparent;
+                    PageSettings.Background = System.Windows.Media.Brushes.Transparent;
+                }
+                else
+                {
+                    PageDownload.SetResourceReference(Panel.BackgroundProperty, "Bg");
+                    PagePacks.SetResourceReference(Panel.BackgroundProperty, "Bg");
+                    PageManage.SetResourceReference(Panel.BackgroundProperty, "Bg");
+                    PageSettings.SetResourceReference(Panel.BackgroundProperty, "Bg");
+                }
+
+                if (updateBox && GlassBox != null) GlassBox.IsChecked = on;
+            }
+            catch (Exception ex) { AppendLog("玻璃面板切换失败：" + ex.Message); }
+        }
+
+        private void GlassBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (GlassBox == null) return;
+            ApplyGlass(GlassBox.IsChecked == true, false);
+            try { SaveConfig(); } catch { }
+            AppendLog("玻璃面板：" + (GlassBox.IsChecked == true ? "开" : "关"));
         }
 
         // ================= 启动页背景 =================
@@ -939,6 +995,7 @@ namespace Mcroute.Wpf
         // ================= 后台任务 + 日志 =================
         private bool _running;
         private int _page;
+        private bool _initializing;
         private bool _gameRunning;
         private string _cancelReason;
 

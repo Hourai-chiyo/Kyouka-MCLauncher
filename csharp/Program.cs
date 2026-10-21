@@ -79,6 +79,9 @@ namespace Mcroute
                     return SelfTest.DownloadTest(args.Length > 1 ? args[1] : null,
                                                  args.Length > 2 ? args[2] : null);
 
+                if (cmd == "--selftest-config")
+                    return SelfTest.ConfigDump(args.Length > 1 ? args[1] : null);
+
                 if (cmd == "--selftest")
                 {
                     Console.WriteLine("构造窗口 ...");

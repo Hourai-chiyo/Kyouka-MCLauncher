@@ -23,18 +23,21 @@ namespace Mcroute
         {
             "Bg", "Surface", "Border", "Hairline", "Primary", "PrimaryDim", "PrimaryEdge",
             "Text", "TextSub", "TextMuted", "TextFaint", "CardOverlay", "InputBg", "ScrollTrack", "Hover",
+            "SurfaceGlass", "BorderGlass",
         };
 
         private static readonly string[] LightColors =
         {
             "#F7F8FA", "#FFFFFF", "#E4E7EC", "#EDEFF2", "#2F6FEB", "#EEF4FF", "#CFE0FF",
             "#101828", "#344054", "#667085", "#98A2B3", "#F2FFFFFF", "#FAFBFC", "#EDEFF2", "#FAFBFE",
+            "#DEFFFFFF", "#66000000",
         };
 
         private static readonly string[] DarkColors =
         {
             "#10141A", "#171C24", "#28303C", "#222A35", "#4C8DFF", "#1E2C42", "#3A5C8C",
             "#E9EEF6", "#B7C2D0", "#8B97A8", "#6D7889", "#E6171C24", "#1D232C", "#2A3340", "#1F2733",
+            "#D0171C24", "#33FFFFFF",
         };
 
         /// <summary>应用主题：mode = "light" | "dark" | "auto"。</summary>
