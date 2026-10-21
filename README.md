@@ -48,6 +48,8 @@ Get-FileHash .\mcroute.exe -Algorithm SHA256
 | [Azure Trusted Signing](https://azure.microsoft.com/products/trusted-signing) | 约 ¥70/月 | 微软云签名，SmartScreen 信誉建立快 |
 | OV / EV 证书 | ¥1000+/年 | 商业项目再考虑；EV 能立刻通过 SmartScreen |
 
+> 详细申请步骤见 [docs/signing.md](docs/signing.md)（SignPath 开源免费，CI 工作流已经配好在 `.github/workflows/build-and-sign.yml`）。
+
 ---
 
 ## 下载与安装

@@ -1,0 +1,98 @@
+name: Build and sign
+
+# 什么时候跑：
+#   1) 打 tag（v0.1.x）时 —— 构建 + 签名 + 把签名后的 exe 传到 GitHub Release
+#   2) 手动触发（Actions 页面点 Run workflow）—— 只构建 + 签名，产出 artifact 供下载
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write      # 上传 Release 资产需要
+
+jobs:
+  build-and-sign:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      # 需要 .NET Framework 4.8 的参考程序集（windows-latest 自带，这里只是显式声明）
+      - name: Build mcroute (net48)
+        run: dotnet build csharp/mcroute.csproj -c Release -o build --nologo
+
+      - name: Sanity check
+        shell: pwsh
+        run: |
+          $exe = "build/mcroute.exe"
+          if (-not (Test-Path $exe)) { throw "构建产物不存在: $exe" }
+          $size = (Get-Item $exe).Length
+          Write-Host "产物大小: $size 字节"
+          if ($size -lt 50000) { throw "产物太小，构建可能失败了" }
+          # 冒烟测试：窗口能构造出来（不显示）
+          & $exe --selftest
+          if ($LASTEXITCODE -ne 0) { throw "selftest 失败（退出码 $LASTEXITCODE）" }
+
+      # 1) 把未签名的 exe 作为 artifact 上传（SignPath 从 artifact 里取）
+      - name: Upload unsigned artifact
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcroute-unsigned
+          path: build/mcroute.exe
+          if-no-files-found: error
+          retention-days: 7
+
+      # 2) 提交签名请求给 SignPath
+      #    需要仓库 Secrets：
+      #      SIGNPATH_API_TOKEN        —— SignPath 网站 → User settings → API tokens
+      #      SIGNPATH_ORGANIZATION_ID  —— SignPath 网站 → Organization settings 里的 ID
+      #    其余三个 slug 见 docs/signing.md 里的「SignPath 配置清单」
+      - name: Submit signing request to SignPath
+        id: sign
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: mcroute
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: mcroute-exe
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      # 3) 验证签名真的生效（Status 必须是 Valid）
+      - name: Verify signature
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem signed -Recurse -Filter mcroute.exe | Select-Object -First 1
+          if (-not $exe) { throw "没拿到签名后的文件" }
+          $sig = Get-AuthenticodeSignature $exe.FullName
+          Write-Host "签名状态: $($sig.Status)"
+          Write-Host "签名者  : $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') { throw "签名无效: $($sig.Status) / $($sig.StatusMessage)" }
+
+      # 4) 打 tag 时，把签名后的 exe 传上 Release
+      - name: Upload signed exe to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: signed/**/mcroute.exe
+          fail_on_unmatched_files: true
+
+      # 5) 手动触发时也能下载签名结果
+      - name: Upload signed artifact (for manual runs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcroute-signed
+          path: signed/**/mcroute.exe
+          if-no-files-found: error
+          retention-days: 7
