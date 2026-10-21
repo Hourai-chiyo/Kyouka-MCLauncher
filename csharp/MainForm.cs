@@ -18,6 +18,7 @@ namespace Mcroute
         private ListBox _versionList;
         private ListBox _manageList;
         private ComboBox _javaCombo;
+        private ComboBox _javaMajorBox;
         private TextBox _memBox;
         private TextBox _downloadBox;
         private ComboBox _loaderKind;
@@ -29,6 +30,7 @@ namespace Mcroute
         private TextBox _cfKeyBox;
         private TextBox _searchBox;
         private TextBox _packPathBox;
+        private readonly List<string> _pendingLog = new List<string>();
         private readonly List<string> _allVersions = new List<string>();
         private readonly List<Tuple<string, int>> _javas = new List<Tuple<string, int>>();
 
@@ -78,6 +80,15 @@ namespace Mcroute
             // 注意：不能在构造函数里 BeginInvoke（窗口句柄还没建），用 Shown 事件
             Shown += (s2, e2) =>
             {
+                try
+                {
+                    if (_pendingLog.Count > 0)
+                    {
+                        foreach (string line in _pendingLog) _log.AppendText(line + Environment.NewLine);
+                        _pendingLog.Clear();
+                    }
+                }
+                catch { }
                 try { EnablePackDragDrop(); } catch (Exception ex) { Program.Trace("拖拽启用失败(忽略): " + ex.Message); }
                 try { if (_versionList.Items.Count == 0) FirstRunGuide(); } catch (Exception ex) { Program.Trace("引导失败: " + ex.Message); }
             };
@@ -194,10 +205,25 @@ namespace Mcroute
             var javaGroup = new GroupBox { Text = "Java（自动按版本匹配）", Dock = DockStyle.Fill, Padding = new Padding(10) };
             var javaPanel = new Panel { Dock = DockStyle.Fill };
             _javaCombo = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
-            var reJava = new Button { Text = "重新检测 Java", Width = 130, Height = 28, Top = 36, Left = 0 };
+            var reJava = new Button { Text = "重新检测", Width = 90, Height = 28, Top = 36, Left = 0 };
             reJava.Click += (s, e) => RefreshJava();
+            _javaMajorBox = new ComboBox { Left = 98, Top = 36, Width = 80, DropDownStyle = ComboBoxStyle.DropDownList };
+            _javaMajorBox.Items.AddRange(new object[] { "8", "11", "17", "21" });
+            _javaMajorBox.SelectedIndex = 2;
+            var dlJava = new Button { Text = "下载并安装", Width = 110, Height = 28, Top = 36, Left = 186 };
+            dlJava.Click += (s2, e2) =>
+            {
+                int major = int.Parse(_javaMajorBox.SelectedItem.ToString());
+                RunInBackground("安装 Java " + major, () =>
+                {
+                    string exe = JavaSources.Install(major, _baseDir);
+                    return exe == null ? 1 : 0;
+                });
+            };
             javaPanel.Controls.Add(_javaCombo);
             javaPanel.Controls.Add(reJava);
+            javaPanel.Controls.Add(_javaMajorBox);
+            javaPanel.Controls.Add(dlJava);
             javaGroup.Controls.Add(javaPanel);
 
             var memGroup = new GroupBox { Text = "最大内存", Dock = DockStyle.Fill, Padding = new Padding(10) };
@@ -708,6 +734,7 @@ namespace Mcroute
                         AppendLog(title + " 结束（退出码 " + code + "）");
                         _status.Text = "就绪";
                         RefreshVersions();
+                        RefreshJava();
                     }));
                 }
                 catch (Exception ex)
@@ -731,7 +758,12 @@ namespace Mcroute
         private void AppendLog(string text)
         {
             if (IsDisposed) return;
-            if (!IsHandleCreated) return;      // 句柄还没建好，直接丢弃（启动阶段）
+            if (!IsHandleCreated)
+            {
+                // 句柄还没建好：先缓存，等窗口显示后补上（启动阶段的日志不能丢）
+                if (_pendingLog.Count < 500) _pendingLog.Add(text);
+                return;
+            }
             if (InvokeRequired) { BeginInvoke(new Action<string>(AppendLog), text); return; }
             _log.AppendText(text + Environment.NewLine);
         }

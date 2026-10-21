@@ -104,6 +104,28 @@ run_gui.bat          # 图形界面
 
 ---
 
+## Java 自动下载
+
+版本要求的 Java 不对时会直接告诉你，并支持一键下载：
+
+```bat
+mcroute.exe java list              :: 看看本机有哪些 Java
+mcroute.exe java install 17        :: 下载并安装 Java 17
+```
+
+GUI 里也有：启动页 → Java 分组 → 选版本 → **下载并安装**。
+
+**下载源优先级**（按可靠性排）：
+
+| 顺序 | 来源 | 说明 |
+|---|---|---|
+| 1 | **Adoptium Temurin** | 首选。实测走**清华镜像**：101 MB / 13 秒（≈7.7 MB/s）；镜像不可用回落官方 GitHub |
+| 2 | **Azul Zulu** | 二号。走 Azul 官方 CDN |
+| 3 | **AWS Corretto** | 最后备选，固定直链 |
+| ✗ | Oracle Java | 不采用（许可与分发限制） |
+
+装好的 Java 放在 `<数据目录>\java_versions\`，启动时自动识别，不写系统 PATH、不动注册表。
+
 ## 镜像失效演练
 
 ```bat
