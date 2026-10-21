@@ -621,7 +621,7 @@
                 </Grid>
 
                 <!-- 下载页 -->
-                <Grid x:Name="PageDownload" Background="{DynamicResource Bg}" Visibility="Collapsed">
+                <Grid x:Name="PageDownload" Background="{DynamicResource PageBg}" Visibility="Collapsed">
                     <Border Margin="24" Background="{DynamicResource Surface}" CornerRadius="12"
                             BorderBrush="{DynamicResource Border}" BorderThickness="1" Padding="24">
                         <StackPanel>
@@ -676,7 +676,7 @@
                 </Grid>
 
                 <!-- 整合包页 -->
-                <Grid x:Name="PagePacks" Background="{DynamicResource Bg}" Visibility="Collapsed">
+                <Grid x:Name="PagePacks" Background="{DynamicResource PageBg}" Visibility="Collapsed">
                     <Border Margin="24" Background="{DynamicResource Surface}" CornerRadius="12"
                             BorderBrush="{DynamicResource Border}" BorderThickness="1" Padding="24">
                         <StackPanel>
@@ -700,7 +700,7 @@
                 </Grid>
 
                 <!-- 管理页 -->
-                <Grid x:Name="PageManage" Background="{DynamicResource Bg}" Visibility="Collapsed">
+                <Grid x:Name="PageManage" Background="{DynamicResource PageBg}" Visibility="Collapsed">
                     <Border Margin="24" Background="{DynamicResource Surface}" CornerRadius="12"
                             BorderBrush="{DynamicResource Border}" BorderThickness="1" Padding="24">
                         <Grid>
@@ -767,7 +767,7 @@
                 </Grid>
 
                 <!-- 设置页 -->
-                <Grid x:Name="PageSettings" Background="{DynamicResource Bg}" Visibility="Collapsed">
+                <Grid x:Name="PageSettings" Background="{DynamicResource PageBg}" Visibility="Collapsed">
                     <Border Margin="24" Background="{DynamicResource Surface}" CornerRadius="12"
                             BorderBrush="{DynamicResource Border}" BorderThickness="1" Padding="24">
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -804,6 +804,11 @@
                             </StackPanel>
                             <TextBlock Text="支持 jpg / png / bmp；图片只保存在本地数据目录，不会打包进程序"
                                        Margin="0,6,0,0" FontSize="11" Foreground="{DynamicResource TextFaint}"/>
+
+                            <CheckBox x:Name="BgAllPagesBox" Margin="0,10,0,0"
+                                      Content="背景图在所有页面显示（不只启动页）"
+                                      Foreground="{DynamicResource TextSub}"
+                                      Checked="BgAllPages_Changed" Unchecked="BgAllPages_Changed"/>
 
                             <Grid Margin="0,14,0,0">
                                 <Grid.ColumnDefinitions>

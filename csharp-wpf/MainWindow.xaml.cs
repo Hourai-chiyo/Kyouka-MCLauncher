@@ -81,6 +81,12 @@ namespace Mcroute.Wpf
 
                     Theme.Apply(theme);
                     ApplyGlass(glass == 1, true);
+
+                    int bgAll = J.Int(cfg, "bg_all", 0);
+                    _initializing = true;
+                    try { if (BgAllPagesBox != null) BgAllPagesBox.IsChecked = bgAll == 1; }
+                    finally { _initializing = false; }
+                    ApplyBackgroundScope(bgAll == 1);
                 }
                 catch { }
 
@@ -199,6 +205,7 @@ namespace Mcroute.Wpf
                 data["page"] = _page;
                 data["theme"] = CurrentTheme();
                 data["glass"] = (GlassBox != null && GlassBox.IsChecked == true) ? 1 : 0;
+                data["bg_all"] = (BgAllPagesBox != null && BgAllPagesBox.IsChecked == true) ? 1 : 0;
 
                 foreach (string cfgPath in ConfigPaths())
                 {
@@ -785,6 +792,32 @@ namespace Mcroute.Wpf
             catch { return "auto"; }
         }
 
+        // ================= 背景图显示范围 =================
+        private bool _bgAll;
+
+        /// <summary>非玻璃模式下页面底色：仅启动页=实色；所有页面=半透明。</summary>
+        private void ApplyBackgroundScope(bool all)
+        {
+            _bgAll = all;
+            if (_glassOn) return;
+            try
+            {
+                bool dark = Theme.Effective == "dark";
+                string hex = all ? (dark ? "#D910141A" : "#D9F7F8FA")
+                                 : (dark ? "#10141A" : "#F7F8FA");
+                var res = Application.Current.Resources;
+                if (res != null) res["PageBg"] = Brush(hex);
+            }
+            catch { }
+        }
+
+        private void BgAllPages_Changed(object sender, RoutedEventArgs e)
+        {
+            if (BgAllPagesBox == null) return;
+            ApplyBackgroundScope(BgAllPagesBox.IsChecked == true);
+            try { SaveConfig(); } catch { }
+        }
+
         // ================= 玻璃面板 =================
         private bool _glassOn;
 
@@ -813,17 +846,12 @@ namespace Mcroute.Wpf
                     res["FieldBorder"] = Brush(dark ? "#40FFFFFF" : "#33000000");
                     if (Sidebar != null) Sidebar.Background = res["SurfaceGlass"] as Brush;
                     if (TopBar != null) TopBar.Background = System.Windows.Media.Brushes.Transparent;
-                    PageDownload.Background = System.Windows.Media.Brushes.Transparent;
-                    PagePacks.Background = System.Windows.Media.Brushes.Transparent;
-                    PageManage.Background = System.Windows.Media.Brushes.Transparent;
-                    PageSettings.Background = System.Windows.Media.Brushes.Transparent;
+                    // 页面底色统一走 PageBg：玻璃 = 全透明（露出背景图）
+                    res["PageBg"] = System.Windows.Media.Brushes.Transparent;
                 }
                 else
                 {
-                    PageDownload.SetResourceReference(Panel.BackgroundProperty, "Bg");
-                    PagePacks.SetResourceReference(Panel.BackgroundProperty, "Bg");
-                    PageManage.SetResourceReference(Panel.BackgroundProperty, "Bg");
-                    PageSettings.SetResourceReference(Panel.BackgroundProperty, "Bg");
+                    ApplyBackgroundScope(_bgAll);   // 关掉玻璃后按"显示范围"设置恢复
                     if (Sidebar != null) Sidebar.SetResourceReference(Border.BackgroundProperty, "Surface");
                     res["FieldBg"] = Brush(Theme.Effective == "dark" ? "#171C24" : "#FFFFFF");
                     res["FieldBorder"] = Brush(Theme.Effective == "dark" ? "#28303C" : "#E4E7EC");
@@ -869,7 +897,7 @@ namespace Mcroute.Wpf
                 if (File.Exists(file))
                 {
                     ApplyBackgroundBrush(file);
-                    BgPathText.Text = file;
+                    SetBgPathText(file);
                 }
                 else
                 {
@@ -894,7 +922,7 @@ namespace Mcroute.Wpf
                 string target = BackgroundFile();
                 File.Copy(dlg.FileName, target, true);
                 ApplyBackgroundBrush(target);
-                BgPathText.Text = target;
+                SetBgPathText(dlg.FileName);      // 显示原图名，而不是内部 background.img
                 AppendLog("已设置背景图：" + dlg.FileName);
             }
             catch (Exception ex)
@@ -914,7 +942,7 @@ namespace Mcroute.Wpf
                 HeroImageLayer.Visibility = Visibility.Collapsed;
                 HeroScrim.Visibility = Visibility.Collapsed;
                 HeroMountains.Visibility = Visibility.Visible;
-                BgPathText.Text = "（默认矢量背景）";
+                SetBgPathText(null);
                 AppendLog("已恢复默认背景");
             }
             catch (Exception ex)
@@ -924,6 +952,26 @@ namespace Mcroute.Wpf
         }
 
         private bool _applyingBg;          // 防止滑块赋值时递归触发保存
+
+        /// <summary>背景框只显示文件名（完整路径放 ToolTip），避免长路径被截断。</summary>
+        private void SetBgPathText(string fileOrEmpty)
+        {
+            if (BgPathText == null) return;
+            if (string.IsNullOrEmpty(fileOrEmpty))
+            {
+                BgPathText.Text = "（默认矢量背景）";
+                BgPathText.ToolTip = null;
+                return;
+            }
+            try
+            {
+                BgPathText.Text = System.IO.Path.GetFileName(fileOrEmpty);
+                BgPathText.ToolTip = fileOrEmpty;
+            }
+            catch { BgPathText.Text = fileOrEmpty; }
+            BgPathText.CaretIndex = 0;
+            BgPathText.ScrollToHome();
+        }
 
         private void ApplyBackgroundBrush(string file)
         {
