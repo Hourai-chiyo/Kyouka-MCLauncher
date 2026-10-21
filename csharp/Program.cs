@@ -123,6 +123,31 @@ namespace Mcroute
                     case "mkbat": return ExtraCommands.Mkbat(args);
                     case "install": return Packs.Install(args);
                     case "java": return JavaCommand.Run(args);
+                    case "mods-search":
+                    {
+                        string q = args.Length > 1 && !args[1].StartsWith("--") ? args[1] : "";
+                        string mc = ArgOf(args, "--mc");
+                        string ld = ArgOf(args, "--loader");
+                        int lim = 10;
+                        string ls = ArgOf(args, "--limit");
+                        if (!string.IsNullOrEmpty(ls)) int.TryParse(ls, out lim);
+                        return Modrinth.CommandSearch(q, mc, ld, lim);
+                    }
+
+                    case "mods-install":
+                    {
+                        string proj = args.Length > 1 && !args[1].StartsWith("--") ? args[1] : null;
+                        if (string.IsNullOrEmpty(proj)) { Console.WriteLine("用法: mods-install <项目id或slug> --mc <版本> --loader <加载器> [--dir <数据目录>] [--version <实例名>]"); return 1; }
+                        string dir = Version.BaseDir(ArgOf(args, "--dir"));
+                        string verName = ArgOf(args, "--version");
+                        string mc = ArgOf(args, "--mc");
+                        string ld = ArgOf(args, "--loader");
+                        string msg;
+                        bool ok = Modrinth.Install(dir, verName, proj, mc, ld, out msg);
+                        Console.WriteLine((ok ? "[完成] " : "[失败] ") + msg);
+                        return ok ? 0 : 1;
+                    }
+
                     case "mods":
                     {
                         int di = Array.IndexOf(args, "--dir");
@@ -200,6 +225,12 @@ namespace Mcroute
             catch { }
         }
 
+        private static string ArgOf(string[] a, string name)
+        {
+            int i = Array.IndexOf(a, name);
+            return (i >= 0 && i + 1 < a.Length) ? a[i + 1] : null;
+        }
+
         private static void Guide()
         {
             Console.WriteLine("mcroute " + "(C# 版) —— Minecraft Java 启动器");
@@ -217,6 +248,8 @@ namespace Mcroute
             Console.WriteLine("  mcroute java list|install <版本>    查看 / 自动下载 Java（Adoptium→Azul→Corretto）");
             Console.WriteLine("  mcroute sources [--no-probe]        列出镜像源并测速（配置文件 <数据目录>/mirrors.json）");
             Console.WriteLine("  mcroute mods <版本>                 列出该版本本地 mods（名称/版本/加载器/启用状态）");
+            Console.WriteLine("  mcroute mods-search <关键词> [--mc 1.20.1] [--loader fabric]   搜索 Modrinth");
+            Console.WriteLine("  mcroute mods-install <项目id> --mc 1.20.1 --loader fabric --version <实例>");
             Console.WriteLine();
             Console.WriteLine("公共参数：--dir <数据目录>  --java <java.exe>  --game-dir <游戏目录>");
             Console.WriteLine("演练参数：--no-mirror  只走官方源（模拟镜像失效）");

@@ -29,6 +29,47 @@ namespace Mcroute.Wpf
                 ShotMode = true;
             }
 
+            // Mod 下载窗口截图：--shot-modbrowser <版本> <MC版本> <加载器> <关键词> <输出.png> [宽 高]
+            if (args.Length >= 6 && args[0] == "--shot-modbrowser")
+            {
+                ShotMode = true;
+                try
+                {
+                    try { Mcroute.Theme.Apply(Environment.GetEnvironmentVariable("MCROUTE_THEME") ?? "auto"); } catch { }
+                    string baseDir = Environment.GetEnvironmentVariable("MCROUTE_DATA");
+                    if (string.IsNullOrEmpty(baseDir)) baseDir = Mcroute.Version.BaseDir(null);
+                    int w = args.Length >= 7 ? int.Parse(args[6]) : 900;
+                    int h = args.Length >= 8 ? int.Parse(args[7]) : 640;
+
+                    var mw = new ModsBrowserWindow(baseDir, args[1], args[2], args[3])
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = -10000, Top = -10000, Width = w, Height = h, ShowInTaskbar = false,
+                    };
+                    mw.Show();
+                    mw.UpdateLayout();
+                    Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+
+                    // 填关键词并触发搜索，等结果回来
+                    mw.PreloadSearch(args[4]);
+                    PumpFor(TimeSpan.FromSeconds(4));
+
+                    var visual = (Visual)mw.Content;
+                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(visual);
+                    string outDir = Path.GetDirectoryName(Path.GetFullPath(args[5]));
+                    if (!string.IsNullOrEmpty(outDir)) Directory.CreateDirectory(outDir);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(rtb));
+                    using (var fs = File.Create(args[5])) enc.Save(fs);
+                    ShotTrace("shot-modbrowser saved");
+                    mw.Close();
+                }
+                catch (Exception ex) { ShotTrace("shot-modbrowser 异常: " + ex); }
+                Shutdown(0);
+                return;
+            }
+
             // 文件浏览窗口截图：--shot-browser <目录> <输出.png> [宽 高]
             if (args.Length >= 3 && args[0] == "--shot-browser")
             {
@@ -148,6 +189,20 @@ namespace Mcroute.Wpf
             ShotTrace("已保存");
 
             win.Close();
+        }
+
+        /// <summary>让 WPF 消息循环继续跑一段时间（等异步结果回来再截图）。</summary>
+        private static void PumpFor(TimeSpan duration)
+        {
+            var frame = new System.Windows.Threading.DispatcherFrame();
+            var timer = new System.Windows.Threading.DispatcherTimer(
+                System.Windows.Threading.DispatcherPriority.Background)
+            {
+                Interval = duration,
+            };
+            timer.Tick += (s2, e2) => { timer.Stop(); frame.Continue = false; };
+            timer.Start();
+            System.Windows.Threading.Dispatcher.PushFrame(frame);
         }
 
         private void ShotMods(string baseDir, string version, string outputPath, int width, int height)

@@ -418,6 +418,13 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 |---|---|
 | ![启动-深色](docs/gui-wpf-launch-dark.png) | ![设置-深色](docs/gui-wpf-settings-dark.png) |
 
+**Mod 下载（Modrinth）**：管理页选中版本 →「Mods 下载」→ 搜索、按当前 MC 版本 + 加载器过滤、一键装进 `mods/`，
+缺前置依赖会提示（不自动装，避免装错版本）：
+
+![Mod 下载](docs/gui-wpf-modbrowser.png)
+
+> CurseForge 需要用户自己的 API Key，暂未接入（二期）。
+
 **本地 Mod 列表**：管理页选中版本 →「Mods」→ 列出 mods 目录里的所有 jar，
 自动识别 Fabric（`fabric.mod.json`）/ Forge·NeoForge（`META-INF/mods.toml`）/ 老 Forge（`mcmod.info`），
 双击即可启用/禁用（`.jar ↔ .jar.disabled`），也能删除：

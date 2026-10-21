@@ -654,6 +654,20 @@ namespace Mcroute.Wpf
             });
         }
 
+        private void OpenModsBrowser_Click(object sender, RoutedEventArgs e)
+        {
+            string ver = SelectedManageVersion();
+            if (ver == null) { MessageBox.Show("先在列表里选一个版本", "提示"); return; }
+            try
+            {
+                string mc, loader, loaderVer;
+                Version.Describe(_baseDir, ver, out mc, out loader, out loaderVer);
+                var w = new ModsBrowserWindow(_baseDir, ver, mc, loader) { Owner = this };
+                w.ShowDialog();
+            }
+            catch (Exception ex) { MessageBox.Show("打开失败：" + ex.Message, "提示"); }
+        }
+
         private void OpenMods_Click(object sender, RoutedEventArgs e)
         {
             string ver = SelectedManageVersion();
