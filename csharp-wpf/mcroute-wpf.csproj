@@ -9,8 +9,8 @@
     <RootNamespace>Mcroute.Wpf</RootNamespace>
     <ApplicationIcon>..\csharp\app.ico</ApplicationIcon>
     <ApplicationManifest>..\csharp\app.manifest</ApplicationManifest>
-    <Version>0.3.9</Version>
-    <FileVersion>0.3.9.0</FileVersion>
+    <Version>0.3.10</Version>
+    <FileVersion>0.3.10.0</FileVersion>
     <Product>mcroute — Minecraft Java 启动器（WPF 原型）</Product>
     <Company>Hourai-chiyo</Company>
     <Description>WPF 视觉原型：只做界面壳，功能逻辑复用 csharp/ 下的 Core</Description>

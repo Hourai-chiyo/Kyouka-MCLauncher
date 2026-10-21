@@ -261,6 +261,7 @@ namespace Mcroute.Wpf
             }
 
             _page = name == "启动" ? 0 : name == "下载" ? 1 : name == "整合包" ? 2 : name == "管理" ? 3 : 4;
+            if (PageTitle != null) PageTitle.Text = name;
             StatusText.Text = "就绪 · " + name + " 页";
         }
 

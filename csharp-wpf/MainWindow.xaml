@@ -64,6 +64,39 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SideNav" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextSub}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bd" CornerRadius="7" Background="Transparent" Padding="10,0">
+                            <Grid>
+                                <Border x:Name="bar" Width="3" Height="14" CornerRadius="2"
+                                        HorizontalAlignment="Left" Margin="-10,0,0,0"
+                                        Background="Transparent"/>
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource Hover}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource PrimaryDim}"/>
+                                <Setter TargetName="bar" Property="Background" Value="{DynamicResource Primary}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Primary}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="PrimaryButton" TargetType="Button">
             <Setter Property="Height" Value="46"/>
             <Setter Property="Foreground" Value="White"/>
@@ -115,13 +148,13 @@
         </Style>
 
         <Style x:Key="VersionItem" TargetType="ListBoxItem">
-            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="bd" CornerRadius="8" Padding="13,9"
+                        <Border x:Name="bd" CornerRadius="8" Padding="12,7"
                                 Background="{DynamicResource Surface}"
                                 BorderBrush="{DynamicResource Border}" BorderThickness="1">
                             <ContentPresenter/>
@@ -373,19 +406,8 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Center"
-                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                <RadioButton x:Name="NavLaunch" Style="{StaticResource NavItem}" Content="启动" IsChecked="True"
-                             GroupName="nav" Checked="Nav_Checked"/>
-                <RadioButton x:Name="NavDownload" Style="{StaticResource NavItem}" Content="下载"
-                             GroupName="nav" Margin="6,0,0,0" Checked="Nav_Checked"/>
-                <RadioButton x:Name="NavPacks" Style="{StaticResource NavItem}" Content="整合包"
-                             GroupName="nav" Margin="6,0,0,0" Checked="Nav_Checked"/>
-                <RadioButton x:Name="NavManage" Style="{StaticResource NavItem}" Content="管理"
-                             GroupName="nav" Margin="6,0,0,0" Checked="Nav_Checked"/>
-                <RadioButton x:Name="NavSettings" Style="{StaticResource NavItem}" Content="设置"
-                             GroupName="nav" Margin="6,0,0,0" Checked="Nav_Checked"/>
-            </StackPanel>
+            <TextBlock x:Name="PageTitle" Grid.Column="1" Text="启动" FontSize="14" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Text}" Margin="22,0,0,0" VerticalAlignment="Center"/>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
@@ -441,12 +463,12 @@
                     BorderBrush="{DynamicResource Hairline}" BorderThickness="0,0,1,0">
                 <Grid Margin="16,14,16,12">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>   <!-- 品牌 -->
+                        <RowDefinition Height="Auto"/>   <!-- 主按钮 -->
+                        <RowDefinition Height="Auto"/>   <!-- 导航 -->
+                        <RowDefinition Height="*"/>      <!-- 搜索 + 版本列表 -->
+                        <RowDefinition Height="Auto"/>   <!-- 数据目录 -->
+                        <RowDefinition Height="Auto"/>   <!-- 底部账号 -->
                     </Grid.RowDefinitions>
 
                     <!-- 品牌 -->
@@ -460,41 +482,59 @@
 
                     <!-- 主按钮 -->
                     <Button x:Name="PlayButton" Grid.Row="1" Style="{StaticResource PrimaryButton}"
-                            Content="开始游戏" Height="40" Margin="0,14,0,0" Click="Play_Click"/>
+                            Content="开始游戏" Height="38" Margin="0,12,0,0" Click="Play_Click"/>
 
-                    <!-- 搜索 + 刷新 -->
-                    <Grid Grid.Row="2" Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid Grid.Column="0">
-                            <TextBox x:Name="VersionSearch" Height="30" TextChanged="VersionSearch_TextChanged"/>
-                            <TextBlock x:Name="SearchHint" Text="搜索版本…" FontSize="12"
-                                       Foreground="{DynamicResource TextFaint}" Margin="10,0,0,0"
-                                       VerticalAlignment="Center" IsHitTestVisible="False"/>
-                        </Grid>
-                        <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="⟳" Width="34" Height="30"
-                                Margin="6,0,0,0" ToolTip="刷新版本列表" Click="Refresh_Click"/>
-                    </Grid>
+                    <!-- 导航 -->
+                    <StackPanel Grid.Row="2" Margin="0,14,0,0">
+                        <TextBlock Text="导航" FontSize="10" Foreground="{DynamicResource TextFaint}"
+                                   Margin="10,0,0,4"/>
+                        <RadioButton x:Name="NavLaunch" Style="{StaticResource SideNav}" Content="启动"
+                                     GroupName="nav" IsChecked="True" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavDownload" Style="{StaticResource SideNav}" Content="下载"
+                                     GroupName="nav" Margin="0,1,0,0" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavPacks" Style="{StaticResource SideNav}" Content="整合包"
+                                     GroupName="nav" Margin="0,1,0,0" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavManage" Style="{StaticResource SideNav}" Content="管理"
+                                     GroupName="nav" Margin="0,1,0,0" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavSettings" Style="{StaticResource SideNav}" Content="设置"
+                                     GroupName="nav" Margin="0,1,0,0" Checked="Nav_Checked"/>
+                    </StackPanel>
 
-                    <!-- 版本列表 -->
-                    <Grid Grid.Row="3" Margin="0,12,0,0">
+                    <!-- 搜索 + 版本列表 -->
+                    <Grid Grid.Row="3" Margin="0,10,0,0">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <Grid Grid.Row="0" Margin="0,0,0,8">
+
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid Grid.Column="0">
+                                <TextBox x:Name="VersionSearch" Height="30" TextChanged="VersionSearch_TextChanged"/>
+                                <TextBlock x:Name="SearchHint" Text="搜索版本…" FontSize="12"
+                                           Foreground="{DynamicResource TextFaint}" Margin="10,0,0,0"
+                                           VerticalAlignment="Center" IsHitTestVisible="False"/>
+                            </Grid>
+                            <Button Grid.Column="1" Style="{StaticResource GhostButton}" Content="⟳" Width="34" Height="30"
+                                    Margin="6,0,0,0" ToolTip="刷新版本列表" Click="Refresh_Click"/>
+                        </Grid>
+
+                        <Grid Grid.Row="1" Margin="0,12,0,8">
                             <TextBlock Text="本地版本" Style="{StaticResource FieldLabel}" Margin="0"/>
                             <TextBlock x:Name="VersionCount" Text="" FontSize="11" Foreground="{DynamicResource TextFaint}"
                                        HorizontalAlignment="Right"/>
                         </Grid>
-                        <ListBox x:Name="VersionList" Grid.Row="1" Style="{StaticResource PlainListBox}"
+
+                        <ListBox x:Name="VersionList" Grid.Row="2" Style="{StaticResource PlainListBox}"
                                  SelectionChanged="VersionList_SelectionChanged"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                     </Grid>
 
-                    <!-- 数据目录（紧凑一行） -->
+                    <!-- 数据目录 -->
                     <Grid Grid.Row="4" Margin="0,10,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
