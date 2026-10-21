@@ -418,8 +418,13 @@ csharp-wpf\out\mcroute-wpf.exe --shot out.png 1180 760 0
 |---|---|
 | ![启动-深色](docs/gui-wpf-launch-dark.png) | ![设置-深色](docs/gui-wpf-settings-dark.png) |
 
-**Mod 下载（Modrinth）**：管理页选中版本 →「Mods 下载」→ 搜索、按当前 MC 版本 + 加载器过滤、一键装进 `mods/`，
-缺前置依赖会提示（不自动装，避免装错版本）：
+**Mod 下载（Modrinth + CurseForge）**：管理页选中版本 →「Mods 下载」→ 选来源 → 搜索、按当前 MC 版本 + 加载器过滤、
+一键装进 `mods/`，缺前置依赖会提示（不自动装，避免装错版本）：
+
+- **Modrinth**：免 Key，开箱即用
+- **CurseForge**：把 API Key 放进 `<数据目录>/cf_api_key.txt`（或环境变量 `CF_API_KEY`）；
+  部分 mod 作者关闭了第三方分发（`downloadUrl` 为空），这时会提示你去网页手动下载
+- 两家**不合并**：同名 mod 两边版本可能不同，混在一起容易装错
 
 ![Mod 下载](docs/gui-wpf-modbrowser.png)
 

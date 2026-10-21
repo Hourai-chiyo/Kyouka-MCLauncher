@@ -128,10 +128,48 @@ namespace Mcroute
                         string q = args.Length > 1 && !args[1].StartsWith("--") ? args[1] : "";
                         string mc = ArgOf(args, "--mc");
                         string ld = ArgOf(args, "--loader");
+                        string src = ArgOf(args, "--source") ?? "modrinth";
                         int lim = 10;
                         string ls = ArgOf(args, "--limit");
                         if (!string.IsNullOrEmpty(ls)) int.TryParse(ls, out lim);
+
+                        if (src.Equals("cf", StringComparison.OrdinalIgnoreCase) ||
+                            src.Equals("curseforge", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string dir = Version.BaseDir(ArgOf(args, "--dir"));
+                            string err;
+                            var hits = CurseForge.Search(dir, q, mc, ld, lim, out err);
+                            if (!string.IsNullOrEmpty(err)) { Console.WriteLine("[错误] " + err); return 1; }
+                            Console.WriteLine("搜索结果 " + hits.Count + " 条（CurseForge）");
+                            int i = 0;
+                            foreach (var h in hits)
+                            {
+                                i++;
+                                Console.WriteLine(string.Format("  {0}. {1}  [id={2}]  下载 {3}", i, h.Name, h.ModId, h.DownloadsText()));
+                                Console.WriteLine("     " + (h.Summary ?? ""));
+                            }
+                            return 0;
+                        }
                         return Modrinth.CommandSearch(q, mc, ld, lim);
+                    }
+
+                    case "mods-install-cf":
+                    {
+                        string idText = args.Length > 1 && !args[1].StartsWith("--") ? args[1] : null;
+                        long modId;
+                        if (string.IsNullOrEmpty(idText) || !long.TryParse(idText, out modId))
+                        {
+                            Console.WriteLine("用法: mods-install-cf <modId> --mc 1.20.1 --loader fabric --version <实例> [--dir <数据目录>]");
+                            return 1;
+                        }
+                        string dir = Version.BaseDir(ArgOf(args, "--dir"));
+                        string verName = ArgOf(args, "--version");
+                        string mc = ArgOf(args, "--mc");
+                        string ld = ArgOf(args, "--loader");
+                        string msg;
+                        bool ok = CurseForge.Install(dir, verName, modId, mc, ld, out msg);
+                        Console.WriteLine((ok ? "[完成] " : "[失败] ") + msg);
+                        return ok ? 0 : 1;
                     }
 
                     case "mods-install":

@@ -145,11 +145,14 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" CornerRadius="7" Background="{DynamicResource PrimaryDim}"
-                        Padding="10,4" VerticalAlignment="Center">
-                    <TextBlock x:Name="SourceText" Text="来源：Modrinth" FontSize="11"
-                               Foreground="{DynamicResource Primary}"/>
-                </Border>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="来源" FontSize="11" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextMuted}"/>
+                    <ComboBox x:Name="SourceBox" Width="120" Height="28" Margin="6,0,0,0">
+                        <ComboBoxItem Content="Modrinth" IsSelected="True"/>
+                        <ComboBoxItem Content="CurseForge"/>
+                    </ComboBox>
+                </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                     <TextBlock Text="MC" FontSize="11" VerticalAlignment="Center"

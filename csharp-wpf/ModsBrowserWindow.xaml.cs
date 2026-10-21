@@ -11,14 +11,36 @@ using System.Windows.Media.Imaging;
 namespace Mcroute
 {
     /// <summary>
-    /// Mod 下载窗口（一期：Modrinth）。
-    /// CurseForge 需要用户自己的 API Key，二期再接。
+    /// Mod 下载窗口。两家来源**不合并**：Modrinth / CurseForge 各查各的，
+    /// 同名 mod 在两边版本可能不同，混在一起容易装错。
+    /// CurseForge 需要用户自己的 API Key（&lt;数据目录&gt;/cf_api_key.txt）。
     /// </summary>
     public partial class ModsBrowserWindow : Window
     {
         private readonly string _baseDir;
         private readonly string _version;
-        private List<ModHit> _hits = new List<ModHit>();
+        private List<Item> _items = new List<Item>();
+
+        /// <summary>两家结果的统一展示模型。</summary>
+        private class Item
+        {
+            public string Source;
+            public string ProjectId;
+            public long CfId;
+            public string Title;
+            public string Author;
+            public string Description;
+            public string IconUrl;
+            public long Downloads;
+            public string Categories;
+
+            public string DownloadsText()
+            {
+                if (Downloads >= 1000000) return (Downloads / 1000000.0).ToString("F1") + "M";
+                if (Downloads >= 1000) return (Downloads / 1000.0).ToString("F0") + "K";
+                return Downloads.ToString();
+            }
+        }
 
         public ModsBrowserWindow(string baseDir, string version, string mcVersion, string loader)
         {
@@ -31,9 +53,18 @@ namespace Mcroute
 
             Loaded += (s, e) =>
             {
-                StatusText.Text = "输入关键词后回车搜索";
+                StatusText.Text = CurseForge.HasKey(baseDir)
+                    ? "输入关键词后回车搜索（CurseForge 已配置 Key）"
+                    : "输入关键词后回车搜索（CurseForge 需要 cf_api_key.txt 才能用）";
                 SearchBox.Focus();
             };
+        }
+
+        private string CurrentSource()
+        {
+            var it = SourceBox.SelectedItem as ComboBoxItem;
+            string s = it == null ? "Modrinth" : (it.Content as string);
+            return string.Equals(s, "CurseForge", StringComparison.OrdinalIgnoreCase) ? "cf" : "modrinth";
         }
 
         private void SelectLoader(string loader)
@@ -69,13 +100,55 @@ namespace Mcroute
 
             string mc = McBox.Text.Trim();
             string loader = CurrentLoader();
+            string source = CurrentSource();
+
+            if (source == "cf" && !CurseForge.HasKey(_baseDir))
+            {
+                StatusText.Text = "CurseForge 需要 API Key：放进 <数据目录>/cf_api_key.txt";
+                return;
+            }
+
             StatusText.Text = "搜索中…";
             HitList.Items.Clear();
 
             var task = new System.Threading.Tasks.Task(() =>
             {
-                string err;
-                var hits = Modrinth.Search(query, mc, loader, 30, out err);
+                var got = new List<Item>();
+                string err = null;
+
+                if (source == "cf")
+                {
+                    var hits = CurseForge.Search(_baseDir, query, mc, loader, 30, out err);
+                    foreach (var h in hits)
+                        got.Add(new Item
+                        {
+                            Source = "cf",
+                            CfId = h.ModId,
+                            Title = h.Name,
+                            Author = h.Author,
+                            Description = h.Summary,
+                            IconUrl = h.LogoUrl,
+                            Downloads = h.Downloads,
+                            Categories = h.Categories,
+                        });
+                }
+                else
+                {
+                    var hits = Modrinth.Search(query, mc, loader, 30, out err);
+                    foreach (var h in hits)
+                        got.Add(new Item
+                        {
+                            Source = "modrinth",
+                            ProjectId = h.ProjectId,
+                            Title = h.Title,
+                            Author = h.Author,
+                            Description = h.Description,
+                            IconUrl = h.IconUrl,
+                            Downloads = h.Downloads,
+                            Categories = h.Categories,
+                        });
+                }
+
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (!string.IsNullOrEmpty(err))
@@ -83,26 +156,26 @@ namespace Mcroute
                         StatusText.Text = "搜索失败：" + err;
                         return;
                     }
-                    _hits = hits;
+                    _items = got;
                     HitList.Items.Clear();
-                    foreach (var h in hits) HitList.Items.Add(MakeItem(h));
-                    StatusText.Text = string.Format("找到 {0} 个 mod（{1}{2}）", hits.Count,
+                    foreach (var it in got) HitList.Items.Add(MakeItem(it));
+                    StatusText.Text = string.Format("找到 {0} 个 mod（{1}{2} · {3}）", got.Count,
                         string.IsNullOrEmpty(mc) ? "任意版本" : mc,
-                        string.IsNullOrEmpty(loader) ? "" : " · " + loader);
+                        string.IsNullOrEmpty(loader) ? "" : " · " + loader,
+                        source == "cf" ? "CurseForge" : "Modrinth");
                     if (HitList.Items.Count > 0) HitList.SelectedIndex = 0;
                 }));
             });
             task.Start();
         }
 
-        private ListBoxItem MakeItem(ModHit h)
+        private ListBoxItem MakeItem(Item h)
         {
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // 图标（加载失败就留空）
             var iconHost = new Border
             {
                 Width = 32,
@@ -170,36 +243,35 @@ namespace Mcroute
                 Width = 60,
                 Height = 26,
                 Style = (Style)FindResource("GhostButton"),
-                Tag = h,
                 VerticalAlignment = VerticalAlignment.Center,
             };
-            install.Click += (s, e) => { Install(h); };
+            install.Click += (s, e) => Install(h);
             Grid.SetColumn(install, 2);
             grid.Children.Add(install);
 
             return new ListBoxItem { Content = grid, Tag = h };
         }
 
-        private ModHit SelectedHit()
+        private Item SelectedItem()
         {
             var item = HitList.SelectedItem as ListBoxItem;
-            return item == null ? null : item.Tag as ModHit;
+            return item == null ? null : item.Tag as Item;
         }
 
         private void HitList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            var h = SelectedHit();
+            var h = SelectedItem();
             if (h != null) Install(h);
         }
 
         private void Install_Click(object sender, RoutedEventArgs e)
         {
-            var h = SelectedHit();
+            var h = SelectedItem();
             if (h == null) { StatusText.Text = "先选一个 mod"; return; }
             Install(h);
         }
 
-        private void Install(ModHit h)
+        private void Install(Item h)
         {
             string mc = McBox.Text.Trim();
             string loader = CurrentLoader();
@@ -209,7 +281,9 @@ namespace Mcroute
             var task = new System.Threading.Tasks.Task(() =>
             {
                 string msg;
-                bool ok = Modrinth.Install(_baseDir, _version, h.ProjectId, mc, loader, out msg);
+                bool ok = h.Source == "cf"
+                    ? CurseForge.Install(_baseDir, _version, h.CfId, mc, loader, out msg)
+                    : Modrinth.Install(_baseDir, _version, h.ProjectId, mc, loader, out msg);
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     InstallBtn.IsEnabled = true;
