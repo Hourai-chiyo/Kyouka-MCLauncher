@@ -27,6 +27,8 @@ namespace Mcroute
         private TextBox _dataDirBox;
         private SimpleProgress _progress;
         private TextBox _cfKeyBox;
+        private TextBox _searchBox;
+        private readonly List<string> _allVersions = new List<string>();
         private readonly List<Tuple<string, int>> _javas = new List<Tuple<string, int>>();
 
         public MainForm()
@@ -129,7 +131,20 @@ namespace Mcroute
             var leftInner = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 0, 8, 0) };
             var listLabel = new Label { Text = "本地已安装版本", Dock = DockStyle.Top, Height = 22 };
             _versionList = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false };
-            _versionList.DoubleClick += (s, e) => LaunchSelected();
+            _versionList.DoubleClick += (s, e) => LaunchSelected();   // 双击直接启动
+            _versionList.KeyDown += (s2, e2) =>
+            {
+                if (e2.KeyCode == Keys.Enter) { e2.SuppressKeyPress = true; LaunchSelected(); }
+            };
+
+            var searchRow = new Panel { Dock = DockStyle.Top, Height = 30 };
+            var searchIcon = new Label { Text = "搜索", AutoSize = true, Location = new Point(0, 8), ForeColor = Color.DimGray };
+            _searchBox = new TextBox { Left = 44, Top = 5, Width = 260, Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right };
+            searchRow.Resize += (s2, e2) => _searchBox.Width = Math.Max(80, searchRow.ClientSize.Width - 50);
+            _searchBox.TextChanged += (s2, e2) => ApplyVersionFilter();
+            searchRow.Controls.Add(searchIcon);
+            searchRow.Controls.Add(_searchBox);
+            ApplyCueBanner(_searchBox, "输入版本名筛选，例如 1.20 或 forge");
             var btnRow = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 40, Padding = new Padding(0, 6, 0, 0) };
             var refresh = new Button { Text = "刷新", Width = 80, Height = 28 };
             refresh.Click += (s, e) => RefreshAll();
@@ -138,6 +153,7 @@ namespace Mcroute
             btnRow.Controls.Add(refresh);
             btnRow.Controls.Add(launch);
             leftInner.Controls.Add(_versionList);
+            leftInner.Controls.Add(searchRow);
             leftInner.Controls.Add(listLabel);
             leftInner.Controls.Add(btnRow);
 
@@ -426,10 +442,47 @@ namespace Mcroute
             }
         }
 
+        /// <summary>按搜索框内容过滤两个列表。</summary>
+        private void ApplyVersionFilter()
+        {
+            string keyword = _searchBox == null ? "" : _searchBox.Text.Trim();
+            _versionList.BeginUpdate();
+            _manageList.BeginUpdate();
+            _versionList.Items.Clear();
+            _manageList.Items.Clear();
+            string root = Path.Combine(_baseDir, "versions");
+            foreach (string name in _allVersions)
+            {
+                if (keyword.Length > 0 && name.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+                string dir = Path.Combine(root, name);
+                string tag = File.Exists(Path.Combine(dir, "instance.json"))
+                    ? "[整合包]"
+                    : (Directory.Exists(Path.Combine(dir, "mods")) ? "[外部]" : "[原版]");
+                _versionList.Items.Add(name);
+                _manageList.Items.Add(name + "   " + tag);
+            }
+            _versionList.EndUpdate();
+            _manageList.EndUpdate();
+
+            if (keyword.Length > 0)
+                _status.Text = string.Format("筛选 \"{0}\"：{1}/{2} 个版本", keyword, _versionList.Items.Count, _allVersions.Count);
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
+
+        /// <summary>给输入框加灰色提示文字（WinForms 没有 placeholder）。</summary>
+        private static void ApplyCueBanner(TextBox box, string text)
+        {
+            try { SendMessage(box.Handle, 0x1501, (IntPtr)1, text); } catch { }
+        }
+
         // ---------------- 数据 ----------------
         private void RefreshAll()
         {
             _dataDirBox.Text = _baseDir;
+            if (_searchBox != null) _searchBox.Text = "";
             RefreshVersions();
             RefreshJava();
         }
@@ -446,18 +499,12 @@ namespace Mcroute
             }
 
             var names = Directory.GetDirectories(root).Select(Path.GetFileName).OrderBy(x => x).ToList();
-            int packs = 0;
-            foreach (string name in names)
-            {
-                string dir = Path.Combine(root, name);
-                string tag = File.Exists(Path.Combine(dir, "instance.json"))
-                    ? "[整合包]"
-                    : (Directory.Exists(Path.Combine(dir, "mods")) ? "[外部]" : "[原版]");
-                if (tag == "[整合包]") packs++;
-                _versionList.Items.Add(name);
-                _manageList.Items.Add(name + "   " + tag);
-            }
-            AppendLog(string.Format("找到 {0} 个本地版本（其中 {1} 个整合包）", names.Count, packs));
+            _allVersions.Clear();
+            _allVersions.AddRange(names);
+
+            int packs = _allVersions.Count(n => File.Exists(Path.Combine(root, n, "instance.json")));
+            ApplyVersionFilter();
+            AppendLog(string.Format("找到 {0} 个本地版本（其中 {1} 个整合包）", _allVersions.Count, packs));
         }
 
         private void RefreshJava()
