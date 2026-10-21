@@ -64,6 +64,10 @@ namespace Mcroute
                     Console.SetOut(new System.IO.StreamWriter(stdout, new UTF8Encoding(false)) { AutoFlush = true });
             }
             catch { }
+            // --parallel：打开分段并行下载（默认关闭，慢链路/单连接被限速时可能有帮助）
+            if (Array.IndexOf(args, "--parallel") >= 0) Http.AllowParallel = true;
+            if (Array.IndexOf(args, "--no-parallel") >= 0) Http.AllowParallel = false;
+
             // --no-mirror：不碰任何大学镜像，只走官方源（镜像失效演练）
             if (Array.IndexOf(args, "--no-mirror") >= 0)
                 Environment.SetEnvironmentVariable("MCROUTE_NO_MIRROR", "1");
@@ -77,6 +81,10 @@ namespace Mcroute
                 if (cmd == "--selftest-security") return SelfTest.Security();
                 if (cmd == "--selftest-download")
                     return SelfTest.DownloadTest(args.Length > 1 ? args[1] : null,
+                                                 args.Length > 2 ? args[2] : null);
+
+                if (cmd == "--selftest-parallel")
+                    return SelfTest.ParallelTest(args.Length > 1 ? args[1] : null,
                                                  args.Length > 2 ? args[2] : null);
 
                 if (cmd == "--selftest-shell")

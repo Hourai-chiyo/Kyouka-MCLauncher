@@ -87,6 +87,15 @@ namespace Mcroute.Wpf
                     try { if (BgAllPagesBox != null) BgAllPagesBox.IsChecked = bgAll == 1; }
                     finally { _initializing = false; }
                     ApplyBackgroundScope(bgAll == 1);
+
+                    _initializing = true;
+                    try
+                    {
+                        bool parallel = J.Int(cfg, "parallel", 0) == 1;
+                        if (ParallelBox != null) ParallelBox.IsChecked = parallel;
+                        Http.AllowParallel = parallel;
+                    }
+                    finally { _initializing = false; }
                 }
                 catch { }
 
@@ -206,6 +215,7 @@ namespace Mcroute.Wpf
                 data["theme"] = CurrentTheme();
                 data["glass"] = (GlassBox != null && GlassBox.IsChecked == true) ? 1 : 0;
                 data["bg_all"] = (BgAllPagesBox != null && BgAllPagesBox.IsChecked == true) ? 1 : 0;
+                data["parallel"] = (ParallelBox != null && ParallelBox.IsChecked == true) ? 1 : 0;
 
                 foreach (string cfgPath in ConfigPaths())
                 {
@@ -716,6 +726,16 @@ namespace Mcroute.Wpf
         }
 
         private void RefreshJava_Click(object sender, RoutedEventArgs e) { RefreshJava(); }
+
+        // ================= 分段下载开关 =================
+        private void ParallelBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (ParallelBox == null) return;
+            bool on = ParallelBox.IsChecked == true;
+            Http.AllowParallel = on;
+            try { SaveConfig(); } catch { }
+            AppendLog("分段下载：" + (on ? "开（实验性）" : "关"));
+        }
 
         // ================= 下载源 =================
         private void RefreshMirrors()

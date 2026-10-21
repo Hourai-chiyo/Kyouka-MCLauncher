@@ -160,7 +160,9 @@ namespace Mcroute
                 try
                 {
                     string info;
-                    if (!Http.StreamToFile(pkg.Url, zipPath, null, out info))
+                    bool ok = Http.DownloadParallel(pkg.Url, zipPath, null, out info) ||
+                              Http.StreamToFile(pkg.Url, zipPath, null, out info);
+                    if (!ok)
                     {
                         Console.WriteLine("[错误] 下载失败: " + info);
                         return null;

@@ -182,6 +182,23 @@ namespace Mcroute
                 client != null ? "有" : "无", libCount, nativesCount, assetObjects);
             if (clientMissing > 0) Console.WriteLine("[警告] 缺少客户端 jar，且找不到父版本可复制");
 
+            // client jar 通常几十 MB，单独走分段并行（其余小文件保持多文件并发）
+            string clientDest = Path.Combine(vdir, ver + ".jar");
+            var clientJob = jobs.FirstOrDefault(t => string.Equals(t.Item2, clientDest, StringComparison.OrdinalIgnoreCase));
+            if (clientJob != null)
+            {
+                jobs.Remove(clientJob);
+                string info;
+                Console.WriteLine("[分段下载] client jar …");
+                string st = Http.Download(clientJob.Item1, clientJob.Item2, clientJob.Item3, out info, true);
+                if (st == "fail")
+                {
+                    // 分段失败再走一次普通下载，保证可用性
+                    st = Http.Download(clientJob.Item1, clientJob.Item2, clientJob.Item3, out info);
+                }
+                Console.WriteLine("[" + (st == "ok" ? "完成" : st == "skip" ? "已存在" : "失败") + "] client jar " + info);
+            }
+
             Http.DownloadAll(jobs, workers);
             return 0;
         }

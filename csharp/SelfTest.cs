@@ -229,6 +229,45 @@ namespace Mcroute
             public static extern int SHOpenFolderAndSelectItems(IntPtr pidlFolder, uint cidl, IntPtr[] apidl, uint dwFlags);
         }
 
+        /// <summary>测试分段下载：--selftest-parallel &lt;url&gt; [sha1]</summary>
+        public static int ParallelTest(string url, string expectedSha1)
+        {
+            if (string.IsNullOrEmpty(url))
+            {
+                Console.WriteLine("用法: mcroute.exe --selftest-parallel <url> [sha1]");
+                return 1;
+            }
+
+            string tmp = Path.Combine(Directory.GetCurrentDirectory(),
+                                      ".ptest-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".bin");
+            Console.WriteLine("  分段下载: " + url);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            string reason;
+            bool ok = Http.DownloadParallel(url, tmp, expectedSha1, out reason);
+            sw.Stop();
+
+            if (!ok)
+            {
+                Console.WriteLine("  [跳过/失败] " + reason);
+                Console.WriteLine("  （调用方此时应退回单连接下载）");
+                try { File.Delete(tmp); } catch { }
+                return 2;
+            }
+
+            long size = new FileInfo(tmp).Length;
+            double mbps = sw.Elapsed.TotalSeconds > 0 ? (size / 1024.0 / 1024.0) / sw.Elapsed.TotalSeconds : 0;
+            Console.WriteLine(string.Format("  [PASS] 分段下载成功：{0} 字节，{1:F2} 秒，{2:F2} MB/s",
+                                            size, sw.Elapsed.TotalSeconds, mbps));
+
+            if (!string.IsNullOrEmpty(expectedSha1))
+            {
+                string actual = Http.Sha1File(tmp);
+                Console.WriteLine("  [INFO] sha1 " + (string.Equals(actual, expectedSha1, StringComparison.OrdinalIgnoreCase) ? "一致" : "不一致"));
+            }
+            try { File.Delete(tmp); } catch { }
+            return 0;
+        }
+
         private static void WriteEntry(ZipArchive zip, string name, string content)
         {
             var entry = zip.CreateEntry(name);

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -111,6 +112,248 @@ namespace Mcroute
         /// 为什么不用 GetBytes：那会把整个文件读进内存（Java 安装包 100MB+、整合包上 GB），
         /// 大文件时会明显吃内存。这里固定 80KB 缓冲，内存占用与文件大小无关。
         /// </summary>
+        // ================= 分段并行下载 =================
+        /// <summary>低于这个大小不值得分段（连接开销占比太高）。</summary>
+        public static long ParallelThreshold = 2 * 1024 * 1024;
+
+        /// <summary>默认分几段。</summary>
+        public static int ParallelSegments = 4;
+
+        /// <summary>
+        /// 全局开关。**默认关闭**：实测在本机网络下分段反而更慢（单连接 6.3 MB/s vs 4 段 1.44 MB/s），
+        /// 瓶颈在链路总带宽而不是单连接。用 --parallel 或设置页开关可以打开。
+        /// </summary>
+        public static bool AllowParallel = false;
+
+        /// <summary>
+        /// 分段并行下载：按字节区间切分，每段写独立临时文件，最后顺序合并并校验 SHA-1。
+        ///
+        /// 为什么每段写独立文件而不是直接写目标文件的不同偏移：
+        ///   · 某段失败只需重试该段，不会整体重来
+        ///   · 不依赖文件 seek 的并发安全
+        ///   · 合并是一次纯本地顺序拷贝，几十 MB 也就几十毫秒
+        ///
+        /// 返回 false 时调用方应退回单连接下载（服务器不支持 Range / 文件太小 / 探测失败）。
+        /// </summary>
+        public static bool DownloadParallel(string url, string dest, string expectedSha1, out string reason)
+        {
+            reason = "";
+            if (!AllowParallel) { reason = "已关闭分段下载"; return false; }
+
+            long size = 0;
+            string etag = null;
+            try
+            {
+                var probe = (HttpWebRequest)WebRequest.Create(url);
+                probe.UserAgent = UA;
+                probe.Timeout = 30000;
+                probe.AddRange(0, 0);
+                using (var resp = (HttpWebResponse)probe.GetResponse())
+                {
+                    if (resp.StatusCode != HttpStatusCode.PartialContent)
+                    {
+                        reason = "服务器不支持 Range（" + (int)resp.StatusCode + "）";
+                        return false;
+                    }
+                    string cr = resp.Headers["Content-Range"];      // bytes 0-0/12345678
+                    if (string.IsNullOrEmpty(cr))
+                    {
+                        reason = "没有 Content-Range";
+                        return false;
+                    }
+                    int slash = cr.LastIndexOf('/');
+                    if (slash < 0 || !long.TryParse(cr.Substring(slash + 1).Trim(), out size) || size <= 0)
+                    {
+                        reason = "解析 Content-Range 失败: " + cr;
+                        return false;
+                    }
+                    etag = resp.Headers["ETag"];
+                }
+            }
+            catch (Exception ex)
+            {
+                reason = "Range 探测失败: " + ex.Message;
+                return false;
+            }
+
+            if (size < ParallelThreshold)
+            {
+                reason = "文件只有 " + (size / 1024) + " KB，不划算";
+                return false;
+            }
+
+            int seg;
+            int overrideSeg = 0;
+            int.TryParse(Environment.GetEnvironmentVariable("MCROUTE_SEGMENTS"), out overrideSeg);
+            try { seg = overrideSeg > 0 ? overrideSeg : (int)Math.Min(ParallelSegments, Math.Max(1, size / (512 * 1024))); }
+            catch { seg = 1; }
+            if (seg <= 1) { reason = "算出来只需 1 段"; return false; }
+            if (seg > 8) seg = 8;
+
+            var parts = new string[seg];
+            var from = new long[seg];
+            var to = new long[seg];
+            long chunk = size / seg;
+
+            for (int i = 0; i < seg; i++)
+            {
+                from[i] = i * chunk;
+                to[i] = (i == seg - 1) ? size - 1 : (i + 1) * chunk - 1;
+                parts[i] = dest + ".p" + i;
+            }
+
+            string tmpDest = dest + ".merging";
+            string dir = Path.GetDirectoryName(dest);
+            try
+            {
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+                var errors = new System.Collections.Concurrent.ConcurrentBag<string>();
+                var options = new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = seg };
+
+                System.Threading.Tasks.Parallel.ForEach(
+                    System.Linq.Enumerable.Range(0, seg), options, i =>
+                {
+                    if (CancelRequested) return;
+                    string why = null;
+                    var swSeg = System.Diagnostics.Stopwatch.StartNew();
+                    for (int attempt = 1; attempt <= 3; attempt++)
+                    {
+                        if (CancelRequested) return;
+                        why = FetchRange(url, from[i], to[i], parts[i], etag);
+                        if (why == null)
+                        {
+                            swSeg.Stop();
+                            if (Environment.GetEnvironmentVariable("MCROUTE_SEG_DEBUG") == "1")
+                                Console.WriteLine(string.Format("    [段{0}] {1:F2}s 第{2}次尝试 {3:F1} MB",
+                                    i, swSeg.Elapsed.TotalSeconds, attempt, (to[i] - from[i]) / 1024.0 / 1024.0));
+                            return;
+                        }
+                        System.Threading.Thread.Sleep(300 * attempt);
+                    }
+                    errors.Add("段" + i + ": " + why);
+                });
+
+                if (CancelRequested)
+                {
+                    Cleanup(parts);
+                    reason = "已取消";
+                    return false;
+                }
+                if (!errors.IsEmpty)
+                {
+                    Cleanup(parts);
+                    reason = string.Join("; ", errors.Take(3));
+                    return false;
+                }
+
+                // 合并 + 边合并边算 SHA-1
+                using (var outFs = new FileStream(tmpDest, FileMode.Create, FileAccess.Write, FileShare.None, 81920))
+                using (var sha = System.Security.Cryptography.SHA1.Create())
+                {
+                    byte[] buf = new byte[81920];
+                    foreach (string partFile in parts)
+                    {
+                        using (var fs = File.OpenRead(partFile))
+                        {
+                            int n;
+                            while ((n = fs.Read(buf, 0, buf.Length)) > 0)
+                            {
+                                outFs.Write(buf, 0, n);
+                                sha.TransformBlock(buf, 0, n, null, 0);
+                            }
+                        }
+                    }
+                    sha.TransformFinalBlock(new byte[0], 0, 0);
+
+                    if (!string.IsNullOrEmpty(expectedSha1))
+                    {
+                        var sb = new System.Text.StringBuilder();
+                        foreach (byte b in sha.Hash) sb.Append(b.ToString("x2"));
+                        string actual = sb.ToString();
+                        if (!string.Equals(actual, expectedSha1, StringComparison.OrdinalIgnoreCase))
+                        {
+                            try { File.Delete(tmpDest); } catch { }
+                            Cleanup(parts);
+                            reason = "合并后 sha1 不符（期望 " + expectedSha1.Substring(0, Math.Min(8, expectedSha1.Length)) +
+                                     "…，实际 " + actual.Substring(0, Math.Min(8, actual.Length)) + "…）";
+                            return false;
+                        }
+                    }
+                }
+
+                long merged = new FileInfo(tmpDest).Length;
+                if (merged != size)
+                {
+                    try { File.Delete(tmpDest); } catch { }
+                    Cleanup(parts);
+                    reason = "合并后大小不符（期望 " + size + "，实际 " + merged + "）";
+                    return false;
+                }
+
+                if (File.Exists(dest)) File.Delete(dest);
+                File.Move(tmpDest, dest);
+                Cleanup(parts);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                try { if (File.Exists(tmpDest)) File.Delete(tmpDest); } catch { }
+                Cleanup(parts);
+                reason = ex.Message;
+                return false;
+            }
+        }
+
+        private static void Cleanup(string[] parts)
+        {
+            foreach (string p in parts)
+            {
+                try { if (File.Exists(p)) File.Delete(p); } catch { }
+            }
+        }
+
+        /// <summary>下载一个区间到文件；成功返回 null，失败返回原因。</summary>
+        private static string FetchRange(string url, long from, long to, string partFile, string etag)
+        {
+            try
+            {
+                var req = (HttpWebRequest)WebRequest.Create(url);
+                req.UserAgent = UA;
+                req.Timeout = 60000;
+                req.ReadWriteTimeout = 60000;
+                req.AddRange(from, to);
+                // 注意：不要加 If-Range。部分服务器（libraries.minecraft.net）在带 If-Range 时
+                // 会改回 200 返回整个文件，导致分段失败。文件一致性由最后的 SHA-1 校验保证。
+
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                {
+                    if (resp.StatusCode != HttpStatusCode.PartialContent)
+                        return "返回 " + (int)resp.StatusCode + "（不是 206）";
+
+                    long expected = to - from + 1;
+                    long got = 0;
+                    using (var net = resp.GetResponseStream())
+                    using (var fs = new FileStream(partFile, FileMode.Create, FileAccess.Write, FileShare.None, 81920))
+                    {
+                        byte[] buf = new byte[81920];
+                        int n;
+                        while ((n = net.Read(buf, 0, buf.Length)) > 0)
+                        {
+                            if (CancelRequested) throw new OperationCanceledException();
+                            fs.Write(buf, 0, n);
+                            got += n;
+                        }
+                    }
+                    if (got != expected)
+                        return "长度不符（期望 " + expected + " 实际 " + got + "）";
+                    return null;
+                }
+            }
+            catch (OperationCanceledException) { return "已取消"; }
+            catch (Exception ex) { return ex.Message; }
+        }
+
         public static bool StreamToFile(string url, string dest, string expectedSha1, out string reason)
         {
             reason = "";
@@ -184,7 +427,8 @@ namespace Mcroute
         /// 下载一个文件到 dest（先试镜像/改写地址，再试官方）。
         /// expectedSha1 为空时跳过校验。返回 ok / skip / fail。
         /// </summary>
-        public static string Download(string url, string dest, string expectedSha1, out string info)
+        public static string Download(string url, string dest, string expectedSha1, out string info,
+                                      bool allowParallel = false)
         {
             info = "";
             if (File.Exists(dest))
@@ -200,6 +444,8 @@ namespace Mcroute
                 try
                 {
                     string reason;
+                    // 大文件先尝试分段并行；不支持 Range / 探测失败会自动退回单连接
+                    if (allowParallel && DownloadParallel(url2, dest, expectedSha1, out reason)) return "ok";
                     if (StreamToFile(url2, dest, expectedSha1, out reason)) return "ok";
                     last = reason;
                 }

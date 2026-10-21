@@ -851,6 +851,11 @@
                             <Button Style="{StaticResource GhostButton}" Content="重新检测 Java" Width="120"
                                     Margin="0,8,0,0" HorizontalAlignment="Left" Click="RefreshJava_Click"/>
 
+                            <CheckBox x:Name="ParallelBox" Margin="0,14,0,0"
+                                      Content="分段下载（实验性：单连接被限速时可能有帮助，否则会更慢）"
+                                      Foreground="{DynamicResource TextSub}"
+                                      Checked="ParallelBox_Changed" Unchecked="ParallelBox_Changed"/>
+
                             <TextBlock Text="下载源（镜像）" Style="{StaticResource FieldLabel}" Margin="0,22,0,6"/>
                             <WrapPanel>
                                 <Button Style="{StaticResource GhostButton}" Content="测速" Width="90"
