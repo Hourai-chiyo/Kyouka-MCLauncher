@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: QQ 邮箱（国内用户推荐）
+    url: mailto:2084619977@qq.com
+    about: 没有 GitHub 账号也可以直接发邮件反馈
+  - name: 最新版本下载
+    url: https://github.com/Hourai-chiyo/mcroute/releases/latest
+    about: 报问题前请先确认是最新版

@@ -1,0 +1,28 @@
+name: 功能建议
+description: 想要某个功能，或觉得哪里不好用
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        说明「你想解决什么问题」比「你要什么功能」更有用。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你遇到的不方便
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你希望的解决方式
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 你觉得这属于
+      options:
+        - 核心功能（下载/加载器/整合包/Java）
+        - 界面体验
+        - 兼容性
+        - 其他

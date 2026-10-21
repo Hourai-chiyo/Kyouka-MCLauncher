@@ -10,7 +10,7 @@
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
 > 本项目已进入beta版本，为主镜像源崩溃时的紧急预案。如有bug，请提交至QQ:3849596108或者邮箱2084619997@qq.com
-> 本项目分为c#版本与python版本。Python版本目前出现安装不稳定的情况，建议使用单文件的C#版本。如有安装失败的情况可尝试重新安装。本应用会跳过已安装项。
+> 主版本为 **C# 单文件（157 KB）**；Python 版已归档到 `legacy/`（冻结维护）。安装失败可直接重试，已装好的内容会自动跳过。
 
 [![Release](https://img.shields.io/github/v/release/Hourai-chiyo/mcroute?label=release)](https://github.com/Hourai-chiyo/mcroute/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Hourai-chiyo/mcroute/total)](https://github.com/Hourai-chiyo/mcroute/releases)
@@ -555,6 +555,23 @@ mcroute.exe loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 ## 路线图
 
 下一步计划（Fabric / Quilt / Legacy Fabric、Java 检测与管理、整合包安装、明确不做的平台）见 [ROADMAP.md](ROADMAP.md)。
+
+## 反馈
+
+| 渠道 | 适合 | 说明 |
+|---|---|---|
+| **[QQ 邮箱 2084619977@qq.com](mailto:2084619977@qq.com)** | 所有人（推荐） | 没有 GitHub 账号也能发 |
+| QQ：3849596108 | 所有人 | 急事直接戳 |
+| **[GitHub Issue](https://github.com/Hourai-chiyo/mcroute/issues/new/choose)** | 有 GitHub 账号的 | 会引导你填版本 / 系统 / 复现步骤 / 日志，修得最快 |
+
+报问题时最好附上：
+
+- 版本号（设置页右下角，或 `mcroute.exe --help`）
+- 哪个界面（`mcroute.exe` / `mcroute-wpf.exe`）
+- 游戏启动日志：`<游戏目录>/logs/mcroute-launch.log`
+- 崩溃日志：`%TEMP%\mcroute-wpf-crash.log`
+
+> 未签名 exe，Windows 首次运行会提示「未知发布者」——点「更多信息 → 仍要运行」即可。
 
 ## 已知限制
 

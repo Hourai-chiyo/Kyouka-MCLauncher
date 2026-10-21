@@ -1,0 +1,64 @@
+name: 报告问题
+description: 启动器装不上、启动失败、界面异常……用这个
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！填得越具体，修得越快。
+        请先确认用的是最新版（[Release](https://github.com/Hourai-chiyo/mcroute/releases/latest)）。
+  - type: dropdown
+    id: ui
+    attributes:
+      label: 用的哪个界面
+      options:
+        - mcroute.exe（WinForms）
+        - mcroute-wpf.exe（WPF）
+        - 命令行
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本号
+      description: 设置页右下角 / 或 --help 里显示
+      placeholder: v0.3.3
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: 系统
+      placeholder: Windows 11 26100 / Windows 10 22H2
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 点了什么 → 发生了什么
+      placeholder: |
+        1. 打开 mcroute-wpf.exe
+        2. 选 1.20.1
+        3. 点「开始游戏」
+        4. 弹出 xxx 错误
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志（重要）
+      description: |
+        游戏启动日志在 `<游戏目录>/logs/mcroute-launch.log`；
+        崩溃日志在 `%TEMP%\mcroute-wpf-crash.log`（WPF 版）。
+        直接粘贴内容，或拖进来。
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: 截图 / 其他
