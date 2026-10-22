@@ -450,6 +450,26 @@ namespace Mcroute.Wpf
                     return;
                 }
 
+                // Java 版本不够：也提示（比如 1.20 要 17，本机只有 8）
+                if (plan.Java != "java" && plan.JavaMajor > 0 &&
+                    plan.JavaRequired > plan.JavaMajor)
+                {
+                    int needMajor = plan.JavaRequired;
+                    var ans2 = MessageBox.Show(
+                        "这个版本需要 Java " + needMajor + "，检测到的是 Java " + plan.JavaMajor + "。\n\n" +
+                        "现在下载 Java " + needMajor + " 吗？（也可以先直接用 Java " + plan.JavaMajor + " 试，多半会崩）",
+                        "Java 版本不匹配", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (ans2 == MessageBoxResult.Yes)
+                    {
+                        RunTask("安装 Java " + needMajor, () =>
+                        {
+                            string exe = JavaSources.Install(needMajor, _baseDir);
+                            return string.IsNullOrEmpty(exe) ? 1 : 0;
+                        }, () => Dispatcher.BeginInvoke(new Action(() => Play_Click(this, null))));
+                        return;
+                    }
+                }
+
                 // 缺 Java：直接问要不要装，而不是让游戏闪退后自己猜
                 if (plan.Java == "java" || plan.JavaMajor <= 0)
                 {
@@ -500,7 +520,10 @@ namespace Mcroute.Wpf
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         _gameRunning = false;
+                        _gameProc = null;
                         PlayButton.IsEnabled = true;
+                        if (KillButton != null) KillButton.Visibility = Visibility.Collapsed;
+                        StopGameWatchdog();
                         int code = -1;
                         try { code = proc.ExitCode; } catch { }
                         CardTitle.Text = "游戏已退出";
@@ -512,15 +535,94 @@ namespace Mcroute.Wpf
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     _gameRunning = true;
+                    _gameProc = proc;
+                    _noWindowTicks = 0;
                     PlayButton.IsEnabled = false;
+                    if (KillButton != null)
+                    {
+                        KillButton.Visibility = Visibility.Visible;
+                        KillButton.Content = "强制结束游戏";
+                    }
                     CardTitle.Text = "游戏运行中";
                     CardDetail.Text = "PID " + proc.Id + " · 关掉游戏后这里会自动更新";
                     StatusText.Text = "游戏运行中（PID " + proc.Id + "）";
+                    StartGameWatchdog();
                 }));
             };
 
             RunTask("启动 " + ver, () =>
                 Commands.Launch(new[] { "launch", ver, "--dir", _baseDir, "--memory", mem }));
+        }
+
+        // ===== 退出保护：卡在关闭中时能强制结束 =====
+        private void StartGameWatchdog()
+        {
+            try
+            {
+                StopGameWatchdog();
+                _gameWatchdog = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(10)
+                };
+                _gameWatchdog.Tick += (s2, e2) =>
+                {
+                    var p = _gameProc;
+                    if (p == null) { StopGameWatchdog(); return; }
+                    bool alive;
+                    try { alive = !p.HasExited; } catch { alive = false; }
+                    if (!alive) { StopGameWatchdog(); return; }
+
+                    IntPtr hwnd = IntPtr.Zero;
+                    try { hwnd = p.MainWindowHandle; } catch { }
+                    if (hwnd == IntPtr.Zero)
+                    {
+                        _noWindowTicks++;
+                        if (_noWindowTicks >= 3)   // 约 30 秒没窗口
+                        {
+                            if (KillButton != null) KillButton.Content = "卡在关闭中？点这里强制结束";
+                            CardDetail.Text = "PID " + p.Id + " · 看起来卡在关闭中（窗口已消失但进程还在）";
+                            AppendLog("[退出] 游戏窗口已消失但进程仍在，可用「强制结束」");
+                        }
+                    }
+                    else
+                    {
+                        _noWindowTicks = 0;
+                        if (KillButton != null) KillButton.Content = "强制结束游戏";
+                    }
+                };
+                _gameWatchdog.Start();
+            }
+            catch { }
+        }
+
+        private void StopGameWatchdog()
+        {
+            try
+            {
+                if (_gameWatchdog != null) { _gameWatchdog.Stop(); _gameWatchdog = null; }
+                _noWindowTicks = 0;
+            }
+            catch { }
+        }
+
+        private void KillGame_Click(object sender, RoutedEventArgs e)
+        {
+            var p = _gameProc;
+            if (p == null) { MessageBox.Show("没有正在运行的游戏", "提示"); return; }
+            if (MessageBox.Show("强制结束 PID " + p.Id + " 的游戏进程？\n\n" +
+                    "如果它卡在「正在关闭内置服务器」，这通常能救回来；\n" +
+                    "但若正在保存存档，可能丢失最后几秒的进度。",
+                    "强制结束", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            try
+            {
+                p.Kill();
+                AppendLog("[退出] 已强制结束 PID " + p.Id);
+                StatusText.Text = "就绪 · 已强制结束游戏";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("结束失败：" + ex.Message, "提示");
+            }
         }
 
         /// <summary>恢复上次的窗口大小/位置/页签（越界时夹回屏幕内）。</summary>
@@ -1247,6 +1349,9 @@ namespace Mcroute.Wpf
         private int _page;
         private bool _initializing;
         private bool _gameRunning;
+        private System.Diagnostics.Process _gameProc;
+        private System.Windows.Threading.DispatcherTimer _gameWatchdog;
+        private int _noWindowTicks;
         private readonly System.Collections.Generic.HashSet<string> _cleanroomPrepared =
             new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private string _cancelReason;

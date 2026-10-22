@@ -474,17 +474,21 @@
                     <!-- 品牌 -->
                     <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <Border Width="26" Height="26" CornerRadius="8" Background="{DynamicResource Primary}"/>
-                        <TextBlock Text="Kyouka" Margin="10,0,0,0" FontSize="15" FontWeight="SemiBold"
+                        <TextBlock Text="Kyouka" Margin="9,0,0,0" FontSize="14" FontWeight="SemiBold"
                                    Foreground="{DynamicResource Text}" VerticalAlignment="Center"/>
-                        <TextBlock Text="MCLauncher" FontSize="11" Margin="4,2,0,0" FontWeight="SemiBold"
+                        <TextBlock Text="MCLauncher" FontSize="10" Margin="3,2,0,0" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="SideVersion" Text="" FontSize="10" Margin="8,3,0,0"
+                        <TextBlock x:Name="SideVersion" Text="" FontSize="9.5" Margin="6,3,0,0"
                                    Foreground="{DynamicResource TextFaint}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- 主按钮 -->
-                    <Button x:Name="PlayButton" Grid.Row="1" Style="{StaticResource PrimaryButton}"
-                            Content="开始游戏" Height="38" Margin="0,12,0,0" Click="Play_Click"/>
+                    <StackPanel Grid.Row="1" Margin="0,12,0,0">
+                        <Button x:Name="PlayButton" Style="{StaticResource PrimaryButton}"
+                                Content="开始游戏" Height="38" Click="Play_Click"/>
+                        <Button x:Name="KillButton" Style="{StaticResource GhostButton}" Content="强制结束游戏"
+                                Height="30" Margin="0,6,0,0" Visibility="Collapsed" Click="KillGame_Click"/>
+                    </StackPanel>
 
                     <!-- 导航 -->
                     <StackPanel Grid.Row="2" Margin="0,14,0,0">
@@ -751,7 +755,7 @@
                                 </Border>
                             </Grid>
 
-                            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,14,0,0">
+                            <WrapPanel Grid.Row="3" Orientation="Horizontal" Margin="0,14,0,0">
                                 <Button Style="{StaticResource GhostButton}" Content="刷新" Width="80"
                                         Click="RefreshManage_Click"/>
                                 <Button Style="{StaticResource GhostButton}" Content="体检" Width="80" Margin="8,0,0,0"
@@ -770,7 +774,7 @@
                                         Click="OpenModsBrowser_Click"/>
                         <Button Style="{StaticResource GhostButton}" Content="资源包 · 光影" Width="110" Margin="8,0,0,0"
                                 Click="OpenPacks_Click"/>
-                            </StackPanel>
+                            </WrapPanel>
                         </Grid>
                     </Border>
                 </Grid>
