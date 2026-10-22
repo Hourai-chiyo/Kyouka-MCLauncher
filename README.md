@@ -9,8 +9,10 @@
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
-> Kyouka MCLauncher 1.5.3 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
+> Kyouka MCLauncher 1.6.0 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
 > 主版本为 **Kyouka MCLauncher**（WPF，约 250 KB 单文件）；WinForms 版与 Python 版已归档到 `legacy/`（冻结维护）。
+
+**English**: [README.en.md](README.en.md)
 
 [![Release](https://img.shields.io/github/v/release/Hourai-chiyo/Kyouka-MCLauncher?label=release)](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Hourai-chiyo/Kyouka-MCLauncher/total)](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/releases)
@@ -666,12 +668,25 @@ mcroute.exe loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 ## 路线图
 
 已完成：资源包/光影管理（含 Modrinth 下载）、缺 Java 提示、Cleanroom 一键修复、多实例、优雅关闭游戏。
+## 测试
+
+core 有独立单元测试（81 条断言，net48 控制台，不引 NuGet）：
+
+```powershell
+dotnet build tests/Mcroute.Tests/Mcroute.Tests.csproj -c Release -o tests-out
+tests-out/Mcroute.Tests.exe
+```
+
+覆盖：JSON 解析、版本合并与 rules、更新版本比较、Zip-Slip 防护、mod 元数据（Fabric/Forge/老 Forge）、
+资源包元数据与启停、实例创建/复制/重命名/删除、authlib 地址规整。
+
+另外还有 9 个 `--selftest-*` 命令（security / download / packs / instances / authlib / update /
+proctree / orphan / cleanroom），CI 里全部会跑。
+
 ### 还剩什么
 
-1. **单元测试框架**（现在只有 `--selftest-*` 命令，没有测试工程）
-2. **代码签名**（SignPath Foundation 申请中，通过后填 2 个 secret 即自动签名）
-3. **英文文档**（English summary 目前只有摘要）
-4. **发公告**（稿子在仓库外的 `发布公告.md`）
+1. **代码签名**（SignPath Foundation 申请中，通过后填 2 个 secret 即自动签名）
+2. **发公告**（稿子在仓库外的 `发布公告.md`）
 
 低优先级可选：MC百科中文界面、Cleanroom 组件按 components 解析、退出日志留存。
 详见 [ROADMAP.md](ROADMAP.md) 与 `进度与待办.md`。

@@ -33,6 +33,13 @@ jobs:
       - name: Build legacy CLI (for self-tests)
         run: dotnet build legacy/winforms/McrouteWinForms.csproj -c Release -o build-legacy --nologo
 
+      # ---- 3) core 单元测试（net48 控制台，无 NuGet）----
+      - name: Core unit tests
+        run: |
+          dotnet build tests/Mcroute.Tests/Mcroute.Tests.csproj -c Release -o tests-out --nologo
+          tests-out/Mcroute.Tests.exe
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Sanity check + self-tests
         shell: pwsh
         run: |

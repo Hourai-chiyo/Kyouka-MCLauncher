@@ -90,3 +90,9 @@ core/obj/
 legacy/winforms/out/
 legacy/winforms/obj/
 build-legacy/
+
+# 单元测试产物
+tests/out/
+tests/obj/
+tests/bin/
+_tests_tmp/
