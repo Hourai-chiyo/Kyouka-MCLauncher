@@ -943,15 +943,6 @@ namespace Mcroute.Wpf
             });
         }
 
-        private void OpenModUpdate_Click(object sender, RoutedEventArgs e)
-        {
-            string ver = SelectedManageVersion();
-            if (ver == null) { MessageBox.Show("先在列表里选一个版本", "提示"); return; }
-            string mc, loader, loaderVer;
-            Version.Describe(_baseDir, ver, out mc, out loader, out loaderVer);
-            new ModUpdateWindow(_baseDir, ver, mc, loader) { Owner = this }.ShowDialog();
-        }
-
         private void OpenInstances_Click(object sender, RoutedEventArgs e)
         {
             new InstancesWindow(_baseDir) { Owner = this }.ShowDialog();
@@ -1003,7 +994,9 @@ namespace Mcroute.Wpf
             if (ver == null) { MessageBox.Show("先在列表里选一个版本", "提示"); return; }
             try
             {
-                var w = new ModsWindow(_baseDir, ver) { Owner = this };
+                string mc, loader, loaderVer;
+                Version.Describe(_baseDir, ver, out mc, out loader, out loaderVer);
+                var w = new ModsWindow(_baseDir, ver, mc, loader) { Owner = this };
                 w.ShowDialog();
             }
             catch (Exception ex) { MessageBox.Show("打开失败：" + ex.Message, "提示"); }
