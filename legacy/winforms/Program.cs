@@ -123,6 +123,20 @@ namespace Mcroute
                     case "mkbat": return ExtraCommands.Mkbat(args);
                     case "install": return Packs.Install(args);
                     case "java": return JavaCommand.Run(args);
+                    case "--selftest-authlib":
+                    {
+                        string url = args.Length > 1 ? args[1] : "https://littleskin.cn/api/yggdrasil/";
+                        string dir = Version.BaseDir(ArgOf(args, "--dir"));
+                        Console.WriteLine("  服务器: " + Authlib.NormalizeRoot(url));
+                        Console.WriteLine("  服务器名: " + (Authlib.ServerName(url) ?? "(读不到)"));
+                        string err;
+                        string jar = Authlib.EnsureInjector(dir, out err);
+                        if (jar == null) { Console.WriteLine("[FAIL] " + err); return 1; }
+                        Console.WriteLine("  injector: " + jar + "  " + (new System.IO.FileInfo(jar).Length / 1024) + " KB");
+                        Console.WriteLine("[PASS] 外置登录准备就绪");
+                        return 0;
+                    }
+
                     case "--selftest-update":
                     {
                         Console.WriteLine("当前版本: " + Update.CurrentVersion());

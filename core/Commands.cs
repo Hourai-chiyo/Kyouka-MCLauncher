@@ -329,6 +329,26 @@ namespace Mcroute
             int required = J.Int(J.Dict(vj, "javaVersion") ?? new Dictionary<string, object>(), "majorVersion", 8);
             plan.Java = Java.Find(baseDir, required, javaArg, out plan.JavaMajor);
 
+            // 外置登录（authlib-injector）：有账号就用它的 token，否则离线占位
+            AuthAccount authAccount = null;
+            bool hasAuth = Authlib.TryLoad(baseDir, out authAccount);
+            string authNote = null;
+            if (hasAuth)
+            {
+                string injector = Authlib.InjectorPath(baseDir);
+                if (File.Exists(injector))
+                {
+                    plan.JvmArgs.Add("-javaagent:" + injector + "=" + authAccount.ApiRoot);
+                    authNote = "外置登录：" + authAccount.Name +
+                               (string.IsNullOrEmpty(authAccount.ServerName) ? "" : " @ " + authAccount.ServerName);
+                }
+                else
+                {
+                    authNote = "外置登录：缺少 authlib-injector.jar（按离线启动）";
+                    hasAuth = false;
+                }
+            }
+
             // 变量上下文
             string sep = ";";
             var ctx = new Dictionary<string, string>
@@ -344,11 +364,11 @@ namespace Mcroute
                 { "classpath_separator", sep },
                 { "launcher_name", "mcroute" },
                 { "launcher_version", "0.2" },
-                { "auth_player_name", "Player" },
-                { "auth_uuid", "00000000000000000000000000000000" },
-                { "auth_access_token", "0" },
-                { "auth_session", "0" },
-                { "user_type", "legacy" },
+                { "auth_player_name", hasAuth ? authAccount.Name : "Player" },
+                { "auth_uuid", hasAuth ? authAccount.Uuid : "00000000000000000000000000000000" },
+                { "auth_access_token", hasAuth ? authAccount.AccessToken : "0" },
+                { "auth_session", hasAuth ? authAccount.AccessToken : "0" },
+                { "user_type", hasAuth ? "mojang" : "legacy" },
                 { "user_properties", "{}" },
                 { "clientid", "0" },
                 { "auth_xuid", "0" },
@@ -388,6 +408,9 @@ namespace Mcroute
             // 默认堆内存（json 没指定时补上，和 Python 版一致）
             if (!plan.JvmArgs.Any(x => x.StartsWith("-Xms"))) plan.JvmArgs.Insert(0, "-Xms512M");
             if (!plan.JvmArgs.Any(x => x.StartsWith("-Xmx"))) plan.JvmArgs.Insert(1, "-Xmx2G");
+
+            if (!string.IsNullOrEmpty(authNote))
+                plan.FixNote = string.IsNullOrEmpty(plan.FixNote) ? authNote : plan.FixNote + " · " + authNote;
 
             // 指定 java.io.tmpdir：有些机器/受限环境里 %TEMP% 不可写，
             // JNA 之类往临时目录解压 dll 会失败（UnsatisfiedLinkError: jnidispatch.dll）。
@@ -445,6 +468,9 @@ namespace Mcroute
             Console.WriteLine("  mainClass  : " + plan.MainClass);
             Console.WriteLine("  Java       : " + plan.Java + "   (Java " + plan.JavaMajor + ")");
             Console.WriteLine("  工作目录   : " + plan.GameDir);
+            if (!string.IsNullOrEmpty(plan.FixNote)) Console.WriteLine("  登录/修复  : " + plan.FixNote);
+            foreach (string ja in plan.JvmArgs)
+                if (ja.StartsWith("-javaagent:")) Console.WriteLine("  javaagent  : " + ja);
             Console.WriteLine("  classpath  : " + plan.Classpath.Count + " 个条目（按规则跳过 " + plan.SkippedLibs + " 个库）");
             Console.WriteLine("  natives    : " + plan.NativesJars.Count + " 个 jar → " + plan.NativesDir);
             Console.WriteLine("  assets索引 : " + plan.AssetIndex);

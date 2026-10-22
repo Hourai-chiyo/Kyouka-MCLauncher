@@ -566,9 +566,12 @@
                                       Stretch="Fill" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                             </Grid>
                         </Border>
-                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="Steve" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Text}"/>
-                            <TextBlock Text="离线模式" FontSize="10" Foreground="{DynamicResource TextMuted}"/>
+                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Cursor="Hand"
+                                    MouseLeftButtonUp="Account_Click" ToolTip="点击登录（外置登录 / 皮肤站）">
+                            <TextBlock x:Name="AccountName" Text="Steve" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Text}"/>
+                            <TextBlock x:Name="AccountMode" Text="离线模式 · 点击登录" FontSize="10"
+                                       Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
                         <Button Grid.Column="2" Style="{StaticResource GhostButton}" Content="打开目录" Width="88" Height="28"
                                 Click="OpenDir_Click"/>

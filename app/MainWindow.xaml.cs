@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -31,6 +32,10 @@ namespace Mcroute.Wpf
 
             try { if (AboutVersion != null) AboutVersion.Text = "Kyouka MCLauncher v" + Update.CurrentVersion(); } catch { }
 
+            Loaded += (s, e) =>
+            {
+                try { RefreshAccount(); } catch { }
+            };
             Loaded += (s, e) =>
             {
                 RefreshVersions();
@@ -729,6 +734,28 @@ namespace Mcroute.Wpf
                 SaveConfig();
                 RefreshVersions();
                 AppendLog("已切换数据目录：" + chosen);
+            }
+        }
+
+        // ===== 外置登录 =====
+        private void Account_Click(object sender, MouseButtonEventArgs e)
+        {
+            var dlg = new AuthlibWindow(_baseDir) { Owner = this };
+            if (dlg.ShowDialog() == true) RefreshAccount();
+        }
+
+        private void RefreshAccount()
+        {
+            AuthAccount a;
+            if (Authlib.TryLoad(_baseDir, out a) && a != null)
+            {
+                AccountName.Text = a.Name;
+                AccountMode.Text = "外置登录 · " + (string.IsNullOrEmpty(a.ServerName) ? "皮肤站" : a.ServerName);
+            }
+            else
+            {
+                AccountName.Text = "Steve";
+                AccountMode.Text = "离线模式 · 点击登录";
             }
         }
 

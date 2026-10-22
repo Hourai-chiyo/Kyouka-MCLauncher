@@ -70,6 +70,44 @@ namespace Mcroute.Wpf
                 return;
             }
 
+            // 外置登录窗口截图：--shot-authlib <输出.png> [宽 高]
+            if (args.Length >= 2 && args[0] == "--shot-authlib")
+            {
+                ShotMode = true;
+                try
+                {
+                    try { Mcroute.Theme.Apply(Environment.GetEnvironmentVariable("MCROUTE_THEME") ?? "auto"); } catch { }
+                    string baseDir = Environment.GetEnvironmentVariable("MCROUTE_DATA");
+                    if (string.IsNullOrEmpty(baseDir)) baseDir = Mcroute.Version.BaseDir(null);
+                    int w = args.Length >= 3 ? int.Parse(args[2]) : 520;
+                    int h = args.Length >= 4 ? int.Parse(args[3]) : 470;
+
+                    var authWin = new AuthlibWindow(baseDir)
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = -10000, Top = -10000, Width = w, Height = h, ShowInTaskbar = false,
+                    };
+                    authWin.Show();
+                    authWin.UpdateLayout();
+                    Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                    PumpFor(TimeSpan.FromMilliseconds(600));
+
+                    var visual = (Visual)authWin.Content;
+                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(visual);
+                    string dir = Path.GetDirectoryName(Path.GetFullPath(args[1]));
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(rtb));
+                    using (var fs = File.Create(args[1])) enc.Save(fs);
+                    ShotTrace("shot-authlib saved");
+                    authWin.Close();
+                }
+                catch (Exception ex) { ShotTrace("shot-authlib 异常: " + ex); }
+                Shutdown(0);
+                return;
+            }
+
             // 文件浏览窗口截图：--shot-browser <目录> <输出.png> [宽 高]
             if (args.Length >= 3 && args[0] == "--shot-browser")
             {
