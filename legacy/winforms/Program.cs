@@ -137,6 +137,36 @@ namespace Mcroute
                         return 0;
                     }
 
+                    case "--selftest-proctree":
+                    {
+                        string self = System.Reflection.Assembly.GetEntryAssembly().Location;
+                        Console.WriteLine("  用 cmd.exe 当父进程，里面起一个自己的界面实例当子进程…");
+                        var cmdProc = System.Diagnostics.Process.Start("cmd.exe", "/c \"" + self + "\"");
+                        if (cmdProc == null) { Console.WriteLine("[FAIL] 起不来 cmd"); return 1; }
+                        System.Threading.Thread.Sleep(3000);
+
+                        var desc = ProcessTree.Descendants(cmdProc.Id);
+                        Console.WriteLine("  父 PID " + cmdProc.Id + " 的子孙: " + (desc.Count == 0 ? "(无)" : string.Join(", ", desc)));
+                        if (desc.Count == 0) { try { cmdProc.Kill(); } catch { } Console.WriteLine("[FAIL] 没找到子进程"); return 1; }
+
+                        int sent = ProcessTree.CloseWindowsInTree(cmdProc.Id);
+                        Console.WriteLine("  进程树里共发送 WM_CLOSE 到 " + sent + " 个窗口");
+                        System.Threading.Thread.Sleep(2500);
+
+                        var alive = ProcessTree.AliveInTree(cmdProc.Id);
+                        if (alive.Count > 0)
+                        {
+                            Console.WriteLine("  仍有存活: " + string.Join(", ", alive) + " → 强杀整棵树");
+                            ProcessTree.KillTree(cmdProc.Id);
+                            System.Threading.Thread.Sleep(1200);
+                            alive = ProcessTree.AliveInTree(cmdProc.Id);
+                        }
+
+                        if (alive.Count == 0 && sent > 0) { Console.WriteLine("[PASS] 进程树关闭成功（父+子全部退出）"); return 0; }
+                        Console.WriteLine("[FAIL] 残留 " + alive.Count + " 个进程（sent=" + sent + "）");
+                        return 1;
+                    }
+
                     case "--selftest-close":
                     {
                         // 用自己（WinForms 界面）当目标：记事本在 Win11 是商店应用，PID 会换

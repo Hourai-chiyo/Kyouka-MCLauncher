@@ -9,8 +9,8 @@
     <RootNamespace>Mcroute.Wpf</RootNamespace>
     <ApplicationIcon>..\legacy\winforms\app.ico</ApplicationIcon>
     <ApplicationManifest>..\legacy\winforms\app.manifest</ApplicationManifest>
-    <Version>1.5.1</Version>
-    <FileVersion>1.5.1.0</FileVersion>
+    <Version>1.5.2</Version>
+    <FileVersion>1.5.2.0</FileVersion>
     <Product>mcroute — Minecraft Java 启动器（WPF 原型）</Product>
     <Company>Hourai-chiyo</Company>
     <Description>WPF 视觉原型：只做界面壳，功能逻辑复用 csharp/ 下的 Core</Description>
@@ -43,6 +43,7 @@
     <Compile Include="..\core\CleanroomSetup.cs" Link="Core\CleanroomSetup.cs" />
     <Compile Include="..\core\Instances.cs"  Link="Core\Instances.cs" />
     <Compile Include="..\core\WindowCloser.cs" Link="Core\WindowCloser.cs" />
+    <Compile Include="..\core\ProcessTree.cs" Link="Core\ProcessTree.cs" />
   </ItemGroup>
 
   <ItemGroup>

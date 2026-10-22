@@ -510,6 +510,12 @@ namespace Mcroute.Wpf
                 return;
             }
 
+            if (CloseGameButton != null)
+            {
+                CloseGameButton.Visibility = Visibility.Visible;
+                CloseGameButton.Content = _gameProc == null ? "取消启动" : "关闭游戏";
+            }
+
             string mem = MemoryBox.Text.Trim();
             CardTitle.Text = "正在启动";
             CardDetail.Text = ver + " · " + mem + " 内存";
@@ -520,6 +526,23 @@ namespace Mcroute.Wpf
             {
                 proc.Exited += (s2, e2) =>
                 {
+                    // 父进程退出后，javaw 子进程可能还在（音乐继续）——这里兜底清掉
+                    try
+                    {
+                        int pid = _gameRootPid > 0 ? _gameRootPid : proc.Id;
+                        System.Threading.Tasks.Task.Run(() =>
+                        {
+                            var alive = ProcessTree.AliveInTree(pid);
+                            if (alive.Count > 0)
+                            {
+                                ProcessTree.KillTree(pid);
+                                Dispatcher.BeginInvoke(new Action(() =>
+                                    AppendLog("[关闭] 父进程已退出，清理残留子进程：" + string.Join(", ", alive))));
+                            }
+                        });
+                    }
+                    catch { }
+
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         _gameRunning = false;
@@ -539,7 +562,9 @@ namespace Mcroute.Wpf
                 {
                     _gameRunning = true;
                     _gameProc = proc;
+                    _gameRootPid = proc.Id;
                     _noWindowTicks = 0;
+                    _cancelLaunch = false;
                     PlayButton.IsEnabled = false;
                     if (CloseGameButton != null)
                     {
@@ -554,7 +579,16 @@ namespace Mcroute.Wpf
             };
 
             RunTask("启动 " + ver, () =>
-                Commands.Launch(new[] { "launch", ver, "--dir", _baseDir, "--memory", mem }));
+                Commands.Launch(new[] { "launch", ver, "--dir", _baseDir, "--memory", mem }), () =>
+            {
+                if (_gameProc == null && CloseGameButton != null)
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (_gameProc == null) CloseGameButton.Visibility = Visibility.Collapsed;
+                    }));
+                }
+            });
         }
 
         // ===== 退出保护：卡在关闭中时能强制结束 =====
@@ -610,75 +644,73 @@ namespace Mcroute.Wpf
 
         private void CloseGame_Click(object sender, RoutedEventArgs e)
         {
-            var p = _gameProc;
-            if (p == null) { MessageBox.Show("没有正在运行的游戏", "提示"); return; }
+            // 还在启动阶段（游戏进程没出来）：取消这次启动
+            if (_gameProc == null)
+            {
+                if (!_running) { StatusText.Text = "没有正在运行的游戏"; return; }
+                _cancelLaunch = true;
+                Http.CancelRequested = true;
+                StatusText.Text = "正在取消启动…";
+                AppendLog("[关闭] 用户取消启动");
+                if (CloseGameButton != null) CloseGameButton.Content = "正在取消…";
+                return;
+            }
 
-            StatusText.Text = "正在关闭游戏…（已请求游戏退出）";
+            var root = _gameProc;
+            int rootPid = _gameRootPid > 0 ? _gameRootPid : root.Id;
+            StatusText.Text = "正在关闭游戏（含后台进程树）…";
             CardDetail.Text = "正在关闭…";
 
-            // 先给这个进程的**所有顶层窗口**发 WM_CLOSE（只发 MainWindowHandle 经常无效）
-            int sent = WindowCloser.CloseAll(p.Id);
-            try { p.CloseMainWindow(); } catch { }
-            AppendLog("[关闭] 已向 PID " + p.Id + " 的 " + sent + " 个窗口发送关闭请求");
+            // 一次性快照整棵树的 pid（java.exe → javaw.exe / 辅助进程）
+            var tree = ProcessTree.Tree(rootPid);
+            AppendLog("[关闭] 进程树 PID：" + string.Join(", ", tree));
+
+            // 1) 给树里每个进程的所有窗口发 WM_CLOSE
+            int sent = ProcessTree.CloseWindowsInTree(rootPid);
+            AppendLog("[关闭] 已发送 WM_CLOSE 到 " + sent + " 个窗口");
+
+            // 2) taskkill /T（不带 /F）= 请求整棵树退出
+            ProcessTree.SoftKillTree(rootPid);
 
             var waiter = new System.Threading.Tasks.Task(() =>
             {
-                bool exited = false, windowGone = false;
+                bool allGone = false;
                 for (int i = 0; i < 20; i++)   // 最多 10 秒
                 {
                     System.Threading.Thread.Sleep(500);
-                    try
-                    {
-                        if (p.HasExited) { exited = true; break; }
-                        if (!windowGone && p.MainWindowHandle == IntPtr.Zero)
-                        {
-                            windowGone = true;
-                            Dispatcher.BeginInvoke(new Action(() =>
-                            {
-                                StatusText.Text = "窗口已关闭，等待进程退出…";
-                                CardDetail.Text = "窗口已关闭，等待进程退出…";
-                            }));
-                        }
-                    }
-                    catch { exited = true; break; }
+                    var alive = ProcessTree.AliveInTree(rootPid);
+                    if (alive.Count == 0) { allGone = true; break; }
                 }
 
-                // 窗口都关了、进程还不退：直接结束（用户点的是"关闭游戏"，不是"最小化"）
-                if (!exited && windowGone)
+                // 3) 还活着就强杀整棵树（含 javaw 子进程）
+                if (!allGone)
                 {
-                    try
-                    {
-                        p.Kill();
-                        AppendLog("[关闭] 窗口已关但进程未退出，已自动结束 PID " + p.Id);
-                        exited = true;
-                    }
-                    catch { }
+                    ProcessTree.KillTree(rootPid);
+                    System.Threading.Thread.Sleep(800);
+                    allGone = ProcessTree.AliveInTree(rootPid).Count == 0;
+                    if (allGone)
+                        Dispatcher.BeginInvoke(new Action(() =>
+                            AppendLog("[关闭] 优雅关闭失败，已强制结束整棵进程树 " + rootPid)));
                 }
 
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    if (exited)
+                    var alive = ProcessTree.AliveInTree(rootPid);
+                    if (alive.Count == 0)
                     {
                         _gameRunning = false;
+                        _gameProc = null;
+                        _gameRootPid = 0;
+                        PlayButton.IsEnabled = true;
                         if (CloseGameButton != null) CloseGameButton.Visibility = Visibility.Collapsed;
                         StopGameWatchdog();
                         StatusText.Text = "就绪 · 游戏已退出";
-                        CardDetail.Text = "游戏已退出";
-                        return;
+                        CardDetail.Text = "游戏已退出（含后台进程）";
                     }
-
-                    var ans = MessageBox.Show(
-                        "关闭请求已发送，但游戏 10 秒内没有退出。\n\n要强制结束进程吗？",
-                        "关闭游戏", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                    if (ans == MessageBoxResult.Yes)
+                    else
                     {
-                        try
-                        {
-                            p.Kill();
-                            AppendLog("[关闭] 已强制结束 PID " + p.Id);
-                            StatusText.Text = "就绪 · 已强制结束游戏";
-                        }
-                        catch (Exception ex) { MessageBox.Show("结束失败：" + ex.Message, "提示"); }
+                        StatusText.Text = "还有 " + alive.Count + " 个进程没退出（PID " + string.Join("/", alive) + "）";
+                        CardDetail.Text = "未能完全结束，可再点一次「关闭游戏」";
                     }
                 }));
             });
@@ -1447,6 +1479,8 @@ namespace Mcroute.Wpf
         private bool _initializing;
         private bool _gameRunning;
         private System.Diagnostics.Process _gameProc;
+        private int _gameRootPid;
+        private bool _cancelLaunch;
         private System.Windows.Threading.DispatcherTimer _gameWatchdog;
         private int _noWindowTicks;
         private readonly System.Collections.Generic.HashSet<string> _cleanroomPrepared =
