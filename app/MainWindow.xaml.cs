@@ -40,6 +40,7 @@ namespace Mcroute.Wpf
             {
                 RefreshVersions();
                 RefreshJava();
+                CheckOrphanProcesses();
                 Mirrors.ContextBaseDir = _baseDir;
                 Mirrors.Invalidate();
                 RefreshMirrors();
@@ -642,6 +643,34 @@ namespace Mcroute.Wpf
             catch { }
         }
 
+        /// <summary>启动时检查上次遗留的游戏进程（启动器崩溃/被强杀时会留下）。</summary>
+        private void CheckOrphanProcesses()
+        {
+            var t = new System.Threading.Tasks.Task(() =>
+            {
+                System.Collections.Generic.List<int> pids;
+                try { pids = OrphanCleaner.FindLeftovers(_baseDir); }
+                catch { return; }
+                if (pids == null || pids.Count == 0) return;
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    AppendLog("[残留] 发现 " + pids.Count + " 个上次运行留下的游戏进程：" + string.Join(", ", pids));
+                    var ans = MessageBox.Show(
+                        "发现上次运行残留的游戏进程（PID " + string.Join(", ", pids) + "）。\n\n" +
+                        "它们没有窗口，但可能还在后台放音乐/占内存。要结束吗？",
+                        "清理残留进程", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (ans == MessageBoxResult.Yes)
+                    {
+                        int n = OrphanCleaner.Kill(pids);
+                        AppendLog("[残留] 已清理 " + n + " 个");
+                        StatusText.Text = "就绪 · 已清理残留进程 " + n + " 个";
+                    }
+                }));
+            });
+            t.Start();
+        }
+
         private void CloseGame_Click(object sender, RoutedEventArgs e)
         {
             // 还在启动阶段（游戏进程没出来）：取消这次启动
@@ -691,6 +720,19 @@ namespace Mcroute.Wpf
                     if (allGone)
                         Dispatcher.BeginInvoke(new Action(() =>
                             AppendLog("[关闭] 优雅关闭失败，已强制结束整棵进程树 " + rootPid)));
+
+                    // 兜底：父进程可能已退出、子进程被"过继"成孤儿，按命令行特征再扫一遍
+                    try
+                    {
+                        var leftovers = OrphanCleaner.FindLeftovers(_baseDir);
+                        if (leftovers.Count > 0)
+                        {
+                            int n = OrphanCleaner.Kill(leftovers);
+                            Dispatcher.BeginInvoke(new Action(() =>
+                                AppendLog("[关闭] 清理残留游戏进程 " + n + " 个：" + string.Join(", ", leftovers))));
+                        }
+                    }
+                    catch { }
                 }
 
                 Dispatcher.BeginInvoke(new Action(() =>

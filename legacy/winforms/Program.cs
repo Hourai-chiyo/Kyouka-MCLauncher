@@ -137,6 +137,21 @@ namespace Mcroute
                         return 0;
                     }
 
+                    case "--selftest-orphan":
+                    {
+                        string dir = Version.BaseDir(ArgOf(args, "--dir"));
+                        var pids = OrphanCleaner.FindLeftovers(dir);
+                        Console.WriteLine("  数据目录: " + dir);
+                        Console.WriteLine("  找到残留进程: " + (pids.Count == 0 ? "(无)" : string.Join(", ", pids)));
+                        if (Array.IndexOf(args, "--kill") >= 0 && pids.Count > 0)
+                        {
+                            int n = OrphanCleaner.Kill(pids);
+                            Console.WriteLine("  已结束 " + n + " 个");
+                        }
+                        Console.WriteLine("[PASS] 残留检测可用（当前 " + pids.Count + " 个）");
+                        return 0;
+                    }
+
                     case "--selftest-proctree":
                     {
                         string self = System.Reflection.Assembly.GetEntryAssembly().Location;
