@@ -9,7 +9,7 @@
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
-> Kyouka MCLauncher 1.0.0 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
+> Kyouka MCLauncher 1.1.0 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
 > 主版本为 **Kyouka MCLauncher**（WPF，约 250 KB 单文件）；WinForms 版与 Python 版已归档到 `legacy/`（冻结维护）。
 
 [![Release](https://img.shields.io/github/v/release/Hourai-chiyo/Kyouka-MCLauncher?label=release)](https://github.com/Hourai-chiyo/Kyouka-MCLauncher/releases/latest)
@@ -94,13 +94,13 @@ Get-FileHash .\KyoukaMCLauncher.exe -Algorithm SHA256
 ### 源码运行
 
 ```bat
-:: 主版本（C#）
+:: 主版本（WPF）
 dotnet build app\KyoukaMCLauncher.csproj -c Release -o app\out
 app\out\KyoukaMCLauncher.exe
 
-:: WPF 界面
+:: 自测 / CLI（legacy 的 WinForms 工程同时是 CLI 宿主）
 dotnet build legacy\winforms\McrouteWinForms.csproj -c Release -o legacy\winforms\out
-app\out\KyoukaMCLauncher.exe
+legacy\winforms\out\mcroute.exe --selftest-security
 
 :: 历史版本（Python）
 cd legacy
@@ -117,8 +117,12 @@ python mcroute_gui.py
 | 6 种加载器安装 | ✅ | ⚠️ 手动实测 4 种（Forge legacy/现代、NeoForge×2） | ✅（Fabric 系在普通桌面会话实测通过） |
 | 3 种整合包安装 | ✅ | ⚠️ 手动回归（mrpack/MultiMC/CurseForge） | ✅ |
 | Java 自动下载 | ✅ | ✅ 实测（清华镜像 101 MB / 13 s） | ✅ |
-| 正版登录（login） | 仅 legacy 版 | ❌ Mojang AppID 未过审 | ❌ 暂不可用 |
-| 单文件分段并行下载（HTTP Range） | ❌ | — | — |
+| 微软正版登录 | ❌（AppID 被拒） | — | ❌ 不可用 |
+| **外置登录（authlib-injector / 皮肤站）** | ✅ | ✅ `--selftest-authlib` + 实机 | ✅ v1.1.0 |
+| **Mod 下载（Modrinth / CurseForge / 链接）** | ✅ | ✅ 实机（sodium / IC2） | ✅ v0.5.x（CF 需自带 Key） |
+| **自动更新** | ✅ | ✅ `--selftest-update` | ✅ v1.0.1 |
+| 分段下载（HTTP Range + 自适应） | ✅ | ✅ 实测（本机单连接 4.7 MB/s → 自动不分段） | ✅ v0.4.1（默认关） |
+| Cleanroom（1.12.2） | 🟡 手工 | ✅ 手工五步跑通（149 mod） | 🟡 需手工配置，见 `docs/cleanroom.md` |
 
 > 说明：**"代码写了" ≠ "测过了" ≠ "普通用户能直接用"**。上表把三者分开列，
 > 避免出现"README 写了但实际不能用"的情况。
@@ -144,8 +148,10 @@ python mcroute_gui.py
 | Java 检测 | 扫描 PATH 与常见安装目录，按版本要求自动匹配（`mcroute.exe java list` 列出全部） |
 | **整合包** | 自动识别 Modrinth `.mrpack` / MultiMC·Prism 实例包 / CurseForge zip（CF 需要免费 API key） |
 | 本地缓存 | 内容寻址（`assets/objects/<h2>/<hash>`），天然去重 |
-| 图形界面 | tkinter，零依赖，下载 / 启动 / 登录状态 / 日志 |
-| 微软登录 | OAuth 设备码流程（需自备 client_id，见下） |
+| 图形界面 | WPF，单文件零依赖：侧栏导航 / 深浅色 / 玻璃面板 / 自定义背景图 |
+| **外置登录** | 皮肤站（Yggdrasil）：账号卡片点一下，自动注入 authlib-injector（见下） |
+| Mod | 本地启停删除 · Modrinth 搜索装 · CurseForge（自带 Key）· 任意 jar 直链粘贴安装 |
+| 自动更新 | 查 GitHub Release → 下载 → 重启替换（失败保留原程序） |
 | 源加速 | 大学镜像优先 + 官方兜底；Forge/NeoForge 的 maven 库走镜像快 5~12 倍（见下） |
 | 源体检 | 一条命令测出所有下载源当前的真实速度 |
 
@@ -155,9 +161,14 @@ python mcroute_gui.py
 
 版本要求的 Java 不对时会直接告诉你，并支持一键下载：
 
+图形界面：**下载页 → 安装 Java**（Adoptium 清华镜像 → Azul → Corretto），
+设置页「本机 Java」可以看到全部检测结果。
+
+命令行（legacy CLI）：
+
 ```bat
-mcroute.exe java list              :: 看看本机有哪些 Java
-mcroute.exe java install 17        :: 下载并安装 Java 17
+legacy\winforms\out\mcroute.exe java list      :: 列出本机 Java
+legacy\winforms\out\mcroute.exe java install 17 :: 下载并安装 Java 17
 ```
 
 GUI 里也有：启动页 → Java 分组 → 选版本 → **下载并安装**。
@@ -342,20 +353,26 @@ NeoForge 的 `BootstrapLauncher` 会把部分库放进 JVM 的 module path，同
 
 ---
 
-## 微软登录（可选，仅 legacy 版）
+## 登录方式
 
-登录用于在线游玩。**离线模式下单人游戏不受影响。**
+| 方式 | 状态 | 说明 |
+|---|---|---|
+| **外置登录（皮肤站）** | ✅ 推荐 | 账号卡片点一下 → 填皮肤站地址（默认 LittleSkin）+ 账号密码；启动时自动加 `-javaagent:authlib-injector.jar=<api_root>` |
+| 离线模式 | ✅ 默认 | 单人游戏、局域网都正常；进不了正版服务器 |
+| 微软正版登录 | ❌ 不可用 | AppID 申请**被 Mojang 拒绝**（2026-10-21），详见 `进度与待办.md` 附录 B |
 
-登录需要一个 Azure 应用的 **client_id**：
+![外置登录](docs/gui-wpf-authlib.png)
 
-1. 在 `https://entra.microsoft.com` 注册应用（受支持的帐户类型需包含「个人 Microsoft 帐户」）
-2. 「身份验证」→「允许公共客户端流」设为**是**
-3. 把 client_id 单独一行写入 `mcdata/client_id.txt`
+外置登录用的是第三方 Yggdrasil 账号（LittleSkin 等皮肤站），**不是** Mojang 正版账号——
+这和 HMCL / PCL 的「外置登录」是同一个方案，合规且不需要经过 Mojang 白名单。
 
-**注意：** Mojang 对调用 `api.minecraftservices.com` 的 client_id 设有白名单，新应用需要先通过官方表单申请：
-`https://aka.ms/mce-reviewappid`
+> 外置登录只保存返回的 `accessToken`（`authlib_account.json`），**不保存密码**。
+> 想退回离线模式：账号窗口里点「退出登录」。
 
-未通过审核前，认证流程会走到最后一步并返回 `Invalid app registration`——这不是配置错误。
+**为什么微软登录不行**：Mojang 对调用 `api.minecraftservices.com` 的 client_id 设有白名单，
+第三方启动器必须先把 AppID 提交备案（<https://aka.ms/mce-reviewappid>）。我们的申请被拒，
+且官方明确表示不提供申诉协助。legacy Python 版保留了 OAuth 设备码实现，
+但同样受白名单限制，会返回 `Invalid app registration`——这不是配置错误。
 
 ---
 
@@ -641,7 +658,8 @@ mcroute.exe loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 
 ## 路线图
 
-下一步计划（Fabric / Quilt / Legacy Fabric、Java 检测与管理、整合包安装、明确不做的平台）见 [ROADMAP.md](ROADMAP.md)。
+下一步：资源包/光影管理、启动时缺 Java 自动提示、Cleanroom 一键修复、多实例、单元测试。
+详见 [ROADMAP.md](ROADMAP.md) 与 `进度与待办.md`。
 
 ## 反馈
 
@@ -653,7 +671,7 @@ mcroute.exe loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 
 报问题时最好附上：
 
-- 版本号（设置页右下角，或 `mcroute.exe --help`）
+- 版本号（设置页右下角；或 `legacy\winforms\out\mcroute.exe --help`）
 - 哪个版本（`KyoukaMCLauncher.exe` / legacy 版）
 - 游戏启动日志：`<游戏目录>/logs/mcroute-launch.log`
 - 崩溃日志：`%TEMP%\KyoukaMCLauncher-crash.log`
@@ -662,45 +680,46 @@ mcroute.exe loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 
 ## 已知限制
 
-### 正版登录卡在 Mojang 的 AppID 备案（当前唯一的硬阻塞）
+### 微软正版登录不可用（AppID 被拒，非技术问题）
 
-实测链路（2026-10-20）：
+链路本身是通的（设备码 → 微软令牌 → XBL → XSTS 全过），最后一步
+`login_with_xbox` 被 Mojang 以 `Invalid app registration` 拒绝：
+第三方启动器必须先把 AppID 提交白名单（<https://aka.ms/mce-reviewappid>）。
 
-| 步骤 | 状态 |
-|---|---|
-| 设备码 → 微软账号授权 | ✅ |
-| `login.microsoftonline.com` 换访问令牌 | ✅ |
-| Xbox Live 认证（XBL） | ✅ |
-| XSTS 授权 | ✅ |
-| `login_with_xbox` 换 Minecraft 令牌 | ❌ `Invalid app registration` |
-
-前四步全通，最后一步是 **Mojang 侧**拒绝：第三方启动器想让玩家用正版账号登录，必须先把 AppID 提交备案。
-
-- 申请地址：<https://aka.ms/mce-reviewappid>
-- 这与账号、网络、加速器都无关，纯粹是等待审批
-- 审批通过前只能用**离线模式**（可单机游玩，进不了正版服务器）
-- 通过后只需再跑一次 `cd legacy && python mcroute.py login`（**只有 legacy 版有这个命令**），之后靠 refresh token 自动续期
+- 我们的申请于 2026-10-21 被拒，官方明确不提供申诉/咨询
+- 替代方案：**外置登录**（皮肤站，v1.1.0）或离线模式
+- 不做的事：借用公开的 client_id（违反条款，且会导致**用户**账号异常）
 
 ### 其他
 
 - **离线模式下的报错是正常的**：部分版本（如 1.20.1、1.12.2）的 authlib 启动时会拿占位令牌去校验，
   会打印 `InvalidCredentialsException: 401` / `Realms` 授权失败，不影响进游戏
-- **没有一键安装器**：需要 Python 3.9+（本项目在 3.14 上测试）和 tkinter（Windows 自带）
-- **CurseForge 整合包需要 API key**：`console.curseforge.com` 免费申请，放环境变量 `CF_API_KEY`
-  或 `mcdata/cf_api_key.txt`
-- **内存要手动指定**：`--memory 6G`，默认 2G（大整合包 2G 会崩）
+- **单文件即装即用**：.NET Framework 4.8（Win10/11 自带），无需安装运行时
+- **CurseForge 需要 API key**：`console.curseforge.com` 免费申请（**该站仅 Google 登录，国内较难**），
+  可在「下载 Mod」窗口直接填，存到 `<数据目录>/cf_api_key.txt`
+- **内存要手动指定**：设置页「最大内存」，默认 2G（149 个 mod 那种整合包建议 6G+）
+- **启动时缺 Java 不会自动装**：只做检测，需要用户点一次「安装 Java」
+- **Cleanroom 实例需手工配置**：见 [`docs/cleanroom.md`](docs/cleanroom.md)（一键修复在做）
 - **OptiFine 不支持**：它是"改 jar"的版本覆盖模式，和多版本共存天然冲突
 
 ---
 
 ## English summary (for reviewers)
 
-`mcroute` is a personal, non-commercial Minecraft: Java Edition launcher for the
-Chinese network environment. It authenticates through Microsoft OAuth (device code)
-→ Xbox Live → XSTS → Minecraft Services using the user's own account, and launches
-the game only for accounts that own Java Edition. Game files are never redistributed;
-they are downloaded exclusively from Mojang's official servers and verified by SHA-1.
-Tokens are stored only on the local machine. No telemetry, no ads, no monetization.
+**Kyouka MCLauncher** is a personal, non-commercial Minecraft: Java Edition launcher
+for the Chinese network environment. About 250 KB, single file, no installer.
+
+- **Network resilience is the point**: 9 Chinese mirrors are probed and sorted, official
+  sources are the fallback, every file is verified by SHA-1. Segmented download is
+  available but adaptive-disabled by default (measured: single connection is faster here).
+- **Authentication**: offline mode by default; **external login** (authlib-injector +
+  Yggdrasil skin sites) since v1.1.0. Microsoft login is unavailable because the Mojang
+  AppID application was rejected — not a technical limitation on our side.
+- **Mods**: local list/enable/delete, Modrinth search-install, CurseForge (user's own
+  key), and "install from any jar URL" (works with mcmod after its captcha).
+- Game files are never redistributed; they are downloaded from Mojang's official
+  servers and verified. Tokens stay on the local machine. No telemetry, no ads, no
+  monetization. NOT AN OFFICIAL MINECRAFT PRODUCT.
 
 ---
 
