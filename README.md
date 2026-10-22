@@ -9,7 +9,7 @@
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
-> Kyouka MCLauncher 1.9.0 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
+> Kyouka MCLauncher 1.9.2 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
 > 主版本为 **Kyouka MCLauncher**（WPF，约 250 KB 单文件）；WinForms 版与 Python 版已归档到 `legacy/`（冻结维护）。
 
 **English**: [README.en.md](README.en.md)
@@ -127,7 +127,7 @@ python mcroute_gui.py
 | **自动更新** | ✅ | ✅ `--selftest-update` | ✅ v1.0.1 |
 | 分段下载（HTTP Range + 自适应） | ✅ | ✅ 实测（本机单连接 4.7 MB/s → 自动不分段） | ✅ v0.4.1（默认关） |
 | **Cleanroom（1.12.2）** | ✅ | ✅ 一键修复 + 实机（149 mod） | ✅ v1.5.0（实例标注 + 修复按钮） |
-| **多实例** | ✅ | ✅ `--selftest-instances` | ✅ v1.5.0（`versions/` 结构，主流启动器可识别） |
+| **多实例** | ✅ | ✅ `--selftest-instances` | ✅ v1.5.0（`versions/<名字>/`，主流启动器可识别） |
 | 资源包/光影从 Modrinth 下载 | ✅ | ✅ 搜索接口实测（636 资源包 / 1 光影命中） | ✅ v1.4.0 |
 | **Mod 识别与更新**
 
@@ -157,9 +157,9 @@ Mod 下载窗口 →「MC百科搜索」：输入关键词，直接看到中文�
 ![MC百科搜索](docs/gui-wpf-mcmod.png)
 
 **整合包在线下载** | ✅ | ✅ 实测（Fabulously Optimized：0.2MB → 44 mods） | ✅ v1.5.0 |
-| **MC百科搜索（mcmod）** | ✅ | ✅ `--selftest-mcmod` + 解析单测 | ✅ v1.6.1（中文名/简介，浏览器打开详情；不抓详情页） |
-| **Mod 识别与更新** | ✅ | ✅ 实机 149 mods → 识别 145（Modrinth 67 + CurseForge 78） | ✅ v1.9.0（Modrinth SHA1 + **CurseForge 文件指纹**；更新 + 缺依赖提示） |
-| 关闭游戏（**整棵进程树** + 残留清理） | ✅ | ✅ `--selftest-proctree` / `--selftest-orphan` | ✅ v1.5.3（含 javaw 子进程；启动可取消；启动时清理上次残留） |
+| **MC百科搜索（mcmod）** | ✅ | ✅ `--selftest-mcmod` + 解析单测 | ✅ v1.6.1（中文名/简介/快照，双击跳转；不抓详情页） |
+| **Mod 识别与更新** | ✅ | ✅ 实机 149 mods → 识别 145（Modrinth 67 + CurseForge 78） | ✅ v1.9.2（SHA1 + **CF 指纹**；更新；`⚠ n` 悬停看依赖） |
+| 关闭游戏（**整棵进程树** + 残留清理） | ✅ | ✅ `--selftest-proctree` / `--selftest-orphan` | ✅ v1.5.3（含 javaw；启动可取消；启动时清残留） |
 
 > 说明：**"代码写了" ≠ "测过了" ≠ "普通用户能直接用"**。上表把三者分开列，
 > 避免出现"README 写了但实际不能用"的情况。
@@ -713,10 +713,13 @@ proctree / orphan / cleanroom），CI 里全部会跑。
 
 ### 还剩什么
 
+只有两件（均为外部依赖，不是功能缺口）：
+
 1. **代码签名**（SignPath Foundation 申请中，通过后填 2 个 secret 即自动签名）
 2. **发公告**（稿子在仓库外的 `发布公告.md`）
 
-低优先级可选：MC百科中文界面、Cleanroom 组件按 components 解析、退出日志留存。
+低优先级可选（不急）：Cleanroom 组件按 components 解析、退出日志留存、CurseForge 依赖自动补装。
+完整待办见仓库外的 `进度与待办.md`。
 详见 [ROADMAP.md](ROADMAP.md) 与 `进度与待办.md`。
 
 ## 反馈
