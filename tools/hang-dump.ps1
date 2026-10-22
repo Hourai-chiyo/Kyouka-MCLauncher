@@ -1,21 +1,22 @@
-# 抓 1.12.2「正在关闭内置服务器」卡死的线程栈
+# Dump Java thread stacks when Minecraft 1.12.2 hangs at
+# "Shutting down internal server" / "Saving worlds".
 #
-# 用法：
-#   1. 游戏卡在"正在关闭内置服务器"时（别关进程！）
-#   2. 在 PowerShell 里跑：.\tools\hang-dump.ps1
-#   3. 把生成的 dump 文件发给开发者
+# Usage:
+#   1. When the game is stuck (do NOT close the game window)
+#   2. Run tools\hang-dump.cmd  (double-click is fine)
+#   3. Send the dump file to the developer
 #
-# 原理：用进程自带的 jstack（同目录 bin）导出所有线程栈，
-# 卡住时能看到 Server thread / Client thread 到底停在哪个 mod 的方法里。
+# It finds the Minecraft java process, uses jstack from the same JDK,
+# and saves all thread stacks to %TEMP%\kyouka-hang-dumps\hang-<time>.txt
 
 $ErrorActionPreference = 'SilentlyContinue'
 
-Write-Host "=== 查找 java 进程 ===" -ForegroundColor Cyan
+Write-Host "=== looking for java processes ===" -ForegroundColor Cyan
 $procs = Get-CimInstance Win32_Process -Filter "Name='javaw.exe' OR Name='java.exe'" |
-         Where-Object { $_.CommandLine -match 'minecraft|forge|cleanroom|Foundation|mainClass' -or $_.CommandLine -match 'net\.minecraft' }
+         Where-Object { $_.CommandLine -match 'minecraft|forge|cleanroom|Foundation|net\.minecraft' }
 
 if (-not $procs) {
-    Write-Host "没找到 Minecraft 的 java 进程。卡死时再跑一次（进程应该还在）。" -ForegroundColor Yellow
+    Write-Host "No Minecraft java process found. Run this while the game is still stuck." -ForegroundColor Yellow
     exit 1
 }
 
@@ -23,20 +24,21 @@ foreach ($p in $procs) {
     Write-Host ("  PID " + $p.ProcessId + "  " + $p.ExecutablePath) -ForegroundColor Gray
 }
 
-# 选第一个（通常是 javaw）
-$target = $procs | Select-Object -First 1
+$target = $procs | Where-Object { $_.CommandLine -match 'top\.outlands\.foundation\.boot\.Foundation|net\.minecraft\.client\.main\.Main' } | Select-Object -First 1
+if (-not $target) { $target = $procs | Where-Object { $_.Name -eq 'javaw.exe' } | Select-Object -First 1 }
+if (-not $target) { $target = $procs | Select-Object -First 1 }
+Write-Host ("  -> target PID " + $target.ProcessId + "  (" + $target.Name + ")") -ForegroundColor Cyan
 $exe = $target.ExecutablePath
 if (-not $exe -or -not (Test-Path $exe)) {
-    Write-Host "拿不到进程 exe 路径，退出。" -ForegroundColor Red
+    Write-Host "Cannot resolve process exe path." -ForegroundColor Red
     exit 1
 }
 
-# jstack 和 java 在同一个 bin 目录
 $bin = Split-Path $exe -Parent
 $jstack = Join-Path $bin 'jstack.exe'
 if (-not (Test-Path $jstack)) {
-    Write-Host ("找不到 jstack.exe：" + $jstack) -ForegroundColor Red
-    Write-Host "提示：这个 java 可能是 JRE（没有 jstack）。用 JDK 的 javaw 启动，或在环境里装一个 JDK 再试。" -ForegroundColor Yellow
+    Write-Host ("jstack.exe not found: " + $jstack) -ForegroundColor Red
+    Write-Host "This java may be a JRE without jstack. Launch with a JDK, or install a JDK." -ForegroundColor Yellow
     exit 1
 }
 
@@ -45,12 +47,12 @@ $outDir = Join-Path $env:TEMP 'kyouka-hang-dumps'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $outFile = Join-Path $outDir ("hang-" + $stamp + ".txt")
 
-Write-Host ("=== 导出线程栈：" + $outFile) -ForegroundColor Cyan
+Write-Host ("=== dumping to: " + $outFile) -ForegroundColor Cyan
 $header = @(
-    "时间: " + (Get-Date).ToString("yyyy-MM-dd HH:mm:ss"),
-    "PID : " + $target.ProcessId,
+    "time: " + (Get-Date).ToString("yyyy-MM-dd HH:mm:ss"),
+    "pid : " + $target.ProcessId,
     "exe : " + $exe,
-    "命令行: " + $target.CommandLine,
+    "cmd : " + $target.CommandLine,
     ""
 ) -join "`r`n"
 Set-Content -Path $outFile -Value $header -Encoding UTF8
@@ -58,12 +60,11 @@ Set-Content -Path $outFile -Value $header -Encoding UTF8
 & $jstack $target.ProcessId 2>&1 | Out-File -FilePath $outFile -Append -Encoding UTF8
 
 Write-Host ""
-Write-Host "=== 关键线程（看这里最省事）===" -ForegroundColor Cyan
+Write-Host "=== interesting threads ===" -ForegroundColor Cyan
 $lines = Get-Content $outFile
-$interesting = $lines | Select-String -Pattern '^"Server thread"|^"Client thread"|^"main"|shutdown|Stopping|WAITING|BLOCKED' |
-               Select-Object -First 40
-$interesting | ForEach-Object { Write-Host ("  " + $_.Line) }
+$lines | Select-String -Pattern '^"Server thread"|^"Client thread"|^"main"|Stopping|Saving|WAITING|BLOCKED' |
+    Select-Object -First 40 | ForEach-Object { Write-Host ("  " + $_.Line) }
 
 Write-Host ""
-Write-Host ("完整栈已保存：" + $outFile) -ForegroundColor Green
-Write-Host "把这个文件（或里面的 Server thread / Client thread 段）发给开发者即可定位到具体 mod。" -ForegroundColor Green
+Write-Host ("Full dump saved: " + $outFile) -ForegroundColor Green
+Write-Host "Send that file (or the Server/Client thread sections) to the developer." -ForegroundColor Green
