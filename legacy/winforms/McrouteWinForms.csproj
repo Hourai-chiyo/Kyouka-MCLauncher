@@ -60,6 +60,7 @@
     <Compile Include="..\..\core\OrphanCleaner.cs" Link="Core\OrphanCleaner.cs" />
     <Compile Include="..\..\core\Mcmod.cs"        Link="Core\Mcmod.cs" />
     <Compile Include="..\..\core\ModIdentity.cs" Link="Core\ModIdentity.cs" />
+    <Compile Include="..\..\core\Murmur2.cs"     Link="Core\Murmur2.cs" />
   </ItemGroup>
 
 </Project>

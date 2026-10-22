@@ -144,7 +144,8 @@ namespace Mcroute
 
             var sub = new TextBlock
             {
-                Text = m.FileName + " · " + m.Loader + " · " + m.SizeText(),
+                Text = m.FileName + " · " + m.Loader + " · " + m.SizeText() +
+                       (match != null && !string.IsNullOrEmpty(match.Source) ? " · " + match.Source : ""),
                 FontSize = 10,
                 Margin = new Thickness(0, 2, 0, 0),
                 TextTrimming = TextTrimming.CharacterEllipsis,
@@ -317,7 +318,12 @@ namespace Mcroute
             {
                 string msg = null;
                 bool ok = false;
-                try { ok = Modrinth.Install(_baseDir, _version, match.ProjectId, _mc, _loader, out msg); }
+                try
+                {
+                    ok = match.Source == "CurseForge"
+                        ? CurseForge.Install(_baseDir, _version, match.CfModId, _mc, _loader, out msg)
+                        : Modrinth.Install(_baseDir, _version, match.ProjectId, _mc, _loader, out msg);
+                }
                 catch (Exception ex) { msg = ex.Message; }
 
                 if (ok)

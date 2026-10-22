@@ -9,8 +9,8 @@
     <RootNamespace>Mcroute.Wpf</RootNamespace>
     <ApplicationIcon>..\legacy\winforms\app.ico</ApplicationIcon>
     <ApplicationManifest>..\legacy\winforms\app.manifest</ApplicationManifest>
-    <Version>1.8.0</Version>
-    <FileVersion>1.8.0.0</FileVersion>
+    <Version>1.9.0</Version>
+    <FileVersion>1.9.0.0</FileVersion>
     <Product>mcroute — Minecraft Java 启动器（WPF 原型）</Product>
     <Company>Hourai-chiyo</Company>
     <Description>WPF 视觉原型：只做界面壳，功能逻辑复用 csharp/ 下的 Core</Description>
@@ -47,6 +47,7 @@
     <Compile Include="..\core\OrphanCleaner.cs" Link="Core\OrphanCleaner.cs" />
     <Compile Include="..\core\Mcmod.cs"        Link="Core\Mcmod.cs" />
     <Compile Include="..\core\ModIdentity.cs" Link="Core\ModIdentity.cs" />
+    <Compile Include="..\core\Murmur2.cs"     Link="Core\Murmur2.cs" />
   </ItemGroup>
 
   <ItemGroup>

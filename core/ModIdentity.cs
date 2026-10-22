@@ -14,12 +14,16 @@ namespace Mcroute
         public string LatestVersion;
         public bool HasUpdate;
         public string Status;                 // 最新 / 可更新 / 未匹配 / 已禁用
+        public string Source;                // Modrinth / CurseForge（空 = 未识别）
+        public long CfModId;                 // CurseForge 项目 id
+        public string UrlOverride;           // CurseForge 项目页地址
         public List<string> MissingDeps = new List<string>();
 
         public string Url
         {
             get
             {
+                if (!string.IsNullOrEmpty(UrlOverride)) return UrlOverride;
                 if (string.IsNullOrEmpty(Slug)) return null;
                 return "https://modrinth.com/mod/" + Slug;
             }
@@ -134,6 +138,7 @@ namespace Mcroute
 
                 matchedProjectIds.Add(entry.ProjectId);
                 row.ProjectId = entry.ProjectId;
+                row.Source = "Modrinth";
                 row.Title = titles.ContainsKey(entry.ProjectId) ? titles[entry.ProjectId] : row.Local.Name;
                 row.Slug = slugs.ContainsKey(entry.ProjectId) ? slugs[entry.ProjectId] : null;
 
@@ -177,6 +182,113 @@ namespace Mcroute
                         row.MissingDeps.Add(name);
                 }
             }
+
+            // 5) CurseForge 兜底：Modrinth 没匹配到的，用文件指纹再试一次（需要 API Key）
+            try
+            {
+                if (CurseForge.HasKey(baseDir))
+                {
+                    var pending = result.Where(r => string.IsNullOrEmpty(r.ProjectId) && !r.Local.Disabled).ToList();
+                    if (pending.Count > 0)
+                    {
+                        // sha1 → 行（复用前面算过的哈希）
+                        var sha1ToRow = new Dictionary<string, ModMatch>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var kv in hashToLocal)
+                        {
+                            var row = result.FirstOrDefault(r => ReferenceEquals(r.Local, kv.Value));
+                            if (row != null && string.IsNullOrEmpty(row.ProjectId)) sha1ToRow[kv.Key] = row;
+                        }
+
+                        var fps = new List<long>();
+                        var fpToRow = new Dictionary<long, ModMatch>();
+                        foreach (var row in pending)
+                        {
+                            try
+                            {
+                                if (!System.IO.File.Exists(row.Local.FilePath)) continue;
+                                long fp = Murmur2.Fingerprint(row.Local.FilePath);
+                                if (fpToRow.ContainsKey(fp)) continue;
+                                fpToRow[fp] = row;
+                                fps.Add(fp);
+                            }
+                            catch { }
+                        }
+
+                        if (fps.Count > 0)
+                        {
+                            string cfErr;
+                            var hits = CurseForge.MatchFingerprints(baseDir, fps, out cfErr);
+                            var ids = hits.Select(h => h.ModId).Distinct().ToList();
+                            var metas = CurseForge.ModMeta(baseDir, ids, out cfErr);
+
+                            foreach (var hit in hits)
+                            {
+                                // 按 sha1 对回本地行
+                                ModMatch row = null;
+                                foreach (string sha in hit.Sha1)
+                                {
+                                    if (sha1ToRow.TryGetValue(sha, out row)) break;
+                                }
+                                if (row == null) continue;
+
+                                row.Source = "CurseForge";
+                                row.ProjectId = hit.ModId.ToString();
+                                row.CfModId = hit.ModId;
+                                if (metas.ContainsKey(hit.ModId))
+                                {
+                                    var m = metas[hit.ModId];
+                                    row.Title = string.IsNullOrEmpty(m.Name) ? row.Local.Name : m.Name;
+                                    row.Slug = m.Slug;
+                                    row.UrlOverride = m.Url;
+                                }
+                                else
+                                {
+                                    row.Title = row.Local.Name;
+                                }
+
+                                // 最新文件：sha1 不同 → 可更新
+                                try
+                                {
+                                    string lerr;
+                                    object latest = CurseForge.LatestFile(baseDir, hit.ModId, mcVersion, loader, out lerr);
+                                    if (latest != null)
+                                    {
+                                        string latestName = J.Str(latest, "displayName");
+                                        if (string.IsNullOrWhiteSpace(latestName) || latestName == "-")
+                                            latestName = J.Str(latest, "fileName");
+                                        if (string.IsNullOrEmpty(latestName))
+                                            latestName = J.Str(latest, "fileName");
+                                        row.LatestVersion = latestName;
+                                        string latestSha1 = null;
+                                        foreach (var h in Version.AsList(J.Get(latest, "hashes")))
+                                        {
+                                            if (J.Int(h, "algo", -1) == 1) { latestSha1 = J.Str(h, "value"); break; }
+                                        }
+                                        bool same = !string.IsNullOrEmpty(latestSha1) &&
+                                                    hit.Sha1.Any(x => string.Equals(x, latestSha1, StringComparison.OrdinalIgnoreCase));
+                                        bool newer = false;
+                                        if (!same)
+                                        {
+                                            // CF 的文件名常带版本号，能比就比较；比不了就按"文件不同"算（保守：只有版本更高才提示）
+                                            newer = string.IsNullOrEmpty(latestName)
+                                                    ? true
+                                                    : CompareVersions(latestName, row.Local.Version) > 0;
+                                        }
+                                        row.HasUpdate = newer;
+                                        row.Status = same ? "最新" : (newer ? "可更新" : "最新");
+                                    }
+                                    else
+                                    {
+                                        row.Status = "已识别";
+                                    }
+                                }
+                                catch { row.Status = "已识别"; }
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
 
             return result.OrderByDescending(r => r.HasUpdate)
                          .ThenBy(r => r.Status == "未匹配" ? 1 : 0)

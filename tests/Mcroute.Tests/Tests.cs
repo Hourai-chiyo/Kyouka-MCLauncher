@@ -33,6 +33,7 @@ namespace Mcroute.Tests
             Run("Authlib 地址规整", AuthlibTests.All);
             Run("Mcmod 结果解析", McmodTests.All);
             Run("ModIdentity 版本比较/哈希解析", ModIdentityTests.All);
+            Run("Murmur2 / CurseForge 指纹", Murmur2Tests.All);
 
             Console.WriteLine();
             Console.WriteLine("------------------------");
@@ -476,6 +477,43 @@ namespace Mcroute.Tests
             };
             Program.AreEqual("1.0.2", ModIdentity.PickLatestVersion(versions), "按发布时间取最新");
             Program.AreEqual(null, ModIdentity.PickLatestVersion(new List<object>()), "空列表返回 null");
+        }
+    }
+
+
+    internal static class Murmur2Tests
+    {
+        public static void All()
+        {
+            // 参考值由 Python 版 MurmurHash2(seed=1) 独立算出
+            Program.AreEqual(1540447798u, Murmur2.Hash(new byte[0], 1), "Murmur2 空数据");
+            Program.AreEqual(2788266382u, Murmur2.Hash(System.Text.Encoding.ASCII.GetBytes("hello"), 1), "Murmur2 hello");
+            Program.AreEqual(2213174766u, Murmur2.Hash(System.Text.Encoding.ASCII.GetBytes("hello world"), 1), "Murmur2 hello world");
+
+            // CurseForge 指纹：空白字节被忽略
+            string dir = Tmp.Dir("murmur");
+            try
+            {
+                string a = Path.Combine(dir, "a.jar");
+                string b = Path.Combine(dir, "b.jar");
+                File.WriteAllBytes(a, System.Text.Encoding.ASCII.GetBytes("hello world"));
+                File.WriteAllBytes(b, System.Text.Encoding.ASCII.GetBytes("hello\tworld"));
+                Program.AreEqual(2824650221u, Murmur2.Fingerprint(a), "指纹去空白后哈希");
+                Program.AreEqual(Murmur2.Fingerprint(a), Murmur2.Fingerprint(b), "空格和制表符不影响指纹");
+            }
+            finally { Tmp.TryDelete(dir); }
+
+            // CurseForge 指纹匹配响应解析
+            const string dataJson = "{\"exactMatches\":[{\"id\":238222,\"file\":{\"id\":3096,\"fileName\":\"jei_1.12.2-4.16.5.1029.jar\",\"displayName\":\"4.16.5.1029 for Forge 1.12.2\",\"downloadUrl\":\"https://example/x.jar\",\"hashes\":[{\"algo\":1,\"value\":\"ABCDEF\"},{\"algo\":2,\"value\":\"md5\"}]}}],\"unmatchedFingerprints\":[1]}";
+            var hits = CurseForge.ParseFingerprintResponse(dataJson);
+            Program.AreEqual(1, hits.Count, "解析出 1 个 CF 匹配");
+            Program.AreEqual(238222L, hits[0].ModId, "CF mod id");
+            Program.AreEqual("jei_1.12.2-4.16.5.1029.jar", hits[0].FileName, "CF 文件名");
+            Program.AreEqual(1, hits[0].Sha1.Count, "只收 sha1 哈希");
+            Program.AreEqual("abcdef", hits[0].Sha1[0], "sha1 转小写");
+            Program.AreEqual("4.16.5.1029 for Forge 1.12.2", hits[0].DisplayName, "CF 显示名");
+            Program.AreEqual(0, CurseForge.ParseFingerprintResponse("").Count, "空响应返回空");
+            Program.AreEqual(0, CurseForge.ParseFingerprintResponse("{}").Count, "无 exactMatches 返回空");
         }
     }
 

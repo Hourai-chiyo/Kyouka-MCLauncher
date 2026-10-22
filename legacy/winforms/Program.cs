@@ -158,7 +158,15 @@ namespace Mcroute
                                               "  本地 " + r.Local.Version + (r.HasUpdate ? " → " + r.LatestVersion : "") +
                                               (r.MissingDeps.Count > 0 ? "  " + r.MissingText : ""));
                         }
-                        Console.WriteLine("  共 " + rows.Count + " 个 mod，可更新 " + upd + " 个");
+                        int cf = 0, mr = 0;
+                        foreach (var rr in rows)
+                        {
+                            if (rr.Source == "CurseForge") cf++;
+                            else if (rr.Source == "Modrinth") mr++;
+                        }
+                        Console.WriteLine("  共 " + rows.Count + " 个 mod，可更新 " + upd +
+                                          " · Modrinth 识别 " + mr + " · CurseForge 识别 " + cf +
+                                          " · 未识别 " + (rows.Count - mr - cf));
                         if (rows.Count == 0) { Console.WriteLine("[FAIL] 没扫到 mod"); return 1; }
                         Console.WriteLine("[PASS] Mod 识别可用");
                         return 0;
