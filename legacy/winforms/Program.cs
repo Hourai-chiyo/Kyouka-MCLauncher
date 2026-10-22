@@ -137,6 +137,20 @@ namespace Mcroute
                         return 0;
                     }
 
+                    case "--selftest-cleanroom":
+                    {
+                        string ver = args.Length > 1 && !args[1].StartsWith("--") ? args[1] : null;
+                        if (string.IsNullOrEmpty(ver)) { Console.WriteLine("用法: --selftest-cleanroom <版本> [--dir <数据目录>] [--dry]"); return 1; }
+                        string dir = Version.BaseDir(ArgOf(args, "--dir"));
+                        bool dry = Array.IndexOf(args, "--dry") >= 0;
+                        Console.WriteLine("  实例: " + ver + "  dir=" + dir + (dry ? "  (预演)" : ""));
+                        Console.WriteLine("  是否 Cleanroom: " + CleanroomSetup.Detect(dir, ver));
+                        string report;
+                        bool ok = CleanroomSetup.Ensure(dir, ver, dry, out report);
+                        Console.WriteLine((ok ? "[PASS] " : "[FAIL] ") + report);
+                        return ok ? 0 : 1;
+                    }
+
                     case "--selftest-packs":
                     {
                         string tmp = ArgOf(args, "--dir");

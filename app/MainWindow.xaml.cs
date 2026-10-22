@@ -473,6 +473,20 @@ namespace Mcroute.Wpf
                 AppendLog("[预检异常] " + ex.Message);
             }
 
+            // Cleanroom 实例：先把第二段环境备好（首次会补运行库/解压 natives/改 cfg）
+            if (CleanroomSetup.Detect(_baseDir, ver) && !_cleanroomPrepared.Contains(ver))
+            {
+                _cleanroomPrepared.Add(ver);
+                RunTask("准备 Cleanroom 环境", () =>
+                {
+                    string report;
+                    bool ok = CleanroomSetup.Ensure(_baseDir, ver, out report);
+                    Console.WriteLine((ok ? "[Cleanroom] " : "[Cleanroom 失败] ") + report);
+                    return ok ? 0 : 1;
+                }, () => Dispatcher.BeginInvoke(new Action(() => Play_Click(this, null))));
+                return;
+            }
+
             string mem = MemoryBox.Text.Trim();
             CardTitle.Text = "正在启动";
             CardDetail.Text = ver + " · " + mem + " 内存";
@@ -1233,6 +1247,8 @@ namespace Mcroute.Wpf
         private int _page;
         private bool _initializing;
         private bool _gameRunning;
+        private readonly System.Collections.Generic.HashSet<string> _cleanroomPrepared =
+            new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private string _cancelReason;
 
         [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]

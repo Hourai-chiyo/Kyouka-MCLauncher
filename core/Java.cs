@@ -69,6 +69,67 @@ namespace Mcroute
             return closest.Item1;
         }
 
+
+        /// <summary>
+        /// 找「至少 minMajor」的 Java（Cleanroom 要 17+），返回 javaw.exe 路径。
+        /// 优先 21（Cleanroom 官方测试版），其次 25，再其次任意 >= minMajor。
+        /// </summary>
+        public static string FindBestAtLeast(string baseDir, int minMajor)
+        {
+            try
+            {
+                var found = new List<Tuple<string, int>>();
+                foreach (string exe in Candidates(baseDir))
+                {
+                    int major = Major(exe);
+                    if (major >= minMajor) found.Add(Tuple.Create(exe, major));
+                }
+                if (found.Count == 0) return null;
+
+                var best = found
+                    .OrderBy(t => t.Item2 == 21 ? 0 : (t.Item2 == 25 ? 1 : 2))
+                    .ThenBy(t => Math.Abs(t.Item2 - 21))
+                    .First();
+
+                string javaw = best.Item1.Replace("java.exe", "javaw.exe");
+                return File.Exists(javaw) ? javaw : best.Item1;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>候选 java.exe 列表（PATH + 常见安装目录 + 数据目录）。</summary>
+        private static List<string> Candidates(string baseDir)
+        {
+            var candidates = new List<string>();
+            string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (string dir in pathEnv.Split(';'))
+            {
+                if (string.IsNullOrWhiteSpace(dir)) continue;
+                string exe = Path.Combine(dir.Trim().Trim('"'), "java.exe");
+                if (File.Exists(exe)) candidates.Add(exe);
+            }
+            var roots = new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Eclipse Adoptium"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Java"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "runtime"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ModrinthApp", "meta", "java_versions"),
+                Path.Combine(baseDir ?? ".", "java_versions"),
+            };
+            foreach (string root in roots)
+            {
+                if (!Directory.Exists(root)) continue;
+                foreach (string sub in Directory.GetDirectories(root))
+                {
+                    string exe = Path.Combine(sub, "bin", "java.exe");
+                    if (File.Exists(exe)) candidates.Add(exe);
+                    string exe2 = Path.Combine(sub, "jre", "bin", "java.exe");
+                    if (File.Exists(exe2)) candidates.Add(exe2);
+                }
+            }
+            return candidates.Distinct().ToList();
+        }
+
         /// <summary>跑一次 java -version 解析主版本号（结果缓存）。</summary>
         public static int Major(string exe)
         {
