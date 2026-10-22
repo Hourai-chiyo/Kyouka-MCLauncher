@@ -96,3 +96,5 @@ tests/out/
 tests/obj/
 tests/bin/
 _tests_tmp/
+tests/**/obj/
+tests/**/bin/
