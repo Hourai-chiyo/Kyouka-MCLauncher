@@ -195,20 +195,34 @@ namespace Mcroute
             Grid.SetColumn(st, 3);
             grid.Children.Add(st);
 
+            bool hasDepWarn = match != null && match.MissingDeps.Count > 0;
             var deps = new TextBlock
             {
-                Text = match == null ? "" : match.MissingText,
-                FontSize = 10,
+                Text = hasDepWarn ? "⚠ " + match.MissingDeps.Count : "",
+                FontSize = 11,
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xC0, 0x6A, 0x00)),
-                TextTrimming = TextTrimming.CharacterEllipsis,
+                Cursor = System.Windows.Input.Cursors.Help,
             };
+            if (hasDepWarn) deps.ToolTip = DepTooltip(match);
             Grid.SetColumn(deps, 4);
             grid.Children.Add(deps);
 
             var item = new ListBoxItem { Content = grid, Tag = m };
-            item.ToolTip = (match != null && !string.IsNullOrEmpty(match.Url)) ? match.Url : m.FilePath;
+            string tip = (match != null && !string.IsNullOrEmpty(match.Url)) ? match.Url : m.FilePath;
+            if (hasDepWarn) tip += "\n" + DepTooltip(match);
+            item.ToolTip = tip;
             return item;
+        }
+
+        /// <summary>依赖提示只在鼠标悬停时展开，避免每行都刷一大串。</summary>
+        private static string DepTooltip(ModMatch match)
+        {
+            if (match == null || match.MissingDeps.Count == 0) return "";
+            var sb = new System.Text.StringBuilder();
+            sb.Append("依赖未找到：").Append(string.Join("、", match.MissingDeps));
+            sb.Append("\n（按 Modrinth 元数据；整合包里常用替代实现，能正常加载就不用管）");
+            return sb.ToString();
         }
 
         private ModInfo Selected()

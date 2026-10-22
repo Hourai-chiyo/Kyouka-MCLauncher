@@ -175,7 +175,7 @@
                 <TextBlock Grid.Column="1" Text="本地版本" FontSize="10.5" Foreground="{DynamicResource TextFaint}"/>
                 <TextBlock Grid.Column="2" Text="最新版本" FontSize="10.5" Foreground="{DynamicResource TextFaint}"/>
                 <TextBlock Grid.Column="3" Text="状态" FontSize="10.5" Foreground="{DynamicResource TextFaint}"/>
-                <TextBlock Grid.Column="4" Text="依赖提示" FontSize="10.5" Foreground="{DynamicResource TextFaint}"/>
+                <TextBlock Grid.Column="4" Text="依赖" FontSize="10.5" Foreground="{DynamicResource TextFaint}"/>
             </Grid>
 
             <ListBox x:Name="ModList" Grid.Row="3" Margin="16,0,16,0"
