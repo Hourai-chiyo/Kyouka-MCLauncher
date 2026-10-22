@@ -34,6 +34,7 @@ namespace Mcroute.Tests
             Run("Mcmod 结果解析", McmodTests.All);
             Run("ModIdentity 版本比较/哈希解析", ModIdentityTests.All);
             Run("Murmur2 / CurseForge 指纹", Murmur2Tests.All);
+            Run("依赖匹配（词根 / 误报抑制）", DepTokenTests.All);
 
             Console.WriteLine();
             Console.WriteLine("------------------------");
@@ -514,6 +515,36 @@ namespace Mcroute.Tests
             Program.AreEqual("4.16.5.1029 for Forge 1.12.2", hits[0].DisplayName, "CF 显示名");
             Program.AreEqual(0, CurseForge.ParseFingerprintResponse("").Count, "空响应返回空");
             Program.AreEqual(0, CurseForge.ParseFingerprintResponse("{}").Count, "无 exactMatches 返回空");
+        }
+    }
+
+
+    internal static class DepTokenTests
+    {
+        public static void All()
+        {
+            var local = new List<string>
+            {
+                "AkashicTome-1.2-12.jar", "AutoRegLib-1.3-32.jar",
+                "Galacticraft-1.12.2-4.0.7.jar", "mcjtylib-1.12-3.5.4.jar",
+                "jei_1.12.2-4.16.5.1029.jar",
+            };
+
+            // 之前两次误报的场景
+            Program.IsTrue(ModIdentity.IsProbablyInstalled("AutoRegLib", local), "AutoRegLib 已安装（本地有 jar）");
+            Program.IsTrue(ModIdentity.IsProbablyInstalled("Galacticraft-Legacy", local), "Galacticraft-Legacy 由 Galacticraft 满足");
+            Program.IsTrue(ModIdentity.IsProbablyInstalled("McJtyLib", local), "McJtyLib 已安装");
+            Program.IsTrue(ModIdentity.IsProbablyInstalled("Just Enough Items (JEI)", local), "JEI 长名字也能匹配");
+
+            // 真缺的（本地没有）
+            Program.IsFalse(ModIdentity.IsProbablyInstalled("RFTools (Legacy)", local), "RFTools 本地确实没有");
+            Program.IsFalse(ModIdentity.IsProbablyInstalled("MixinBootstrap", local), "MixinBootstrap 本地没有");
+            Program.IsFalse(ModIdentity.IsProbablyInstalled("", local), "空依赖名");
+            Program.IsFalse(ModIdentity.IsProbablyInstalled("API", local), "只有限定词时不当命中");
+
+            var tokens = ModIdentity.DepTokens("Galacticraft-Legacy");
+            Program.AreEqual(1, tokens.Count, "限定词 legacy 被去掉，只剩词根");
+            Program.AreEqual("galacticraft", tokens[0], "词根正确");
         }
     }
 

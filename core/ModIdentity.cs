@@ -18,6 +18,7 @@ namespace Mcroute
         public long CfModId;                 // CurseForge 项目 id
         public string UrlOverride;           // CurseForge 项目页地址
         public List<string> MissingDeps = new List<string>();
+        public List<string> DependencyProjectIds = new List<string>();   // 内部用：Modrinth 要求的依赖项目 id
 
         public string Url
         {
@@ -31,7 +32,7 @@ namespace Mcroute
 
         public string MissingText
         {
-            get { return MissingDeps.Count == 0 ? "" : "缺依赖：" + string.Join(", ", MissingDeps); }
+            get { return MissingDeps.Count == 0 ? "" : "依赖未找到：" + string.Join(", ", MissingDeps); }
         }
     }
 
@@ -173,13 +174,11 @@ namespace Mcroute
                     row.Status = "最新";
                 }
 
-                // 依赖：只报告"Modrinth 认为必需、但本地没匹配到"的
+                // 依赖先记下来，等所有 mod 都识别完再统一判断（否则会误报：先处理的 mod 看不到后处理的）
                 foreach (string req in entry.RequiredProjectIds)
                 {
-                    if (string.IsNullOrEmpty(req) || matchedProjectIds.Contains(req)) continue;
-                    string name = titles.ContainsKey(req) ? titles[req] : null;
-                    if (!string.IsNullOrEmpty(name) && !row.MissingDeps.Contains(name))
-                        row.MissingDeps.Add(name);
+                    if (!string.IsNullOrEmpty(req) && !row.DependencyProjectIds.Contains(req))
+                        row.DependencyProjectIds.Add(req);
                 }
             }
 
@@ -290,6 +289,58 @@ namespace Mcroute
             }
             catch { }
 
+            // 6) 统一判断缺依赖：等所有 mod 识别完，再和"已识别集合 + 本地文件名"比对
+            try
+            {
+                var matchedIds = new HashSet<string>(
+                    result.Where(r => r.Source == "Modrinth").Select(r => r.ProjectId));
+
+                var depIds = new HashSet<string>();
+                foreach (var row in result)
+                {
+                    if (row.Source != "Modrinth") continue;
+                    foreach (string id in row.DependencyProjectIds)
+                        if (!matchedIds.Contains(id)) depIds.Add(id);
+                }
+
+                if (depIds.Count > 0)
+                {
+                    var depTitles = new Dictionary<string, string>();
+                    var depList = depIds.ToList();
+                    for (int i = 0; i < depList.Count; i += 50)
+                    {
+                        var batch = depList.Skip(i).Take(50).ToList();
+                        string ids = "[" + string.Join(",", batch.Select(x => "\"" + x + "\"")) + "]";
+                        object arr = Http.GetJson(Api + "/projects?ids=" + Uri.EscapeDataString(ids), 30);
+                        foreach (var p in Version.AsList(arr))
+                        {
+                            string id = J.Str(p, "id");
+                            if (!string.IsNullOrEmpty(id)) depTitles[id] = J.Str(p, "title");
+                        }
+                    }
+
+                    // 本地已有的名字（含 CF 识别的 title / 文件名），用于抑制"其实装了但没匹配到 Modrinth"的误报
+                    var localNames = result.SelectMany(r => new[]
+                    {
+                        r.Local.Name, r.Local.FileName, r.Title,
+                    }).Where(x => !string.IsNullOrEmpty(x)).ToList();
+
+                    foreach (var row in result)
+                    {
+                        if (row.Source != "Modrinth") continue;
+                        foreach (string id in row.DependencyProjectIds)
+                        {
+                            if (matchedIds.Contains(id)) continue;
+                            string name;
+                            if (!depTitles.TryGetValue(id, out name) || string.IsNullOrEmpty(name)) continue;
+                            if (IsProbablyInstalled(name, localNames)) continue;
+                            if (!row.MissingDeps.Contains(name)) row.MissingDeps.Add(name);
+                        }
+                    }
+                }
+            }
+            catch { }
+
             return result.OrderByDescending(r => r.HasUpdate)
                          .ThenBy(r => r.Status == "未匹配" ? 1 : 0)
                          .ThenBy(r => r.Title ?? r.Local.Name, StringComparer.OrdinalIgnoreCase)
@@ -297,6 +348,104 @@ namespace Mcroute
         }
 
         // ---------------- 纯函数（可单测，不联网） ----------------
+
+        /// <summary>
+        /// 本地已有？按"依赖名里的有效词根"匹配本地 jar/名称。
+        ///
+        /// 例：
+        ///   "AutoRegLib"        → jar "AutoRegLib-1.3-32.jar"       命中
+        ///   "Galacticraft-Legacy" → jar "Galacticraft-1.12.2-4.0.7.jar" 命中（legacy 是限定词，不算）
+        ///   "RFTools (Legacy)"  → 需要 rftools，本地没有 → 不命中（真缺）
+        /// </summary>
+        public static bool IsProbablyInstalled(string depName, IEnumerable<string> localNames)
+        {
+            if (string.IsNullOrWhiteSpace(depName) || localNames == null) return false;
+
+            var tokens = DepTokens(depName);
+            var acronyms = DepAcronyms(depName);
+            if (tokens.Count == 0 && acronyms.Count == 0) return false;
+
+            var locals = new List<string>();
+            foreach (string raw in localNames)
+            {
+                if (string.IsNullOrEmpty(raw)) continue;
+                locals.Add(Normalize(raw));
+            }
+
+            // 缩写命中（如 "Just Enough Items (JEI)" → jei_1.12.2-...jar）
+            foreach (string hay in locals)
+            {
+                foreach (string a in acronyms)
+                {
+                    if (hay.IndexOf(a, StringComparison.Ordinal) >= 0) return true;
+                }
+            }
+
+            if (tokens.Count == 0) return false;
+
+            // 全部词根都在同一个本地名字里出现 → 视为已安装
+            foreach (string hay in locals)
+            {
+                bool all = true;
+                foreach (string t in tokens)
+                {
+                    if (hay.IndexOf(t, StringComparison.Ordinal) < 0) { all = false; break; }
+                }
+                if (all) return true;
+            }
+            return false;
+        }
+
+        private static readonly HashSet<string> DepStopWords = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "legacy", "forge", "fabric", "neoforge", "quilt", "unofficial", "core", "mod", "mods",
+            "api", "lib", "library", "edition", "port", "fork", "the", "for", "and", "continued",
+            "reforged", "classic", "lite", "plus", "extra", "addon", "addons", "compat",
+        };
+
+        /// <summary>依赖名 → 有效词根（>=4 字符，去掉限定词）。</summary>
+        public static List<string> DepTokens(string depName)
+        {
+            var list = new List<string>();
+            if (string.IsNullOrWhiteSpace(depName)) return list;
+            var parts = depName.Split(new[] { ' ', '-', '_', '.', '(', ')', ':', '/', '+', ',' },
+                                      StringSplitOptions.RemoveEmptyEntries);
+            foreach (string p in parts)
+            {
+                string t = Normalize(p);
+                if (t.Length < 4) continue;
+                if (DepStopWords.Contains(t)) continue;
+                if (!list.Contains(t)) list.Add(t);
+            }
+            return list;
+        }
+
+        /// <summary>依赖名里的缩写（全大写、2~5 字符），如 JEI / API / TFC。</summary>
+        public static List<string> DepAcronyms(string depName)
+        {
+            var list = new List<string>();
+            if (string.IsNullOrWhiteSpace(depName)) return list;
+            var parts = depName.Split(new[] { ' ', '-', '_', '.', '(', ')', ':', '/', '+', ',' },
+                                      StringSplitOptions.RemoveEmptyEntries);
+            foreach (string p in parts)
+            {
+                if (p.Length < 2 || p.Length > 5) continue;
+                bool allUpper = true;
+                foreach (char c in p) if (c < 'A' || c > 'Z') { allUpper = false; break; }
+                if (!allUpper) continue;
+                string t = Normalize(p);
+                if (t.Length >= 2 && !list.Contains(t)) list.Add(t);
+            }
+            return list;
+        }
+
+        private static string Normalize(string s)
+        {
+            var sb = new System.Text.StringBuilder(s.Length);
+            foreach (char c in s.ToLowerInvariant())
+                if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) sb.Append(c);
+            return sb.ToString();
+        }
 
         /// <summary>解析 POST /version_files 的返回：sha1 → 项目/版本/必需依赖。</summary>
         public static List<HashEntry> ParseHashLookup(string json)
