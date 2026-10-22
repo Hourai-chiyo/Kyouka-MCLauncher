@@ -59,6 +59,29 @@ namespace Mcroute
             }
         }
 
+        /// <summary>POST 一段 JSON，返回响应文本（失败返回 null）。</summary>
+        public static string PostJson(string url, string jsonBody, int timeoutSeconds = 30)
+        {
+            try
+            {
+                using (var content = new System.Net.Http.StringContent(
+                    jsonBody ?? "", System.Text.Encoding.UTF8, "application/json"))
+                {
+                    var task = Client.PostAsync(url, content);
+                    if (!task.Wait(TimeSpan.FromSeconds(timeoutSeconds))) return null;
+                    var resp = task.GetAwaiter().GetResult();
+                    if (!resp.IsSuccessStatusCode) return null;
+                    var read = resp.Content.ReadAsStringAsync();
+                    if (!read.Wait(TimeSpan.FromSeconds(timeoutSeconds))) return null;
+                    return read.GetAwaiter().GetResult();
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         /// <summary>取 JSON（解析失败返回 null）。</summary>
         public static object GetJson(string url, int timeoutSeconds = 30)
         {

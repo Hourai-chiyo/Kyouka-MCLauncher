@@ -108,6 +108,47 @@ namespace Mcroute.Wpf
                 return;
             }
 
+            // Mod 识别窗口截图：--shot-modupdate <数据目录> <版本> <mc版本> <loader> <输出.png> [宽 高]
+            if (args.Length >= 6 && args[0] == "--shot-modupdate")
+            {
+                ShotMode = true;
+                try
+                {
+                    try { Mcroute.Theme.Apply(Environment.GetEnvironmentVariable("MCROUTE_THEME") ?? "auto"); } catch { }
+                    string baseDir = args[1];
+                    string ver = args[2];
+                    string mc = args[3];
+                    string loader = args[4];
+                    string outPath = args[5];
+                    int w = args.Length >= 7 ? int.Parse(args[6]) : 960;
+                    int h = args.Length >= 8 ? int.Parse(args[7]) : 640;
+
+                    var uw = new ModUpdateWindow(baseDir, ver, mc, loader)
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = -10000, Top = -10000, Width = w, Height = h, ShowInTaskbar = false,
+                    };
+                    uw.Show();
+                    uw.UpdateLayout();
+                    Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                    PumpFor(TimeSpan.FromSeconds(10));
+
+                    var visual = (Visual)uw.Content;
+                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(visual);
+                    string dir = Path.GetDirectoryName(Path.GetFullPath(outPath));
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(rtb));
+                    using (var fs = File.Create(outPath)) enc.Save(fs);
+                    ShotTrace("shot-modupdate saved");
+                    uw.Close();
+                }
+                catch (Exception ex) { ShotTrace("shot-modupdate 异常: " + ex); }
+                Shutdown(0);
+                return;
+            }
+
             // MC百科窗口截图：--shot-mcmod <输出.png> [宽 高] [关键词]
             if (args.Length >= 2 && args[0] == "--shot-mcmod")
             {

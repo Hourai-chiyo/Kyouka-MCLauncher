@@ -32,6 +32,7 @@ namespace Mcroute.Tests
             Run("Instances 多实例", InstancesTests.All);
             Run("Authlib 地址规整", AuthlibTests.All);
             Run("Mcmod 结果解析", McmodTests.All);
+            Run("ModIdentity 版本比较/哈希解析", ModIdentityTests.All);
 
             Console.WriteLine();
             Console.WriteLine("------------------------");
@@ -438,4 +439,44 @@ namespace Mcroute.Tests
             Program.AreEqual(0, Mcmod.ParseHtml("<html><body>no results</body></html>", 10).Count, "无结果页面返回空");
         }
     }
+
+    internal static class ModIdentityTests
+    {
+        public static void All()
+        {
+            // 版本比较：真实世界里各种写法
+            Program.AreEqual(0, Math.Sign(ModIdentity.CompareVersions("1.2.0", "1.2.0-forge-1.12.2")), "前缀写法视为相同");
+            Program.AreEqual(0, Math.Sign(ModIdentity.CompareVersions("1.0.14", "1.0.14+mc1.12")), "+mc 后缀视为相同");
+            Program.AreEqual(0, Math.Sign(ModIdentity.CompareVersions("1.12.2-3.14.0", "3.14.0")), "MC 前缀 vs 纯版本号视为相同");
+            Program.AreEqual(1, Math.Sign(ModIdentity.CompareVersions("1.12.7.23", "1.12.3")), "1.12.7.23 > 1.12.3");
+            Program.AreEqual(-1, Math.Sign(ModIdentity.CompareVersions("1.12.3", "1.12.7.23")), "1.12.3 < 1.12.7.23");
+            Program.AreEqual(1, Math.Sign(ModIdentity.CompareVersions("4.22.0.1037", "4.16.5.1029")), "JEI 版本比较");
+            Program.AreEqual(1, Math.Sign(ModIdentity.CompareVersions("2.4.20.0", "2.4.10.0")), "10 → 20 按数字比较");
+            Program.AreEqual(0, Math.Sign(ModIdentity.CompareVersions("${mod_version}", "1.0.0")), "占位符不判断");
+            Program.AreEqual(0, Math.Sign(ModIdentity.CompareVersions("", "1.0.0")), "空版本不判断");
+
+            // 哈希反查解析
+            const string json = "{\"abc123\":{\"id\":\"ver1\",\"project_id\":\"proj1\",\"version_number\":\"1.2.3\",\"dependencies\":[{\"project_id\":\"dep1\",\"dependency_type\":\"required\"},{\"project_id\":\"dep2\",\"dependency_type\":\"optional\"}]}}";
+            var entries = ModIdentity.ParseHashLookup(json);
+            Program.AreEqual(1, entries.Count, "解析出 1 条哈希");
+            Program.AreEqual("abc123", entries[0].Hash, "哈希值");
+            Program.AreEqual("proj1", entries[0].ProjectId, "项目 id");
+            Program.AreEqual("1.2.3", entries[0].VersionNumber, "版本号");
+            Program.AreEqual(1, entries[0].RequiredProjectIds.Count, "只收集 required 依赖");
+            Program.AreEqual("dep1", entries[0].RequiredProjectIds[0], "依赖项目 id");
+            Program.AreEqual(0, ModIdentity.ParseHashLookup("").Count, "空 JSON 返回空");
+            Program.AreEqual(0, ModIdentity.ParseHashLookup("[]").Count, "数组返回空");
+
+            // PickLatestVersion
+            var versions = new List<object>
+            {
+                J.Parse("{\"version_number\":\"1.0.0\",\"date_published\":\"2026-01-01T00:00:00Z\"}"),
+                J.Parse("{\"version_number\":\"1.0.2\",\"date_published\":\"2026-03-01T00:00:00Z\"}"),
+                J.Parse("{\"version_number\":\"1.0.1\",\"date_published\":\"2026-02-01T00:00:00Z\"}"),
+            };
+            Program.AreEqual("1.0.2", ModIdentity.PickLatestVersion(versions), "按发布时间取最新");
+            Program.AreEqual(null, ModIdentity.PickLatestVersion(new List<object>()), "空列表返回 null");
+        }
+    }
+
 }

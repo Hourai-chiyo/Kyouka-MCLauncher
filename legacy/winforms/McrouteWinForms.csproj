@@ -59,6 +59,7 @@
     <Compile Include="..\..\core\ProcessTree.cs" Link="Core\ProcessTree.cs" />
     <Compile Include="..\..\core\OrphanCleaner.cs" Link="Core\OrphanCleaner.cs" />
     <Compile Include="..\..\core\Mcmod.cs"        Link="Core\Mcmod.cs" />
+    <Compile Include="..\..\core\ModIdentity.cs" Link="Core\ModIdentity.cs" />
   </ItemGroup>
 
 </Project>

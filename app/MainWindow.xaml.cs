@@ -943,6 +943,15 @@ namespace Mcroute.Wpf
             });
         }
 
+        private void OpenModUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            string ver = SelectedManageVersion();
+            if (ver == null) { MessageBox.Show("先在列表里选一个版本", "提示"); return; }
+            string mc, loader, loaderVer;
+            Version.Describe(_baseDir, ver, out mc, out loader, out loaderVer);
+            new ModUpdateWindow(_baseDir, ver, mc, loader) { Owner = this }.ShowDialog();
+        }
+
         private void OpenInstances_Click(object sender, RoutedEventArgs e)
         {
             new InstancesWindow(_baseDir) { Owner = this }.ShowDialog();

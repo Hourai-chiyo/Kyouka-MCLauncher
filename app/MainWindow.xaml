@@ -780,6 +780,8 @@
                                 Click="OpenInstances_Click"/>
                         <Button Style="{StaticResource GhostButton}" Content="Cleanroom 修复" Width="130" Margin="8,0,0,0"
                                 Click="FixCleanroom_Click"/>
+                        <Button Style="{StaticResource GhostButton}" Content="Mod 识别 / 更新" Width="130" Margin="8,0,0,0"
+                                Click="OpenModUpdate_Click"/>
                             </WrapPanel>
                         </Grid>
                     </Border>

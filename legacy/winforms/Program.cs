@@ -137,6 +137,33 @@ namespace Mcroute
                         return 0;
                     }
 
+                    case "--selftest-modmatch":
+                    {
+                        string ver = args.Length > 1 ? args[1] : null;
+                        if (string.IsNullOrEmpty(ver)) { Console.WriteLine("[FAIL] 用法: --selftest-modmatch <版本> [--dir <目录>] [--mc 1.12.2] [--loader forge]"); return 1; }
+                        string dir = Version.BaseDir(ArgOf(args, "--dir"));
+                        string mc = ArgOf(args, "--mc");
+                        string loader = ArgOf(args, "--loader");
+                        Console.WriteLine("  目录: " + dir);
+                        Console.WriteLine("  版本: " + ver + "  MC=" + (mc ?? "?") + "  加载器=" + (loader ?? "?"));
+
+                        string err;
+                        var rows = ModIdentity.Match(dir, ver, mc, loader, out err);
+                        if (!string.IsNullOrEmpty(err)) Console.WriteLine("  提示: " + err);
+                        int upd = 0;
+                        foreach (var r in rows)
+                        {
+                            if (r.HasUpdate) upd++;
+                            Console.WriteLine("   · [" + r.Status.PadRight(3) + "] " + (r.Title ?? r.Local.Name) +
+                                              "  本地 " + r.Local.Version + (r.HasUpdate ? " → " + r.LatestVersion : "") +
+                                              (r.MissingDeps.Count > 0 ? "  " + r.MissingText : ""));
+                        }
+                        Console.WriteLine("  共 " + rows.Count + " 个 mod，可更新 " + upd + " 个");
+                        if (rows.Count == 0) { Console.WriteLine("[FAIL] 没扫到 mod"); return 1; }
+                        Console.WriteLine("[PASS] Mod 识别可用");
+                        return 0;
+                    }
+
                     case "--selftest-mcmod":
                     {
                         string q = args.Length > 1 ? args[1] : "sodium";

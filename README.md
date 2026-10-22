@@ -9,7 +9,7 @@
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
-> Kyouka MCLauncher 1.6.1 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
+> Kyouka MCLauncher 1.7.0 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
 > 主版本为 **Kyouka MCLauncher**（WPF，约 250 KB 单文件）；WinForms 版与 Python 版已归档到 `legacy/`（冻结维护）。
 
 **English**: [README.en.md](README.en.md)
@@ -129,7 +129,19 @@ python mcroute_gui.py
 | **Cleanroom（1.12.2）** | ✅ | ✅ 一键修复 + 实机（149 mod） | ✅ v1.5.0（实例标注 + 修复按钮） |
 | **多实例** | ✅ | ✅ `--selftest-instances` | ✅ v1.5.0（`versions/` 结构，主流启动器可识别） |
 | 资源包/光影从 Modrinth 下载 | ✅ | ✅ 搜索接口实测（636 资源包 / 1 光影命中） | ✅ v1.4.0 |
-| **MC百科（中文名 / 简介）**
+| **Mod 识别与更新**
+
+管理页 →「Mod 识别 / 更新」：对选中版本里的每个 jar 算 SHA1，用 Modrinth 的哈希反查接口
+精确识别它对应哪个项目（同文件才命中，不靠名字猜），再查该 MC 版本 + 加载器下的最新版：
+
+- **可更新** → 一键更新（旧文件移到 `mods/.old/`，不会两个版本同时加载）
+- **已识别 / 最新** → 双击打开项目页
+- **未匹配** → 自改版 / CurseForge 独占 / 没上传到 Modrinth；可直接搜 MC百科
+- **缺依赖** → Modrinth 标记为 required 但本地没识别到的项目
+
+![Mod 识别与更新](docs/gui-wpf-modupdate.png)
+
+**MC百科（中文名 / 简介）**
 
 Mod 下载窗口 →「MC百科搜索」：输入关键词，直接看到中文名、简介、快照时间；双击打开对应百科页。
 只解析 `search.mcmod.cn` 的结果列表，不抓详情页、不做自动批量请求。
@@ -138,6 +150,7 @@ Mod 下载窗口 →「MC百科搜索」：输入关键词，直接看到中文�
 
 **整合包在线下载** | ✅ | ✅ 实测（Fabulously Optimized：0.2MB → 44 mods） | ✅ v1.5.0 |
 | **MC百科搜索（mcmod）** | ✅ | ✅ `--selftest-mcmod` + 解析单测 | ✅ v1.6.1（中文名/简介，浏览器打开详情；不抓详情页） |
+| **Mod 识别与更新** | ✅ | ✅ 实机 149 mods（识别 7/8 测试包，可更新 3） | ✅ v1.7.0（SHA1 反查 Modrinth + 版本比较 + 缺依赖提示） |
 | 关闭游戏（**整棵进程树** + 残留清理） | ✅ | ✅ `--selftest-proctree` / `--selftest-orphan` | ✅ v1.5.3（含 javaw 子进程；启动可取消；启动时清理上次残留） |
 
 > 说明：**"代码写了" ≠ "测过了" ≠ "普通用户能直接用"**。上表把三者分开列，
