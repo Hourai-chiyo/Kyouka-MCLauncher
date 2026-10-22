@@ -133,16 +133,16 @@ python mcroute_gui.py
 
 管理页 →「Mod 管理」：左边是本地 mods 列表，右边自动补上联网识别结果。
 对选中版本里的每个 jar：
+
 - **Modrinth**：算 SHA1 走 `POST /v2/version_files` 反查
 - **CurseForge**：算文件指纹（MurmurHash2 去空白，seed=1）走 `POST /v1/fingerprints`（需要 `cf_api_key.txt`）
 
-，用 Modrinth 的哈希反查接口
-精确识别它对应哪个项目（同文件才命中，不靠名字猜），再查该 MC 版本 + 加载器下的最新版：
+命中后查该 MC 版本 + 加载器下的最新版：
 
-- **可更新** → 一键更新（旧文件移到 `mods/.old/`，不会两个版本同时加载）
+- **可更新** → 一键更新（旧文件移到 `mods/.old/`）
 - **已识别 / 最新** → 双击打开项目页
-- **未匹配** → 自改版 / CurseForge 独占 / 没上传到 Modrinth；可直接搜 MC百科
-- **缺依赖** → Modrinth 标记为 required 但本地没识别到的项目
+- **未匹配** → 自改版 / CF 独占（没配 Key 时）/ 没上传到平台；可直接搜 MC百科
+- **依赖** → 列表里只显示 `⚠ n`，悬停看完整依赖名（按 Modrinth 元数据，仅供参考）
 
 ![Mod 管理](docs/gui-wpf-modupdate.png)
 
