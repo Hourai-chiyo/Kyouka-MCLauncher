@@ -354,7 +354,9 @@ namespace Mcroute.Wpf
                 string mc, loader, loaderVer;
                 string tag = Version.Describe(_baseDir, name, out mc, out loader, out loaderVer);
                 if (CleanroomSetup.Detect(_baseDir, name)) tag += " · Cleanroom";
-                if (isPack) tag += " · 整合包";
+                bool isInstance = File.Exists(Path.Combine(dir, "instance.json"));
+                if (isInstance) tag += " · 实例";
+                else if (isPack) tag += " · 整合包";
                 else if (hasMods && string.IsNullOrEmpty(loader)) tag += " · 外部";
 
                 if (q.Length > 0 &&
@@ -611,18 +613,48 @@ namespace Mcroute.Wpf
             var p = _gameProc;
             if (p == null) { MessageBox.Show("没有正在运行的游戏", "提示"); return; }
 
-            // 先优雅关：给游戏窗口发关闭消息，让它自己保存并退出
-            StatusText.Text = "正在关闭游戏…（先尝试正常退出）";
+            StatusText.Text = "正在关闭游戏…（等待游戏自己保存并退出）";
+            CardDetail.Text = "正在关闭…";
             bool sent = false;
             try { sent = p.CloseMainWindow(); } catch { }
+            if (!sent)
+            {
+                // 没有主窗口句柄（LWJGL 常见）：用 taskkill 不带 /F，等价于请求关闭
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "taskkill",
+                        Arguments = "/PID " + p.Id,
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                    });
+                    sent = true;
+                }
+                catch { }
+            }
 
             var waiter = new System.Threading.Tasks.Task(() =>
             {
                 bool exited = false;
-                for (int i = 0; i < 20; i++)   // 最多等 10 秒
+                bool windowGone = false;
+                for (int i = 0; i < 16; i++)   // 最多 8 秒
                 {
                     System.Threading.Thread.Sleep(500);
-                    try { if (p.HasExited) { exited = true; break; } } catch { exited = true; break; }
+                    try
+                    {
+                        if (p.HasExited) { exited = true; break; }
+                        if (!windowGone && p.MainWindowHandle == IntPtr.Zero)
+                        {
+                            windowGone = true;
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                StatusText.Text = "窗口已关闭，等待进程退出…";
+                                CardDetail.Text = "窗口已关闭，等待进程退出…";
+                            }));
+                        }
+                    }
+                    catch { exited = true; break; }
                 }
 
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -630,13 +662,14 @@ namespace Mcroute.Wpf
                     if (exited)
                     {
                         StatusText.Text = "就绪 · 游戏已正常退出";
+                        CardDetail.Text = "游戏已退出";
                         return;
                     }
+
                     var ans = MessageBox.Show(
-                        "游戏在 10 秒内没有退出。\n\n" +
-                        "如果它卡在「正在关闭内置服务器 / 保存世界」，可以强制结束（可能丢最后几秒进度）。\n\n" +
+                        "游戏窗口已关闭，但进程 8 秒内还没退出（有时是音频/存档线程在收尾）。\n\n" +
                         "要强制结束吗？",
-                        "关闭游戏", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                        "关闭游戏", MessageBoxButton.YesNo, MessageBoxImage.Question);
                     if (ans == MessageBoxResult.Yes)
                     {
                         try
@@ -649,7 +682,7 @@ namespace Mcroute.Wpf
                     }
                     else
                     {
-                        StatusText.Text = "游戏仍在运行（未强制结束）";
+                        StatusText.Text = "游戏仍在后台收尾（未强制结束）";
                     }
                 }));
             });
@@ -772,6 +805,11 @@ namespace Mcroute.Wpf
                 Title = "选择整合包",
             };
             if (dlg.ShowDialog() == true) PackPath.Text = dlg.FileName;
+        }
+
+        private void BrowseModpackOnline_Click(object sender, RoutedEventArgs e)
+        {
+            new ModpackWindow(_baseDir, () => RefreshVersions()) { Owner = this }.ShowDialog();
         }
 
         private void InstallPack_Click(object sender, RoutedEventArgs e)

@@ -9,8 +9,8 @@
     <RootNamespace>Mcroute.Wpf</RootNamespace>
     <ApplicationIcon>..\legacy\winforms\app.ico</ApplicationIcon>
     <ApplicationManifest>..\legacy\winforms\app.manifest</ApplicationManifest>
-    <Version>1.4.0</Version>
-    <FileVersion>1.4.0.0</FileVersion>
+    <Version>1.5.0</Version>
+    <FileVersion>1.5.0.0</FileVersion>
     <Product>mcroute — Minecraft Java 启动器（WPF 原型）</Product>
     <Company>Hourai-chiyo</Company>
     <Description>WPF 视觉原型：只做界面壳，功能逻辑复用 csharp/ 下的 Core</Description>

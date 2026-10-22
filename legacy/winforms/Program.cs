@@ -142,23 +142,37 @@ namespace Mcroute
                         string tmp = ArgOf(args, "--dir");
                         if (string.IsNullOrEmpty(tmp)) tmp = System.IO.Path.Combine(Environment.CurrentDirectory, "_insttest");
                         try { if (System.IO.Directory.Exists(tmp)) System.IO.Directory.Delete(tmp, true); } catch { }
+                        // 底板版本
                         System.IO.Directory.CreateDirectory(System.IO.Path.Combine(tmp, "versions", "1.20.1"));
+                        System.IO.File.WriteAllText(System.IO.Path.Combine(tmp, "versions", "1.20.1", "1.20.1.json"),
+                            "{\"id\":\"1.20.1\",\"type\":\"release\"}");
                         Console.WriteLine("  版本候选: " + string.Join(", ", Instances.VersionCandidates(tmp)));
 
                         string err;
                         if (!Instances.Create(tmp, "生存", "1.20.1", out err)) { Console.WriteLine("[FAIL] 创建: " + err); return 1; }
                         if (!Instances.Create(tmp, "创造", "1.20.1", out err)) { Console.WriteLine("[FAIL] 创建2: " + err); return 1; }
+
+                        // 关键：必须是 versions/<名字>/ 且带 <名字>.json（主流启动器可识别）
+                        string vdir = System.IO.Path.Combine(tmp, "versions", "生存");
+                        if (!System.IO.Directory.Exists(vdir)) { Console.WriteLine("[FAIL] 不在 versions/ 下"); return 1; }
+                        if (!System.IO.File.Exists(System.IO.Path.Combine(vdir, "生存.json"))) { Console.WriteLine("[FAIL] 缺 生存.json"); return 1; }
+                        string vjson = System.IO.File.ReadAllText(System.IO.Path.Combine(vdir, "生存.json"));
+                        if (!vjson.Contains("\"inheritsFrom\":\"1.20.1\"")) { Console.WriteLine("[FAIL] inheritsFrom 不对: " + vjson); return 1; }
+                        Console.WriteLine("  版本 json: " + vjson);
+
                         var list = Instances.List(tmp);
                         if (list.Count != 2) { Console.WriteLine("[FAIL] 列表数量 " + list.Count); return 1; }
                         Console.WriteLine("  列表: " + string.Join(", ", list.ConvertAll(i => i.Name + "@" + i.Version)));
 
                         if (!Instances.Copy(tmp, "生存", "生存-备份", out err)) { Console.WriteLine("[FAIL] 复制: " + err); return 1; }
+                        if (!System.IO.File.Exists(System.IO.Path.Combine(tmp, "versions", "生存-备份", "生存-备份.json")))
+                        { Console.WriteLine("[FAIL] 复制后缺 json"); return 1; }
                         if (!Instances.Rename(tmp, "生存-备份", "生存-改名", out err)) { Console.WriteLine("[FAIL] 重命名: " + err); return 1; }
                         if (!Instances.Delete(tmp, "生存-改名", out err)) { Console.WriteLine("[FAIL] 删除: " + err); return 1; }
 
                         var after = Instances.List(tmp);
                         Console.WriteLine("  最终: " + string.Join(", ", after.ConvertAll(i => i.Name)));
-                        Console.WriteLine("[PASS] 实例创建/列表/复制/重命名/删除 全部通过");
+                        Console.WriteLine("[PASS] 实例（versions/ 结构，主流启动器可识别）全部通过");
                         try { System.IO.Directory.Delete(tmp, true); } catch { }
                         return 0;
                     }

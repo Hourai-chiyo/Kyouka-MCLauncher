@@ -108,6 +108,46 @@ namespace Mcroute.Wpf
                 return;
             }
 
+            // 整合包下载窗口截图：--shot-modpack <输出.png> [宽 高] [关键词]
+            if (args.Length >= 2 && args[0] == "--shot-modpack")
+            {
+                ShotMode = true;
+                try
+                {
+                    try { Mcroute.Theme.Apply(Environment.GetEnvironmentVariable("MCROUTE_THEME") ?? "auto"); } catch { }
+                    string baseDir = Environment.GetEnvironmentVariable("MCROUTE_DATA");
+                    if (string.IsNullOrEmpty(baseDir)) baseDir = Mcroute.Version.BaseDir(null);
+                    int w = args.Length >= 3 ? int.Parse(args[2]) : 900;
+                    int h = args.Length >= 4 ? int.Parse(args[3]) : 640;
+                    string q = args.Length >= 5 ? args[4] : "sky";
+
+                    var mpWin = new ModpackWindow(baseDir)
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = -10000, Top = -10000, Width = w, Height = h, ShowInTaskbar = false,
+                    };
+                    mpWin.Show();
+                    mpWin.UpdateLayout();
+                    Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                    mpWin.PreloadSearch(q);
+                    PumpFor(TimeSpan.FromSeconds(3));
+
+                    var visual = (Visual)mpWin.Content;
+                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(visual);
+                    string dir = Path.GetDirectoryName(Path.GetFullPath(args[1]));
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(rtb));
+                    using (var fs = File.Create(args[1])) enc.Save(fs);
+                    ShotTrace("shot-modpack saved");
+                    mpWin.Close();
+                }
+                catch (Exception ex) { ShotTrace("shot-modpack 异常: " + ex); }
+                Shutdown(0);
+                return;
+            }
+
             // 实例窗口截图：--shot-instances <输出.png> [宽 高]
             if (args.Length >= 2 && args[0] == "--shot-instances")
             {

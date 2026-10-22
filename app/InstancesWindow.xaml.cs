@@ -23,6 +23,7 @@ namespace Mcroute
 
         private void Reload()
         {
+            try { Instances.MigrateLegacy(_baseDir); } catch { }
             _items = Instances.List(_baseDir);
             InstList.Items.Clear();
             foreach (var i in _items) InstList.Items.Add(MakeItem(i));
@@ -166,7 +167,8 @@ namespace Mcroute
                 int code = -1;
                 try
                 {
-                    code = Commands.Launch(new[] { "launch", ver, "--dir", _baseDir, "--game-dir", i.Dir, "--memory", "6G" });
+                    // 实例就在 versions/<名字>/，直接按版本名启动即可（和普通版本一致）
+                    code = Commands.Launch(new[] { "launch", i.Name, "--dir", _baseDir, "--memory", "6G" });
                     log = "退出码 " + code;
                 }
                 catch (Exception ex) { log = ex.Message; }

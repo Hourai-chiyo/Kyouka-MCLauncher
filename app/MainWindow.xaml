@@ -700,9 +700,11 @@
                                         Margin="8,0,0,0" Click="BrowsePack_Click"/>
                                 <Button Style="{StaticResource GhostButton}" Content="安装" Width="80"
                                         Margin="8,0,0,0" Click="InstallPack_Click"/>
+                                <Button Style="{StaticResource GhostButton}" Content="浏览 Modrinth 整合包" Width="160"
+                                        Margin="8,0,0,0" Click="BrowseModpackOnline_Click"/>
                             </StackPanel>
 
-                            <TextBlock Text="装完会自动补全依赖，可以直接到「启动」页启动。CurseForge 包需要 API key（写 mcdata\cf_api_key.txt）。"
+                            <TextBlock Text="装完会自动补全依赖，可以直接到「启动」页启动。也可以点「浏览 Modrinth 整合包」在线下载。CurseForge 包需要 API key。"
                                        Margin="0,12,0,0" FontSize="11" Foreground="{DynamicResource TextFaint}"/>
                         </StackPanel>
                     </Border>
