@@ -108,6 +108,46 @@ namespace Mcroute.Wpf
                 return;
             }
 
+            // 资源包/光影窗口截图：--shot-packs <版本> <输出.png> [宽 高] [shaders]
+            if (args.Length >= 3 && args[0] == "--shot-packs")
+            {
+                ShotMode = true;
+                try
+                {
+                    try { Mcroute.Theme.Apply(Environment.GetEnvironmentVariable("MCROUTE_THEME") ?? "auto"); } catch { }
+                    string baseDir = Environment.GetEnvironmentVariable("MCROUTE_DATA");
+                    if (string.IsNullOrEmpty(baseDir)) baseDir = Mcroute.Version.BaseDir(null);
+                    int w = args.Length >= 4 ? int.Parse(args[3]) : 880;
+                    int h = args.Length >= 5 ? int.Parse(args[4]) : 620;
+                    bool shaders = args.Length >= 6 && args[5] == "shaders";
+
+                    var packWin = new PacksWindow(baseDir, args[1])
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = -10000, Top = -10000, Width = w, Height = h, ShowInTaskbar = false,
+                    };
+                    packWin.Show();
+                    packWin.UpdateLayout();
+                    Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                    packWin.PreloadTab(shaders);
+                    PumpFor(TimeSpan.FromMilliseconds(700));
+
+                    var visual = (Visual)packWin.Content;
+                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(visual);
+                    string dir = Path.GetDirectoryName(Path.GetFullPath(args[2]));
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(rtb));
+                    using (var fs = File.Create(args[2])) enc.Save(fs);
+                    ShotTrace("shot-packs saved");
+                    packWin.Close();
+                }
+                catch (Exception ex) { ShotTrace("shot-packs 异常: " + ex); }
+                Shutdown(0);
+                return;
+            }
+
             // 文件浏览窗口截图：--shot-browser <目录> <输出.png> [宽 高]
             if (args.Length >= 3 && args[0] == "--shot-browser")
             {

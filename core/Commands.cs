@@ -12,6 +12,7 @@ namespace Mcroute
     {
         public string Base, Version, MainClass, Java, GameDir, NativesDir, AssetsDir, AssetIndex;
         public int JavaMajor;
+        public int JavaRequired;   // 版本 json 要求的 Java 主版本
         public string FixNote;   // 启动前自动修复的说明（无则 null）
         public Dictionary<string, object> Json;
         public List<string> Classpath = new List<string>();
@@ -327,6 +328,7 @@ namespace Mcroute
 
             // Java
             int required = J.Int(J.Dict(vj, "javaVersion") ?? new Dictionary<string, object>(), "majorVersion", 8);
+            plan.JavaRequired = required;
             plan.Java = Java.Find(baseDir, required, javaArg, out plan.JavaMajor);
 
             // 外置登录（authlib-injector）：有账号就用它的 token，否则离线占位

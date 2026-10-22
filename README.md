@@ -120,6 +120,8 @@ python mcroute_gui.py
 | 微软正版登录 | ❌（AppID 被拒） | — | ❌ 不可用 |
 | **外置登录（authlib-injector / 皮肤站）** | ✅ | ✅ `--selftest-authlib` + 实机 | ✅ v1.1.0 |
 | **Mod 下载（Modrinth / CurseForge / 链接）** | ✅ | ✅ 实机（sodium / IC2） | ✅ v0.5.x（CF 需自带 Key） |
+| **资源包 / 光影管理** | ✅ | ✅ `--selftest-packs` + 界面实机 | ✅ v1.2.0 |
+| **启动时缺 Java 提示** | ✅ | ✅ 界面实机 | ✅ v1.2.0（缺 Java 直接问要不要装） |
 | **自动更新** | ✅ | ✅ `--selftest-update` | ✅ v1.0.1 |
 | 分段下载（HTTP Range + 自适应） | ✅ | ✅ 实测（本机单连接 4.7 MB/s → 自动不分段） | ✅ v0.4.1（默认关） |
 | Cleanroom（1.12.2） | 🟡 手工 | ✅ 手工五步跑通（149 mod） | 🟡 需手工配置，见 `docs/cleanroom.md` |

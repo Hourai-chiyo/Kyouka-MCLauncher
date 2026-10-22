@@ -768,6 +768,8 @@
                                         Click="OpenMods_Click"/>
                                 <Button Style="{StaticResource GhostButton}" Content="Mods 下载" Width="100" Margin="8,0,0,0"
                                         Click="OpenModsBrowser_Click"/>
+                        <Button Style="{StaticResource GhostButton}" Content="资源包 · 光影" Width="110" Margin="8,0,0,0"
+                                Click="OpenPacks_Click"/>
                             </StackPanel>
                         </Grid>
                     </Border>

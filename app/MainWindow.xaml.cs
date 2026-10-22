@@ -449,6 +449,24 @@ namespace Mcroute.Wpf
                     AppendLog("[启动失败] 缺 " + plan.Missing.Count + " 个文件，先下载或体检补齐");
                     return;
                 }
+
+                // 缺 Java：直接问要不要装，而不是让游戏闪退后自己猜
+                if (plan.Java == "java" || plan.JavaMajor <= 0)
+                {
+                    int major = plan.JavaRequired > 0 ? plan.JavaRequired : 17;
+                    var ans = MessageBox.Show(
+                        "没有检测到可用的 Java " + major + "。\n\n现在下载并安装吗？（Adoptium 清华镜像，失败会依次换 Azul / Corretto）",
+                        "缺少 Java", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    if (ans == MessageBoxResult.Yes)
+                    {
+                        RunTask("安装 Java " + major, () =>
+                        {
+                            string exe = JavaSources.Install(major, _baseDir);
+                            return string.IsNullOrEmpty(exe) ? 1 : 0;
+                        }, () => Dispatcher.BeginInvoke(new Action(() => Play_Click(this, null))));
+                        return;
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -660,6 +678,13 @@ namespace Mcroute.Wpf
                 if (cmd == "test") return ExtraCommands.Test(new[] { "test", ver, "--dir", _baseDir });
                 return ExtraCommands.Mkbat(new[] { "mkbat", ver, "--dir", _baseDir });
             });
+        }
+
+        private void OpenPacks_Click(object sender, RoutedEventArgs e)
+        {
+            string ver = SelectedManageVersion();
+            if (ver == null) { MessageBox.Show("先在列表里选一个版本", "提示"); return; }
+            new PacksWindow(_baseDir, ver) { Owner = this }.ShowDialog();
         }
 
         private void OpenModsBrowser_Click(object sender, RoutedEventArgs e)

@@ -137,6 +137,43 @@ namespace Mcroute
                         return 0;
                     }
 
+                    case "--selftest-packs":
+                    {
+                        string tmp = ArgOf(args, "--dir");
+                        if (string.IsNullOrEmpty(tmp)) tmp = System.IO.Path.Combine(Environment.CurrentDirectory, "_packtest");
+                        try { if (System.IO.Directory.Exists(tmp)) System.IO.Directory.Delete(tmp, true); } catch { }
+                        string rp = System.IO.Path.Combine(tmp, "versions", "T", "resourcepacks");
+                        System.IO.Directory.CreateDirectory(rp);
+                        // 造一个最小资源包
+                        string zipPath = System.IO.Path.Combine(rp, "demo.zip");
+                        using (var fs = System.IO.File.Create(zipPath))
+                        using (var zip = new System.IO.Compression.ZipArchive(fs, System.IO.Compression.ZipArchiveMode.Create))
+                        {
+                            var e = zip.CreateEntry("pack.mcmeta");
+                            using (var w = new System.IO.StreamWriter(e.Open()))
+                                w.Write("{\"pack\":{\"pack_format\":15,\"description\":\"selftest pack\"}}");
+                        }
+                        var packs = LocalPacks.Scan(tmp, "T", LocalPacks.ResourcePacks);
+                        Console.WriteLine("  扫描到 " + packs.Count + " 个资源包");
+                        if (packs.Count != 1) { Console.WriteLine("[FAIL] 扫描数量不对"); return 1; }
+                        var p0 = packs[0];
+                        Console.WriteLine("  名称=" + p0.Title + "  格式=" + p0.PackFormat + "  描述=" + p0.Description);
+                        if (p0.PackFormat != 15 || p0.Description != "selftest pack") { Console.WriteLine("[FAIL] 元数据解析不对"); return 1; }
+
+                        string err;
+                        if (!LocalPacks.SetEnabled(p0, false, out err)) { Console.WriteLine("[FAIL] 禁用失败: " + err); return 1; }
+                        if (!System.IO.File.Exists(zipPath + ".disabled")) { Console.WriteLine("[FAIL] 禁用后文件不存在"); return 1; }
+                        var packs2 = LocalPacks.Scan(tmp, "T", LocalPacks.ResourcePacks);
+                        if (packs2.Count != 1 || !packs2[0].Disabled) { Console.WriteLine("[FAIL] 禁用状态未生效"); return 1; }
+
+                        if (!LocalPacks.SetEnabled(packs2[0], true, out err)) { Console.WriteLine("[FAIL] 启用失败: " + err); return 1; }
+                        if (!System.IO.File.Exists(zipPath)) { Console.WriteLine("[FAIL] 启用后文件不存在"); return 1; }
+
+                        Console.WriteLine("[PASS] 资源包扫描 / 元数据 / 启停 全部通过");
+                        try { System.IO.Directory.Delete(tmp, true); } catch { }
+                        return 0;
+                    }
+
                     case "--selftest-update":
                     {
                         Console.WriteLine("当前版本: " + Update.CurrentVersion());
