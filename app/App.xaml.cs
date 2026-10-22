@@ -108,6 +108,44 @@ namespace Mcroute.Wpf
                 return;
             }
 
+            // MC百科窗口截图：--shot-mcmod <输出.png> [宽 高] [关键词]
+            if (args.Length >= 2 && args[0] == "--shot-mcmod")
+            {
+                ShotMode = true;
+                try
+                {
+                    try { Mcroute.Theme.Apply(Environment.GetEnvironmentVariable("MCROUTE_THEME") ?? "auto"); } catch { }
+                    int w = args.Length >= 3 ? int.Parse(args[2]) : 900;
+                    int h = args.Length >= 4 ? int.Parse(args[3]) : 620;
+                    string q = args.Length >= 5 ? args[4] : "sodium";
+
+                    var mw = new McmodWindow()
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = -10000, Top = -10000, Width = w, Height = h, ShowInTaskbar = false,
+                    };
+                    mw.Show();
+                    mw.UpdateLayout();
+                    Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                    mw.SearchNow(q);
+                    PumpFor(TimeSpan.FromSeconds(3));
+
+                    var visual = (Visual)mw.Content;
+                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(visual);
+                    string dir = Path.GetDirectoryName(Path.GetFullPath(args[1]));
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(rtb));
+                    using (var fs = File.Create(args[1])) enc.Save(fs);
+                    ShotTrace("shot-mcmod saved");
+                    mw.Close();
+                }
+                catch (Exception ex) { ShotTrace("shot-mcmod 异常: " + ex); }
+                Shutdown(0);
+                return;
+            }
+
             // 整合包下载窗口截图：--shot-modpack <输出.png> [宽 高] [关键词]
             if (args.Length >= 2 && args[0] == "--shot-modpack")
             {

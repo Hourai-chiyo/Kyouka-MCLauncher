@@ -31,6 +31,7 @@ namespace Mcroute.Tests
             Run("LocalPacks 资源包", LocalPacksTests.All);
             Run("Instances 多实例", InstancesTests.All);
             Run("Authlib 地址规整", AuthlibTests.All);
+            Run("Mcmod 结果解析", McmodTests.All);
 
             Console.WriteLine();
             Console.WriteLine("------------------------");
@@ -412,6 +413,29 @@ namespace Mcroute.Tests
             Program.AreEqual("http://x/", Authlib.NormalizeRoot("http://x"), "保留 http");
             Program.AreEqual(null, Authlib.NormalizeRoot(null), "null 输入");
             Program.AreEqual(null, Authlib.NormalizeRoot(""), "空串输入");
+        }
+    }
+
+    internal static class McmodTests
+    {
+        public static void All()
+        {
+            const string html = "<div class=\"result-item\"><div class=\"head\"><a  target=\"_blank\" href=\"https://www.mcmod.cn/class/2785.html\">\u94a0 (<em>Sodium</em>)</a></div><div class=\"body\">[h1=\u6982\u8ff0]<em>Sodium</em> \u662f\u4e00\u4e2a&nbsp;\u6e32\u67d3\u5f15\u64ce</div><div class=\"foot\"><span class=\"info\"><span>\u5feb\u7167\u65f6\u95f4\uff1a</span><span class=\"value\">2026-10-17</span></span></div></div>"
+                         + "<div class=\"result-item\"><div class=\"head\"><a href=\"https://www.mcmod.cn/class/3701.html\">\u94a0 \u00b7 \u6269\u5c55 (Sodium Extra)</a></div><div class=\"body\">\u6b64\u6a21\u7ec4\u662f\u94a0\u7684\u62d3\u5c55</div></div>";
+
+            var hits = Mcmod.ParseHtml(html, 10);
+            Program.AreEqual(2, hits.Count, "解析出 2 条结果");
+            Program.AreEqual("\u94a0 ( Sodium )", hits[0].Name, "中文名 + 英文括注（去标签/压空格）");
+            Program.AreEqual("https://www.mcmod.cn/class/2785.html", hits[0].Url, "条目链接");
+            Program.AreEqual("2026-10-17", hits[0].Snapshot, "快照时间");
+            Program.Contains(hits[0].Summary, "Sodium", "简介保留英文名");
+            Program.IsFalse(hits[0].Summary.Contains("h1="), "简介去掉 BBCode");
+            Program.AreEqual("\u94a0 \u00b7 \u6269\u5c55 (Sodium Extra)", hits[1].Name, "第二条中文名");
+
+            Program.AreEqual(0, Mcmod.ParseHtml("", 10).Count, "空 HTML 返回空");
+            Program.AreEqual(0, Mcmod.ParseHtml(html, 0).Count, "limit=0 返回空");
+            Program.AreEqual(1, Mcmod.ParseHtml(html, 1).Count, "limit 生效");
+            Program.AreEqual(0, Mcmod.ParseHtml("<html><body>no results</body></html>", 10).Count, "无结果页面返回空");
         }
     }
 }

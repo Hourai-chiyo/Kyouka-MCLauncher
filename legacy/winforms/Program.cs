@@ -137,6 +137,26 @@ namespace Mcroute
                         return 0;
                     }
 
+                    case "--selftest-mcmod":
+                    {
+                        string q = args.Length > 1 ? args[1] : "sodium";
+                        string err;
+                        var hits = Mcmod.Search(q, 5, out err);
+                        Console.WriteLine("  搜索: " + q);
+                        if (!string.IsNullOrEmpty(err)) Console.WriteLine("  提示: " + err);
+                        Console.WriteLine("  结果数: " + hits.Count);
+                        for (int i = 0; i < hits.Count && i < 3; i++)
+                        {
+                            var h = hits[i];
+                            Console.WriteLine("   · " + h.Name + "  [" + h.Snapshot + "]");
+                            Console.WriteLine("     " + h.Url);
+                            Console.WriteLine("     " + h.Summary);
+                        }
+                        if (hits.Count == 0) { Console.WriteLine("[FAIL] 没解析到结果"); return 1; }
+                        Console.WriteLine("[PASS] mcmod 搜索可用（" + hits.Count + " 条）");
+                        return 0;
+                    }
+
                     case "--selftest-orphan":
                     {
                         string dir = Version.BaseDir(ArgOf(args, "--dir"));

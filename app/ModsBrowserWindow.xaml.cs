@@ -417,10 +417,7 @@ namespace Mcroute
         private void OpenMcmodSearch_Click(object sender, RoutedEventArgs e)
         {
             string q = SearchBox.Text.Trim();
-            string url = string.IsNullOrEmpty(q)
-                ? "https://search.mcmod.cn/s"
-                : "https://search.mcmod.cn/s?key=" + Uri.EscapeDataString(q);
-            OpenUrlSafe(url);
+            new McmodWindow(string.IsNullOrEmpty(q) ? null : q) { Owner = this }.ShowDialog();
         }
 
         private void OpenUrlSafe(string url)
