@@ -142,6 +142,13 @@ namespace Mcroute
             StatusText.Text = p.Disabled ? ("已禁用 " + p.Title) : ("已启用 " + p.Title);
         }
 
+        private void SearchModrinth_Click(object sender, RoutedEventArgs e)
+        {
+            string kind = _kind == LocalPacks.ResourcePacks ? "resourcepack" : "shader";
+            new ModsBrowserWindow(_baseDir, _version, "", "", kind) { Owner = this }.ShowDialog();
+            Reload();
+        }
+
         private void Import_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFileDialog

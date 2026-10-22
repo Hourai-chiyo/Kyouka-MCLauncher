@@ -108,6 +108,44 @@ namespace Mcroute.Wpf
                 return;
             }
 
+            // 实例窗口截图：--shot-instances <输出.png> [宽 高]
+            if (args.Length >= 2 && args[0] == "--shot-instances")
+            {
+                ShotMode = true;
+                try
+                {
+                    try { Mcroute.Theme.Apply(Environment.GetEnvironmentVariable("MCROUTE_THEME") ?? "auto"); } catch { }
+                    string baseDir = Environment.GetEnvironmentVariable("MCROUTE_DATA");
+                    if (string.IsNullOrEmpty(baseDir)) baseDir = Mcroute.Version.BaseDir(null);
+                    int w = args.Length >= 3 ? int.Parse(args[2]) : 860;
+                    int h = args.Length >= 4 ? int.Parse(args[3]) : 620;
+
+                    var instWin = new InstancesWindow(baseDir)
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = -10000, Top = -10000, Width = w, Height = h, ShowInTaskbar = false,
+                    };
+                    instWin.Show();
+                    instWin.UpdateLayout();
+                    Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.Loaded);
+                    PumpFor(TimeSpan.FromMilliseconds(700));
+
+                    var visual = (Visual)instWin.Content;
+                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                    rtb.Render(visual);
+                    string dir = Path.GetDirectoryName(Path.GetFullPath(args[1]));
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    var enc = new PngBitmapEncoder();
+                    enc.Frames.Add(BitmapFrame.Create(rtb));
+                    using (var fs = File.Create(args[1])) enc.Save(fs);
+                    ShotTrace("shot-instances saved");
+                    instWin.Close();
+                }
+                catch (Exception ex) { ShotTrace("shot-instances 异常: " + ex); }
+                Shutdown(0);
+                return;
+            }
+
             // 资源包/光影窗口截图：--shot-packs <版本> <输出.png> [宽 高] [shaders]
             if (args.Length >= 3 && args[0] == "--shot-packs")
             {

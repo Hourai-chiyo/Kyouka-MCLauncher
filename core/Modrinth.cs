@@ -68,14 +68,23 @@ namespace Mcroute
         /// <summary>搜索 mod。mcVersion / loader 可以为空（不过滤）。</summary>
         public static List<ModHit> Search(string query, string mcVersion, string loader, int limit, out string error)
         {
+            return Search(query, mcVersion, loader, limit, "mod", out error);
+        }
+
+        /// <summary>projectType: "mod" / "resourcepack" / "shader"。</summary>
+        public static List<ModHit> Search(string query, string mcVersion, string loader, int limit,
+                                          string projectType, out string error)
+        {
             error = null;
+            if (string.IsNullOrEmpty(projectType)) projectType = "mod";
             var list = new List<ModHit>();
             try
             {
-                var facets = new List<string> { "[\"project_type:mod\"]" };
+                var facets = new List<string> { "[\"project_type:" + projectType + "\"]" };
                 if (!string.IsNullOrEmpty(mcVersion)) facets.Add("[\"versions:" + mcVersion + "\"]");
                 string loaderId = LoaderId(loader);
-                if (!string.IsNullOrEmpty(loaderId)) facets.Add("[\"categories:" + loaderId + "\"]");
+                // 资源包/光影没有加载器概念
+                if (projectType == "mod" && !string.IsNullOrEmpty(loaderId)) facets.Add("[\"categories:" + loaderId + "\"]");
 
                 string facetsJson = "[" + string.Join(",", facets) + "]";
                 string url = Api + "/search?query=" + Uri.EscapeDataString(query ?? "") +
@@ -203,6 +212,44 @@ namespace Mcroute
                 var names = ProjectNames(required);
                 message += "\n注意：这个 mod 需要前置：" + string.Join("、", names) + "\n（请手动安装，避免装错版本）";
             }
+            return true;
+        }
+
+        /// <summary>
+        /// 安装到指定类型：kind = "mod" / "resourcepack" / "shader"。
+        /// 目标目录分别是 mods/ resourcepacks/ shaderpacks/。
+        /// </summary>
+        public static bool InstallToKind(string baseDir, string verName, string projectId,
+                                         string mcVersion, string loader, string kind, out string message)
+        {
+            if (kind == "mod") return Install(baseDir, verName, projectId, mcVersion, loader, out message);
+
+            message = "";
+            string err;
+            var versions = Versions(projectId, mcVersion, kind == "shader" ? null : loader, out err);
+            if (!string.IsNullOrEmpty(err)) { message = "查询版本失败：" + err; return false; }
+            if (versions.Count == 0) { message = "没有适配 " + mcVersion + " 的版本"; return false; }
+
+            object first = versions[0];
+            var files = Version.AsList(J.Get(first, "files"));
+            if (files == null || files.Count == 0) { message = "这个版本没有文件"; return false; }
+            object fileObj = files[0];
+            string url = J.Str(fileObj, "url");
+            string filename = J.Str(fileObj, "filename");
+            string sha1 = J.Str(J.Dict(fileObj, "hashes"), "sha1");
+            if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(filename)) { message = "文件信息不完整"; return false; }
+
+            string dirName = kind == "resourcepack" ? LocalPacks.ResourcePacks : LocalPacks.ShaderPacks;
+            string dir = LocalPacks.PackDir(baseDir, verName, dirName);
+            Directory.CreateDirectory(dir);
+            string dest = Path.Combine(dir, filename);
+            if (File.Exists(dest)) { message = "已存在：" + filename; return true; }
+
+            string info;
+            string status = Http.Download(url, dest, string.IsNullOrEmpty(sha1) ? null : sha1, out info, true);
+            if (status == "fail") { message = "下载失败：" + info; return false; }
+
+            message = "已下载 " + filename;
             return true;
         }
 

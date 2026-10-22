@@ -137,6 +137,32 @@ namespace Mcroute
                         return 0;
                     }
 
+                    case "--selftest-instances":
+                    {
+                        string tmp = ArgOf(args, "--dir");
+                        if (string.IsNullOrEmpty(tmp)) tmp = System.IO.Path.Combine(Environment.CurrentDirectory, "_insttest");
+                        try { if (System.IO.Directory.Exists(tmp)) System.IO.Directory.Delete(tmp, true); } catch { }
+                        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(tmp, "versions", "1.20.1"));
+                        Console.WriteLine("  版本候选: " + string.Join(", ", Instances.VersionCandidates(tmp)));
+
+                        string err;
+                        if (!Instances.Create(tmp, "生存", "1.20.1", out err)) { Console.WriteLine("[FAIL] 创建: " + err); return 1; }
+                        if (!Instances.Create(tmp, "创造", "1.20.1", out err)) { Console.WriteLine("[FAIL] 创建2: " + err); return 1; }
+                        var list = Instances.List(tmp);
+                        if (list.Count != 2) { Console.WriteLine("[FAIL] 列表数量 " + list.Count); return 1; }
+                        Console.WriteLine("  列表: " + string.Join(", ", list.ConvertAll(i => i.Name + "@" + i.Version)));
+
+                        if (!Instances.Copy(tmp, "生存", "生存-备份", out err)) { Console.WriteLine("[FAIL] 复制: " + err); return 1; }
+                        if (!Instances.Rename(tmp, "生存-备份", "生存-改名", out err)) { Console.WriteLine("[FAIL] 重命名: " + err); return 1; }
+                        if (!Instances.Delete(tmp, "生存-改名", out err)) { Console.WriteLine("[FAIL] 删除: " + err); return 1; }
+
+                        var after = Instances.List(tmp);
+                        Console.WriteLine("  最终: " + string.Join(", ", after.ConvertAll(i => i.Name)));
+                        Console.WriteLine("[PASS] 实例创建/列表/复制/重命名/删除 全部通过");
+                        try { System.IO.Directory.Delete(tmp, true); } catch { }
+                        return 0;
+                    }
+
                     case "--selftest-cleanroom":
                     {
                         string ver = args.Length > 1 && !args[1].StartsWith("--") ? args[1] : null;

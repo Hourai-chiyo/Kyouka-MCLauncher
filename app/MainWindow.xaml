@@ -486,8 +486,8 @@
                     <StackPanel Grid.Row="1" Margin="0,12,0,0">
                         <Button x:Name="PlayButton" Style="{StaticResource PrimaryButton}"
                                 Content="开始游戏" Height="38" Click="Play_Click"/>
-                        <Button x:Name="KillButton" Style="{StaticResource GhostButton}" Content="强制结束游戏"
-                                Height="30" Margin="0,6,0,0" Visibility="Collapsed" Click="KillGame_Click"/>
+                        <Button x:Name="CloseGameButton" Style="{StaticResource GhostButton}" Content="关闭游戏"
+                                Height="30" Margin="0,6,0,0" Visibility="Collapsed" Click="CloseGame_Click"/>
                     </StackPanel>
 
                     <!-- 导航 -->
@@ -774,6 +774,10 @@
                                         Click="OpenModsBrowser_Click"/>
                         <Button Style="{StaticResource GhostButton}" Content="资源包 · 光影" Width="110" Margin="8,0,0,0"
                                 Click="OpenPacks_Click"/>
+                        <Button Style="{StaticResource GhostButton}" Content="实例" Width="80" Margin="8,0,0,0"
+                                Click="OpenInstances_Click"/>
+                        <Button Style="{StaticResource GhostButton}" Content="Cleanroom 修复" Width="130" Margin="8,0,0,0"
+                                Click="FixCleanroom_Click"/>
                             </WrapPanel>
                         </Grid>
                     </Border>

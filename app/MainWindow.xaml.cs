@@ -353,6 +353,7 @@ namespace Mcroute.Wpf
 
                 string mc, loader, loaderVer;
                 string tag = Version.Describe(_baseDir, name, out mc, out loader, out loaderVer);
+                if (CleanroomSetup.Detect(_baseDir, name)) tag += " · Cleanroom";
                 if (isPack) tag += " · 整合包";
                 else if (hasMods && string.IsNullOrEmpty(loader)) tag += " · 外部";
 
@@ -522,7 +523,7 @@ namespace Mcroute.Wpf
                         _gameRunning = false;
                         _gameProc = null;
                         PlayButton.IsEnabled = true;
-                        if (KillButton != null) KillButton.Visibility = Visibility.Collapsed;
+                        if (CloseGameButton != null) CloseGameButton.Visibility = Visibility.Collapsed;
                         StopGameWatchdog();
                         int code = -1;
                         try { code = proc.ExitCode; } catch { }
@@ -538,10 +539,10 @@ namespace Mcroute.Wpf
                     _gameProc = proc;
                     _noWindowTicks = 0;
                     PlayButton.IsEnabled = false;
-                    if (KillButton != null)
+                    if (CloseGameButton != null)
                     {
-                        KillButton.Visibility = Visibility.Visible;
-                        KillButton.Content = "强制结束游戏";
+                        CloseGameButton.Visibility = Visibility.Visible;
+                        CloseGameButton.Content = "关闭游戏";
                     }
                     CardTitle.Text = "游戏运行中";
                     CardDetail.Text = "PID " + proc.Id + " · 关掉游戏后这里会自动更新";
@@ -579,7 +580,7 @@ namespace Mcroute.Wpf
                         _noWindowTicks++;
                         if (_noWindowTicks >= 3)   // 约 30 秒没窗口
                         {
-                            if (KillButton != null) KillButton.Content = "卡在关闭中？点这里强制结束";
+                            if (CloseGameButton != null) CloseGameButton.Content = "卡在关闭中？点这里关闭";
                             CardDetail.Text = "PID " + p.Id + " · 看起来卡在关闭中（窗口已消失但进程还在）";
                             AppendLog("[退出] 游戏窗口已消失但进程仍在，可用「强制结束」");
                         }
@@ -587,7 +588,7 @@ namespace Mcroute.Wpf
                     else
                     {
                         _noWindowTicks = 0;
-                        if (KillButton != null) KillButton.Content = "强制结束游戏";
+                        if (CloseGameButton != null) CloseGameButton.Content = "关闭游戏";
                     }
                 };
                 _gameWatchdog.Start();
@@ -605,24 +606,62 @@ namespace Mcroute.Wpf
             catch { }
         }
 
-        private void KillGame_Click(object sender, RoutedEventArgs e)
+        private void CloseGame_Click(object sender, RoutedEventArgs e)
         {
             var p = _gameProc;
             if (p == null) { MessageBox.Show("没有正在运行的游戏", "提示"); return; }
-            if (MessageBox.Show("强制结束 PID " + p.Id + " 的游戏进程？\n\n" +
-                    "如果它卡在「正在关闭内置服务器」，这通常能救回来；\n" +
-                    "但若正在保存存档，可能丢失最后几秒的进度。",
-                    "强制结束", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-            try
+
+            // 先优雅关：给游戏窗口发关闭消息，让它自己保存并退出
+            StatusText.Text = "正在关闭游戏…（先尝试正常退出）";
+            bool sent = false;
+            try { sent = p.CloseMainWindow(); } catch { }
+
+            var waiter = new System.Threading.Tasks.Task(() =>
             {
-                p.Kill();
-                AppendLog("[退出] 已强制结束 PID " + p.Id);
-                StatusText.Text = "就绪 · 已强制结束游戏";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("结束失败：" + ex.Message, "提示");
-            }
+                bool exited = false;
+                for (int i = 0; i < 20; i++)   // 最多等 10 秒
+                {
+                    System.Threading.Thread.Sleep(500);
+                    try { if (p.HasExited) { exited = true; break; } } catch { exited = true; break; }
+                }
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (exited)
+                    {
+                        StatusText.Text = "就绪 · 游戏已正常退出";
+                        return;
+                    }
+                    var ans = MessageBox.Show(
+                        "游戏在 10 秒内没有退出。\n\n" +
+                        "如果它卡在「正在关闭内置服务器 / 保存世界」，可以强制结束（可能丢最后几秒进度）。\n\n" +
+                        "要强制结束吗？",
+                        "关闭游戏", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                    if (ans == MessageBoxResult.Yes)
+                    {
+                        try
+                        {
+                            p.Kill();
+                            AppendLog("[关闭] 已强制结束 PID " + p.Id);
+                            StatusText.Text = "就绪 · 已强制结束游戏";
+                        }
+                        catch (Exception ex) { MessageBox.Show("结束失败：" + ex.Message, "提示"); }
+                    }
+                    else
+                    {
+                        StatusText.Text = "游戏仍在运行（未强制结束）";
+                    }
+                }));
+            });
+            waiter.Start();
+        }
+
+        private void ForceKill_Click(object sender, RoutedEventArgs e)
+        {
+            var p = _gameProc;
+            if (p == null) return;
+            try { p.Kill(); AppendLog("[关闭] 强制结束 PID " + p.Id); }
+            catch (Exception ex) { MessageBox.Show("结束失败：" + ex.Message, "提示"); }
         }
 
         /// <summary>恢复上次的窗口大小/位置/页签（越界时夹回屏幕内）。</summary>
@@ -794,6 +833,30 @@ namespace Mcroute.Wpf
                 if (cmd == "test") return ExtraCommands.Test(new[] { "test", ver, "--dir", _baseDir });
                 return ExtraCommands.Mkbat(new[] { "mkbat", ver, "--dir", _baseDir });
             });
+        }
+
+        private void OpenInstances_Click(object sender, RoutedEventArgs e)
+        {
+            new InstancesWindow(_baseDir) { Owner = this }.ShowDialog();
+            RefreshVersions();
+        }
+
+        private void FixCleanroom_Click(object sender, RoutedEventArgs e)
+        {
+            string ver = SelectedManageVersion();
+            if (ver == null) { MessageBox.Show("先在列表里选一个版本", "提示"); return; }
+            if (!CleanroomSetup.Detect(_baseDir, ver))
+            {
+                MessageBox.Show("这个版本不是 Cleanroom 实例（没有 relauncher/ 或 ++relauncher jar）。", "提示");
+                return;
+            }
+            RunTask("修复 Cleanroom：" + ver, () =>
+            {
+                string report;
+                bool ok = CleanroomSetup.Ensure(_baseDir, ver, out report);
+                Console.WriteLine((ok ? "[Cleanroom] " : "[Cleanroom 失败] ") + report);
+                return ok ? 0 : 1;
+            }, () => { });
         }
 
         private void OpenPacks_Click(object sender, RoutedEventArgs e)

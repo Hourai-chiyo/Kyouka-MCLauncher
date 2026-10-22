@@ -53,6 +53,7 @@
     <Compile Include="..\..\core\Authlib.cs" Link="Core\Authlib.cs" />
     <Compile Include="..\..\core\LocalPacks.cs" Link="Core\LocalPacks.cs" />
     <Compile Include="..\..\core\CleanroomSetup.cs" Link="Core\CleanroomSetup.cs" />
+    <Compile Include="..\..\core\Instances.cs" Link="Core\Instances.cs" />
   </ItemGroup>
 
 </Project>

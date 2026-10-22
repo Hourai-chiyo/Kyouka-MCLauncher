@@ -20,6 +20,7 @@ namespace Mcroute
         private readonly string _baseDir;
         private readonly string _version;
         private List<Item> _items = new List<Item>();
+        private readonly string _kind;   // mod / resourcepack / shader
 
         /// <summary>两家结果的统一展示模型。</summary>
         private class Item
@@ -42,14 +43,28 @@ namespace Mcroute
             }
         }
 
-        public ModsBrowserWindow(string baseDir, string version, string mcVersion, string loader)
+        public ModsBrowserWindow(string baseDir, string version, string mcVersion, string loader, string kind = "mod")
         {
+            _kind = string.IsNullOrEmpty(kind) ? "mod" : kind;
             InitializeComponent();
             _baseDir = baseDir;
             _version = version;
 
             McBox.Text = mcVersion ?? "";
             SelectLoader(loader);
+
+            if (_kind == "resourcepack") HeaderText.Text = "下载资源包（Modrinth）";
+            else if (_kind == "shader") HeaderText.Text = "下载光影（Modrinth）";
+            if (_kind != "mod")
+            {
+                // 资源包/光影没有加载器；CurseForge 与百科也只做 mod
+                if (LoaderBox != null) LoaderBox.Visibility = Visibility.Collapsed;
+                if (WikiButton != null) WikiButton.Visibility = Visibility.Collapsed;
+                foreach (var it in SourceBox.Items.OfType<ComboBoxItem>())
+                    if (string.Equals(it.Content as string, "CurseForge", StringComparison.OrdinalIgnoreCase))
+                        it.Visibility = Visibility.Collapsed;
+                if (SourceBox.Items.Count > 0) SourceBox.SelectedIndex = 0;
+            }
 
             Loaded += (s, e) =>
             {
@@ -112,6 +127,11 @@ namespace Mcroute
             string loader = CurrentLoader();
             string source = CurrentSource();
 
+            if (source == "cf" && _kind != "mod")
+            {
+                StatusText.Text = "CurseForge 只用于 Mod";
+                return;
+            }
             if (source == "cf" && !CurseForge.HasKey(_baseDir))
             {
                 UpdateKeyPanel();
@@ -145,7 +165,8 @@ namespace Mcroute
                 }
                 else
                 {
-                    var hits = Modrinth.Search(query, mc, loader, 30, out err);
+                    var hits = Modrinth.Search(query, mc, loader, 30,
+                        _kind == "resourcepack" ? "resourcepack" : (_kind == "shader" ? "shader" : "mod"), out err);
                     foreach (var h in hits)
                         got.Add(new Item
                         {
@@ -294,7 +315,7 @@ namespace Mcroute
                 string msg;
                 bool ok = h.Source == "cf"
                     ? CurseForge.Install(_baseDir, _version, h.CfId, mc, loader, out msg)
-                    : Modrinth.Install(_baseDir, _version, h.ProjectId, mc, loader, out msg);
+                    : Modrinth.InstallToKind(_baseDir, _version, h.ProjectId, mc, loader, _kind, out msg);
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     InstallBtn.IsEnabled = true;
@@ -390,6 +411,35 @@ namespace Mcroute
             bool needKey = CurrentSource() == "cf" && !CurseForge.HasKey(_baseDir);
             KeyPanel.Visibility = needKey ? Visibility.Visible : Visibility.Collapsed;
             if (needKey) StatusText.Text = "CurseForge 需要 API Key（官方控制台只能 Google 登录，国内难申请）——可切回 Modrinth，或用底部「从链接安装」";
+        }
+
+        /// <summary>用浏览器打开 MC百科搜索（不抓取，尊重站点规则）。</summary>
+        private void OpenMcmodSearch_Click(object sender, RoutedEventArgs e)
+        {
+            string q = SearchBox.Text.Trim();
+            string url = string.IsNullOrEmpty(q)
+                ? "https://search.mcmod.cn/s"
+                : "https://search.mcmod.cn/s?key=" + Uri.EscapeDataString(q);
+            OpenUrlSafe(url);
+        }
+
+        private void OpenUrlSafe(string url)
+        {
+            try { Clipboard.SetText(url); } catch { }
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true,
+                });
+                StatusText.Text = "已打开浏览器（链接也复制到剪贴板）";
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = "打不开浏览器，链接已复制";
+                MessageBox.Show("没调起浏览器，链接已复制到剪贴板：\n" + url + "\n\n" + ex.Message, "MC百科");
+            }
         }
 
         private void OpenModsDir_Click(object sender, RoutedEventArgs e)

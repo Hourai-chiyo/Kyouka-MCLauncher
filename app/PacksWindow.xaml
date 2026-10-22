@@ -183,6 +183,8 @@
                 <StackPanel Orientation="Horizontal">
                     <Button x:Name="ToggleBtn" Style="{StaticResource PrimaryButton}" Content="启用 / 禁用"
                             Width="130" Click="Toggle_Click"/>
+                    <Button Style="{StaticResource GhostButton}" Content="搜索 Modrinth" Width="120" Margin="8,0,0,0"
+                            Click="SearchModrinth_Click"/>
                     <Button Style="{StaticResource GhostButton}" Content="导入…" Width="90" Margin="8,0,0,0"
                             Click="Import_Click"/>
                     <Button Style="{StaticResource GhostButton}" Content="删除" Width="80" Margin="8,0,0,0"
