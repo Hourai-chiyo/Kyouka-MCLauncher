@@ -613,32 +613,18 @@ namespace Mcroute.Wpf
             var p = _gameProc;
             if (p == null) { MessageBox.Show("没有正在运行的游戏", "提示"); return; }
 
-            StatusText.Text = "正在关闭游戏…（等待游戏自己保存并退出）";
+            StatusText.Text = "正在关闭游戏…（已请求游戏退出）";
             CardDetail.Text = "正在关闭…";
-            bool sent = false;
-            try { sent = p.CloseMainWindow(); } catch { }
-            if (!sent)
-            {
-                // 没有主窗口句柄（LWJGL 常见）：用 taskkill 不带 /F，等价于请求关闭
-                try
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = "taskkill",
-                        Arguments = "/PID " + p.Id,
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                    });
-                    sent = true;
-                }
-                catch { }
-            }
+
+            // 先给这个进程的**所有顶层窗口**发 WM_CLOSE（只发 MainWindowHandle 经常无效）
+            int sent = WindowCloser.CloseAll(p.Id);
+            try { p.CloseMainWindow(); } catch { }
+            AppendLog("[关闭] 已向 PID " + p.Id + " 的 " + sent + " 个窗口发送关闭请求");
 
             var waiter = new System.Threading.Tasks.Task(() =>
             {
-                bool exited = false;
-                bool windowGone = false;
-                for (int i = 0; i < 16; i++)   // 最多 8 秒
+                bool exited = false, windowGone = false;
+                for (int i = 0; i < 20; i++)   // 最多 10 秒
                 {
                     System.Threading.Thread.Sleep(500);
                     try
@@ -657,19 +643,33 @@ namespace Mcroute.Wpf
                     catch { exited = true; break; }
                 }
 
+                // 窗口都关了、进程还不退：直接结束（用户点的是"关闭游戏"，不是"最小化"）
+                if (!exited && windowGone)
+                {
+                    try
+                    {
+                        p.Kill();
+                        AppendLog("[关闭] 窗口已关但进程未退出，已自动结束 PID " + p.Id);
+                        exited = true;
+                    }
+                    catch { }
+                }
+
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (exited)
                     {
-                        StatusText.Text = "就绪 · 游戏已正常退出";
+                        _gameRunning = false;
+                        if (CloseGameButton != null) CloseGameButton.Visibility = Visibility.Collapsed;
+                        StopGameWatchdog();
+                        StatusText.Text = "就绪 · 游戏已退出";
                         CardDetail.Text = "游戏已退出";
                         return;
                     }
 
                     var ans = MessageBox.Show(
-                        "游戏窗口已关闭，但进程 8 秒内还没退出（有时是音频/存档线程在收尾）。\n\n" +
-                        "要强制结束吗？",
-                        "关闭游戏", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                        "关闭请求已发送，但游戏 10 秒内没有退出。\n\n要强制结束进程吗？",
+                        "关闭游戏", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                     if (ans == MessageBoxResult.Yes)
                     {
                         try
@@ -679,10 +679,6 @@ namespace Mcroute.Wpf
                             StatusText.Text = "就绪 · 已强制结束游戏";
                         }
                         catch (Exception ex) { MessageBox.Show("结束失败：" + ex.Message, "提示"); }
-                    }
-                    else
-                    {
-                        StatusText.Text = "游戏仍在后台收尾（未强制结束）";
                     }
                 }));
             });

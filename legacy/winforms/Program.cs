@@ -137,6 +137,24 @@ namespace Mcroute
                         return 0;
                     }
 
+                    case "--selftest-close":
+                    {
+                        // 用自己（WinForms 界面）当目标：记事本在 Win11 是商店应用，PID 会换
+                        string self = System.Reflection.Assembly.GetEntryAssembly().Location;
+                        Console.WriteLine("  启动第二个 " + System.IO.Path.GetFileName(self) + " 作为测试目标…");
+                        var proc = System.Diagnostics.Process.Start(self);
+                        if (proc == null) { Console.WriteLine("[FAIL] 起不来记事本"); return 1; }
+                        System.Threading.Thread.Sleep(2500);
+                        Console.WriteLine("  目标 PID " + proc.Id + "  可见窗口=" + WindowCloser.HasVisibleWindow(proc.Id));
+                        int sent = WindowCloser.CloseAll(proc.Id);
+                        Console.WriteLine("  已发送 WM_CLOSE 到 " + sent + " 个窗口");
+                        bool exited = proc.WaitForExit(5000);
+                        if (!exited) { try { proc.Kill(); } catch { } }
+                        if (exited && sent > 0) { Console.WriteLine("[PASS] 优雅关闭成功（进程已退出）"); return 0; }
+                        Console.WriteLine("[FAIL] 记事本没退出（sent=" + sent + "）");
+                        return 1;
+                    }
+
                     case "--selftest-instances":
                     {
                         string tmp = ArgOf(args, "--dir");
