@@ -14,7 +14,20 @@ namespace Mcroute
     /// <summary>下载：带重试、镜像优先、sha1 校验。</summary>
     public static class Http
     {
-        public const string UA = "Kyouka-MCLauncher/1.9.2 (+https://github.com/Hourai-chiyo/Kyouka-MCLauncher)";
+        /// <summary>UA 里的版本号从程序集版本读，避免每次发版忘改（之前就漏过一次）。</summary>
+        private static string BuildUa()
+        {
+            string ver = "1.10.0";
+            try
+            {
+                var v = typeof(Http).Assembly.GetName().Version;
+                if (v != null) ver = v.Major + "." + v.Minor + "." + v.Build;
+            }
+            catch { }
+            return "Kyouka-MCLauncher/" + ver + " (+https://github.com/" + Update.Repo + ")";
+        }
+
+        public static readonly string UA = BuildUa();
         private static HttpClient _client;
         private static readonly object _clientLock = new object();
 
