@@ -11,8 +11,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>0.6.0</Version>
-    <FileVersion>0.6.0.0</FileVersion>
+    <Version>0.6.1</Version>
+    <FileVersion>0.6.1.0</FileVersion>
     <AssemblyVersion>0.4.0.0</AssemblyVersion>
     <Product>mcroute — Minecraft Java 启动器</Product>
     <Company>Hourai-chiyo</Company>
@@ -47,6 +47,7 @@
     <Compile Include="..\..\core\CurseForge.cs" Link="Core\CurseForge.cs" />
     <Compile Include="..\..\core\Packs.cs" Link="Core\Packs.cs" />
     <Compile Include="..\..\core\SafeZip.cs" Link="Core\SafeZip.cs" />
+    <Compile Include="..\..\core\SafePath.cs" Link="Core\SafePath.cs" />
     <Compile Include="..\..\core\SelfTest.cs" Link="Core\SelfTest.cs" />
     <Compile Include="..\..\core\Version.cs" Link="Core\Version.cs" />
     <Compile Include="..\..\core\Update.cs" Link="Core\Update.cs" />

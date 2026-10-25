@@ -1,0 +1,31 @@
+name: CI
+
+# 每次 push / PR 都构建 + 跑单元测试（发布签名走 build-and-sign.yml，只在 tag 触发）
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      - name: Build Kyouka MCLauncher
+        run: dotnet build app/KyoukaMCLauncher.csproj -c Release -o build --nologo
+
+      - name: Build legacy CLI
+        run: dotnet build legacy/winforms/McrouteWinForms.csproj -c Release -o build-legacy --nologo
+
+      - name: Core unit tests
+        run: |
+          dotnet build tests/Mcroute.Tests/Mcroute.Tests.csproj -c Release -o tests-out --nologo
+          tests-out/Mcroute.Tests.exe

@@ -41,14 +41,44 @@ namespace Mcroute
             return Path.Combine(baseDir, InjectorFile);
         }
 
-        /// <summary>把地址规整成以 / 结尾、去掉多余空格。</summary>
+        /// <summary>
+        /// 把地址规整成以 / 结尾、去掉多余空格。
+        /// 只接受 HTTPS；http:// 仅允许回环地址（本机测试），其它一律返回 null。
+        /// 原因：登录会把用户名+密码 POST 出去，明文 HTTP 等于把密码交给网络上的旁观者。
+        /// </summary>
         public static string NormalizeRoot(string apiRoot)
         {
             if (string.IsNullOrEmpty(apiRoot)) return null;
             string s = apiRoot.Trim();
             if (!s.StartsWith("http://") && !s.StartsWith("https://")) s = "https://" + s;
+
+            if (s.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            {
+                string host;
+                try { host = new Uri(s).Host; } catch { return null; }
+                if (!IsLoopback(host)) return null;
+            }
+
             if (!s.EndsWith("/")) s += "/";
             return s;
+        }
+
+        private static bool IsLoopback(string host)
+        {
+            if (string.IsNullOrEmpty(host)) return false;
+            if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase)) return true;
+            System.Net.IPAddress ip;
+            if (System.Net.IPAddress.TryParse(host, out ip))
+                return System.Net.IPAddress.IsLoopback(ip);
+            return false;
+        }
+
+        /// <summary>地址是否是本机回环（UI 上用来提示"明文 HTTP 仅限本机"）。</summary>
+        public static bool IsLoopbackRoot(string apiRoot)
+        {
+            string s = (apiRoot ?? "").Trim();
+            if (!s.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) return false;
+            try { return IsLoopback(new Uri(s).Host); } catch { return false; }
         }
 
         /// <summary>确保 authlib-injector.jar 存在；返回路径，失败返回 null。</summary>
@@ -64,6 +94,7 @@ namespace Mcroute
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
 
                 string url = null;
+                string expectedSha256 = null;
                 try
                 {
                     var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(ReleasesApi);
@@ -83,6 +114,10 @@ namespace Mcroute
                             && !name.Contains("sources") && !string.IsNullOrEmpty(dl))
                         {
                             url = dl;
+                            // GitHub 现在会给资产一个 sha256 digest；有就存下来
+                            string digest = J.Str(a, "digest");
+                            if (!string.IsNullOrEmpty(digest) && digest.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+                                expectedSha256 = digest.Substring(7);
                             break;
                         }
                     }
@@ -99,12 +134,47 @@ namespace Mcroute
                     try { if (File.Exists(path)) File.Delete(path); } catch { }
                     return null;
                 }
+
+                // 有官方 digest 就强校验；没有至少要求是 jar（PK 头），不能只看大小
+                if (!string.IsNullOrEmpty(expectedSha256))
+                {
+                    string actual = Sha256File(path);
+                    if (!string.Equals(actual, expectedSha256, StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { File.Delete(path); } catch { }
+                        error = "authlib-injector 哈希不符，已删除（可能被劫持）";
+                        return null;
+                    }
+                }
+                else
+                {
+                    byte[] head = new byte[4];
+                    using (var fs = File.OpenRead(path)) { if (fs.Read(head, 0, 4) < 4) { } }
+                    if (head[0] != 0x50 || head[1] != 0x4B)
+                    {
+                        try { File.Delete(path); } catch { }
+                        error = "authlib-injector 不是有效的 jar，已删除";
+                        return null;
+                    }
+                }
                 return path;
             }
             catch (Exception ex)
             {
                 error = ex.Message;
                 return null;
+            }
+        }
+
+        /// <summary>文件 SHA-256（小写十六进制）。</summary>
+        public static string Sha256File(string path)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            using (var fs = File.OpenRead(path))
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (byte b in sha.ComputeHash(fs)) sb.Append(b.ToString("x2"));
+                return sb.ToString();
             }
         }
 

@@ -243,16 +243,22 @@ namespace Mcroute
                 Directory.CreateDirectory(modsDir);
 
                 // 先探一下响应头，拿文件名
-                filename = GuessFileName(url);
-
-                string dest;
-                string tmp;
+                filename = GuessFileName(url);                string dest = null;
+                string tmp = null;
                 if (!string.IsNullOrEmpty(filename))
                 {
-                    dest = Path.Combine(modsDir, filename);
-                    tmp = dest;
+                    // 响应头/URL 里的文件名也可能带 ..\，必须确认落在 mods 目录内
+                    if (!SafePath.TryResolveInside(modsDir, filename, out dest, out _))
+                    {
+                        filename = null;
+                        dest = null;
+                    }
+                    else
+                    {
+                        tmp = dest;
+                    }
                 }
-                else
+                if (string.IsNullOrEmpty(filename))
                 {
                     tmp = Path.Combine(modsDir, ".download-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".jar");
                     dest = tmp;
@@ -325,7 +331,7 @@ namespace Mcroute
                     {
                         var m = System.Text.RegularExpressions.Regex.Match(cd, @"filename\*?=(?:UTF-8'')?""?([^"";]+)""?",
                             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                        if (m.Success) return Uri.UnescapeDataString(m.Groups[1].Value);
+                        if (m.Success) return SafePath.FileNameOnly(m.Groups[1].Value);
                     }
                 }
             }
@@ -338,7 +344,7 @@ namespace Mcroute
                 if (!string.IsNullOrEmpty(last) && last.IndexOf('.') > 0 &&
                     (last.EndsWith(".jar", StringComparison.OrdinalIgnoreCase) ||
                      last.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
-                    return Uri.UnescapeDataString(last);
+                    return SafePath.FileNameOnly(last);
             }
             catch { }
             return null;

@@ -177,6 +177,19 @@ namespace Mcroute
             }
             else Console.WriteLine("  压缩包已存在，跳过下载");
 
+            // 有官方 SHA-256 就校验（下载后和缓存都要过一遍）
+            if (!string.IsNullOrEmpty(pkg.Sha256))
+            {
+                string actual = Authlib.Sha256File(zipPath);
+                if (!string.Equals(actual, pkg.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("[错误] Java 压缩包哈希不符，已删除：" + zipPath);
+                    try { File.Delete(zipPath); } catch { }
+                    return null;
+                }
+                Console.WriteLine("  SHA-256 校验通过");
+            }
+
             // 解压到 <javaRoot>/<vendor>-<major>
             string target = Path.Combine(javaRoot, pkg.Vendor.ToLowerInvariant() + "-" + major);
             if (Directory.Exists(target))

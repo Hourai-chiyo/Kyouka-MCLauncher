@@ -381,8 +381,19 @@ namespace Mcroute
                 if (mcOk && loaderOk) filtered.Add(f);
             }
 
-            // 过滤后为空时退回原列表（避免有些老文件不带 gameVersions 标签）
-            return filtered.Count > 0 ? filtered : all;
+            // 过滤后为空时，只对"完全没带 gameVersions 标签"的老条目放行；
+            // 有标签但不匹配的文件不能再退回（否则会给 1.20 装 1.19 的 mod）
+            if (filtered.Count > 0) return filtered;
+
+            var noTags = new List<object>();
+            foreach (var f in all)
+            {
+                var versions = Version.AsList(J.Get(f, "gameVersions"));
+                bool any = false;
+                foreach (var v in versions) { if (!string.IsNullOrEmpty(v as string)) { any = true; break; } }
+                if (!any) noTags.Add(f);
+            }
+            return noTags;
         }
 
         /// <summary>该 mod 在指定 MC 版本 + 加载器下的最新文件（原始 JSON，可能为 null）。</summary>
@@ -395,7 +406,7 @@ namespace Mcroute
         private static object GetJson(string url, string key)
         {
             var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
-            req.UserAgent = "mcroute (https://github.com/Hourai-chiyo/mcroute)";
+            req.UserAgent = "Kyouka-MCLauncher/1.10 (+https://github.com/Hourai-chiyo/Kyouka-MCLauncher)";
             req.Accept = "application/json";
             req.Headers["x-api-key"] = key;
             req.Timeout = 30000;
@@ -409,7 +420,7 @@ namespace Mcroute
         {
             var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
             req.Method = "POST";
-            req.UserAgent = "mcroute (https://github.com/Hourai-chiyo/mcroute)";
+            req.UserAgent = "Kyouka-MCLauncher/1.10 (+https://github.com/Hourai-chiyo/Kyouka-MCLauncher)";
             req.Accept = "application/json";
             req.ContentType = "application/json";
             req.Headers["x-api-key"] = key;

@@ -75,19 +75,26 @@ namespace Mcroute
                     list.Add(p);
                 }
 
-                // 文件夹形式的资源包（resourcepacks/xxx/pack.mcmeta）
+                // 文件夹形式的资源包（resourcepacks/xxx/pack.mcmeta 或 xxx.disabled/pack.mcmeta）
                 foreach (string sub in Directory.GetDirectories(dir))
                 {
                     string meta = Path.Combine(sub, "pack.mcmeta");
                     if (!File.Exists(meta)) continue;
+
+                    string folder = Path.GetFileName(sub);
+                    bool isDisabled = folder.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase);
+                    string display = isDisabled
+                        ? folder.Substring(0, folder.Length - ".disabled".Length)
+                        : folder;
+
                     var p = new LocalPack
                     {
                         FilePath = sub,
-                        FileName = Path.GetFileName(sub),
+                        FileName = display,
                         Size = 0,
-                        Disabled = false,
+                        Disabled = isDisabled,
                         Kind = kind,
-                        Title = Path.GetFileName(sub),
+                        Title = display,
                     };
                     TryReadMetaText(File.ReadAllText(meta, Encoding.UTF8), p);
                     list.Add(p);

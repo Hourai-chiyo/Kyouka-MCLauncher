@@ -91,9 +91,17 @@ namespace Mcroute
                 // ---- 2) 补齐缺失的库 ----
                 int downloaded = 0, skipped = 0, failed = 0;
                 var missing = new List<string>();
+                string libsRoot = Path.Combine(baseDir, "versions", "libraries");
                 foreach (var lib in libs)
                 {
-                    string dest = Path.Combine(baseDir, "versions", "libraries", lib.RelPath);
+                    string dest;
+                    if (!SafePath.TryResolveInside(libsRoot, lib.RelPath, out dest, out _))
+                    {
+                        // 补丁 JSON 里的 artifact.path 越界：拒绝，不写任何文件
+                        failed++;
+                        missing.Add(lib.Name + "（路径越界）");
+                        continue;
+                    }
                     if (File.Exists(dest) && (string.IsNullOrEmpty(lib.Sha1) || !dryRun))
                     {
                         skipped++;

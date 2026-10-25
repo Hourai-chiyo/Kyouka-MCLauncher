@@ -201,7 +201,12 @@ namespace Mcroute
                 Console.WriteLine("[" + (st == "ok" ? "完成" : st == "skip" ? "已存在" : "失败") + "] client jar " + info);
             }
 
-            Http.DownloadAll(jobs, workers);
+            var batch = Http.DownloadAll(jobs, workers);
+            if (!batch.AllOk)
+            {
+                Console.WriteLine("[错误] 有 " + batch.Failed + " 个文件没下载成功，不能当成安装完成。");
+                return 1;
+            }
             return 0;
         }
 

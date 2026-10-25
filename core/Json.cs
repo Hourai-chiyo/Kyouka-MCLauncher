@@ -137,13 +137,13 @@ namespace Mcroute
 
         public static string Str(object o, string key, string fallback = "")
         {
-            object v = Get(o, key);
+            object v = key == null ? o : Get(o, key);
             return v == null ? fallback : Convert.ToString(v, CultureInfo.InvariantCulture);
         }
 
         public static int Int(object o, string key, int fallback = 0)
         {
-            object v = Get(o, key);
+            object v = key == null ? o : Get(o, key);
             if (v == null) return fallback;
             try { return Convert.ToInt32(v, CultureInfo.InvariantCulture); }
             catch { return fallback; }
@@ -151,7 +151,7 @@ namespace Mcroute
 
         public static bool Bool(object o, string key, bool fallback = false)
         {
-            object v = Get(o, key);
+            object v = key == null ? o : Get(o, key);
             if (v == null) return fallback;
             try { return Convert.ToBoolean(v, CultureInfo.InvariantCulture); }
             catch { return fallback; }

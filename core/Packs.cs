@@ -226,6 +226,7 @@ namespace Mcroute
 
             // 下载清单里的文件
             var jobs = new List<Tuple<string, string, string>>();
+            var badPaths = new List<string>();
             int skipped = 0;
             foreach (var f in Version.AsList(J.Get(index, "files")))
             {
@@ -236,10 +237,28 @@ namespace Mcroute
                 if (string.IsNullOrEmpty(path) || downloads.Count == 0) { skipped++; continue; }
                 var hashes = J.Dict(f, "hashes");
                 string sha1 = hashes == null ? null : J.Str(hashes, "sha1");
-                jobs.Add(Tuple.Create(Convert.ToString(downloads[0]), Path.Combine(instDir, path.Replace('/', '\\')), sha1));
+                string dest;
+                if (!SafePath.TryResolveInside(instDir, path, out dest, out _))
+                {
+                    // 整理包里出现越界路径：直接中止，别写任何文件
+                    badPaths.Add(path);
+                    continue;
+                }
+                jobs.Add(Tuple.Create(Convert.ToString(downloads[0]), dest, sha1));
+            }
+            if (badPaths.Count > 0)
+            {
+                Console.WriteLine("[错误] 整理包里有 " + badPaths.Count + " 个越界路径，已中止安装：");
+                foreach (string p in badPaths.Take(3)) Console.WriteLine("  " + p);
+                return 1;
             }
             Console.WriteLine("[3/4] 下载 " + jobs.Count + " 个文件（跳过 " + skipped + " 个）");
-            Http.DownloadAll(jobs, 16);
+            var batch = Http.DownloadAll(jobs, 16);
+            if (!batch.AllOk)
+            {
+                Console.WriteLine("[错误] " + batch.Failed + " 个文件下载失败，安装中止（可以重试）");
+                return 1;
+            }
 
             using (var zip = ZipFile.OpenRead(pack))
                 ExtractOverrides(zip, "overrides/", instDir);
@@ -432,7 +451,7 @@ namespace Mcroute
             // 用 API 换下载地址
             var files = Version.AsList(J.Get(manifest, "files"));
             Console.WriteLine("[3/4] 解析 " + files.Count + " 个文件（CurseForge API）...");
-            var resolved = new List<Tuple<string, string>>();   // url, fileName
+            var resolved = new List<Tuple<string, string, string>>();   // url, fileName, sha1
             var unresolved = new List<string>();
 
             System.Threading.Tasks.Parallel.ForEach(files, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 8 }, f =>
@@ -447,7 +466,7 @@ namespace Mcroute
                     lock (unresolved) unresolved.Add("projectID=" + pid + " fileID=" + fid);
                     return;
                 }
-                string fileName = J.Str(data, "fileName");
+                string fileName = SafePath.FileNameOnly(J.Str(data, "fileName"));
                 string url = J.Str(data, "downloadUrl");
                 if (string.IsNullOrEmpty(fileName))
                 {
@@ -459,15 +478,30 @@ namespace Mcroute
                 string sha1 = null;
                 foreach (var h in Version.AsList(J.Get(data, "hashes")))
                     if (J.Int(h, "algo") == 1) sha1 = J.Str(h, "value");
-                lock (resolved) resolved.Add(Tuple.Create(url, fileName));
+                lock (resolved) resolved.Add(Tuple.Create(url, fileName, sha1));
             });
 
             if (unresolved.Count > 0)
                 Console.WriteLine("      有 " + unresolved.Count + " 个没解析出来");
 
             Console.WriteLine("      开始下载 " + resolved.Count + " 个 mod ...");
-            var jobs = resolved.Select(r => Tuple.Create(r.Item1, Path.Combine(modsDir, r.Item2), (string)null)).ToList();
-            Http.DownloadAll(jobs, 16);
+            var jobs = new List<Tuple<string, string, string>>();
+            foreach (var r in resolved)
+            {
+                string dest;
+                if (!SafePath.TryResolveInside(modsDir, r.Item2, out dest, out _))
+                {
+                    unresolved.Add("文件名不安全: " + r.Item2);
+                    continue;
+                }
+                jobs.Add(Tuple.Create(r.Item1, dest, r.Item3));
+            }
+            var batch2 = Http.DownloadAll(jobs, 16);
+            if (!batch2.AllOk)
+            {
+                Console.WriteLine("[错误] " + batch2.Failed + " 个 mod 下载失败，安装中止（可以重试）");
+                return 1;
+            }
 
             string overrides = J.Str(manifest, "overrides", "overrides").TrimEnd('/') + "/";
             using (var zip = ZipFile.OpenRead(pack))

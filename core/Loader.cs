@@ -248,7 +248,12 @@ namespace Mcroute
             catch { }
             if (versionJson != null) QueueLibs(J.Get(versionJson, "libraries"));
             Console.WriteLine("      需要预下载 " + queued + " 个文件");
-            Http.DownloadAll(jobs, 16);
+            var batch = Http.DownloadAll(jobs, 16);
+            if (!batch.AllOk)
+            {
+                Console.WriteLine("[错误] 加载器安装有 " + batch.Failed + " 个文件失败");
+                return 1;
+            }
 
             // launcher_profiles.json（安装器拿它判断目录是否合法）
             string profiles = Path.Combine(baseDir, "launcher_profiles.json");

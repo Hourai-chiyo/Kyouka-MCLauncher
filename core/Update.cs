@@ -97,8 +97,77 @@ namespace Mcroute
             }
         }
 
+        /// <summary>
+        /// 拿同一 Release 里的 SHA256SUMS.txt 校验下载到的 exe。
+        /// 失败一律 fail closed（宁可让用户手动下载，也不执行来历不明的文件）。
+        /// </summary>
+        public static bool VerifySums(string filePath, string tag, out string error)
+        {
+            error = null;
+            if (string.IsNullOrEmpty(tag)) { error = "缺少 release tag，无法校验哈希"; return false; }
+            if (!File.Exists(filePath)) { error = "文件不存在"; return false; }
+
+            string url = "https://github.com/" + Repo + "/releases/download/" + tag + "/SHA256SUMS.txt";
+            string sums = Http.GetString(url, 20);
+            if (string.IsNullOrEmpty(sums))
+            {
+                error = "这个 Release 没有 SHA256SUMS.txt，已拒绝自动更新（请手动下载）";
+                return false;
+            }
+
+            string expected = null;
+            foreach (string rawLine in sums.Split('\n'))
+            {
+                string line = rawLine.Trim().TrimEnd('\r');
+                if (line.Length == 0 || line.StartsWith("#")) continue;
+                int sp = line.IndexOf(' ');
+                if (sp <= 0) continue;
+                string hash = line.Substring(0, sp).Trim();
+                string name = line.Substring(sp).Trim().TrimStart('*').Trim();
+                if (name.Equals(AssetName, StringComparison.OrdinalIgnoreCase))
+                {
+                    expected = hash;
+                    break;
+                }
+                // GitHub 会把资产名里的空格换成点
+                if (name.Replace(' ', '.').Equals(AssetName, StringComparison.OrdinalIgnoreCase))
+                {
+                    expected = hash;
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(expected))
+            {
+                error = "SHA256SUMS.txt 里没有 " + AssetName + " 的哈希，已拒绝自动更新";
+                return false;
+            }
+
+            string actual;
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            using (var fs = File.OpenRead(filePath))
+            {
+                var sb = new StringBuilder();
+                foreach (byte b in sha.ComputeHash(fs)) sb.Append(b.ToString("x2"));
+                actual = sb.ToString();
+            }
+
+            if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
+            {
+                error = "哈希不符（期望 " + expected.Substring(0, Math.Min(12, expected.Length)) +
+                        "…，实际 " + actual.Substring(0, Math.Min(12, actual.Length)) + "…），已删除下载文件";
+                return false;
+            }
+            return true;
+        }
+
         /// <summary>下载更新到 &lt;exe 目录&gt;\KyoukaMCLauncher.exe.new。成功返回新文件路径。</summary>
         public static string Download(string downloadUrl, out string error)
+        {
+            return Download(downloadUrl, null, out error);
+        }
+
+        public static string Download(string downloadUrl, string tag, out string error)
         {
             error = null;
             try
@@ -119,6 +188,15 @@ namespace Mcroute
                 {
                     try { File.Delete(target); } catch { }
                     error = "下载到的不是 exe（可能被网络劫持）";
+                    return null;
+                }
+
+                // 关键：用同一 Release 的 SHA256SUMS.txt 校验，失败就不许执行
+                string sumError;
+                if (!VerifySums(target, tag, out sumError))
+                {
+                    try { File.Delete(target); } catch { }
+                    error = sumError;
                     return null;
                 }
                 return target;

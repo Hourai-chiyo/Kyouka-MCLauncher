@@ -49,7 +49,7 @@ namespace Mcroute
                     v = asm.GetName().Version.ToString(3);
                 }
                 catch { }
-                return "mcroute/" + v + " (https://github.com/Hourai-chiyo/mcroute)";
+                return "Kyouka-MCLauncher/" + v + " (https://github.com/Hourai-chiyo/Kyouka-MCLauncher)";
             }
         }
 

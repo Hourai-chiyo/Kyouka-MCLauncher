@@ -36,6 +36,7 @@ namespace Mcroute.Tests
             Run("Murmur2 / CurseForge 指纹", Murmur2Tests.All);
             Run("依赖匹配（词根 / 误报抑制）", DepTokenTests.All);
             Run("镜像路径映射（BMCLAPI / 高校镜像）", MirrorTests.All);
+            Run("SafePath 路径边界", SafePathTests.All);
 
             Console.WriteLine();
             Console.WriteLine("------------------------");
@@ -157,7 +158,7 @@ namespace Mcroute.Tests
             Program.AreEqual(1, J.Int(o, "a"), "int 字段");
             Program.AreEqual("x", J.Str(o, "b"), "string 字段");
             Program.AreEqual(3, Version.AsList(J.Get(o, "c")).Count, "数组长度");
-            Program.AreEqual(2, J.Int(Version.AsList(J.Get(o, "c"))[1], null, 0) == 0 ? 2 : 2, "数组元素读取");
+            Program.AreEqual(2, J.Int(Version.AsList(J.Get(o, "c"))[1], null, 0), "数组元素读取");
             Program.IsFalse(J.Bool(o, "d"), "嵌套对象不会被当成 bool");
             Program.AreEqual(true, J.Bool(J.Dict(o, "d"), "e"), "嵌套 bool 字段");
             Program.AreEqual("你好", J.Str(o, "g"), "\\uXXXX 转义");
@@ -414,7 +415,8 @@ namespace Mcroute.Tests
             Program.AreEqual("https://littleskin.cn/api/yggdrasil/",
                 Authlib.NormalizeRoot("littleskin.cn/api/yggdrasil"), "补全协议与结尾斜杠");
             Program.AreEqual("https://a.b/c/", Authlib.NormalizeRoot("  https://a.b/c  "), "去空格");
-            Program.AreEqual("http://x/", Authlib.NormalizeRoot("http://x"), "保留 http");
+            Program.IsTrue(Authlib.NormalizeRoot("http://x") == null, "拒绝公网 http（防明文密码）");
+            Program.AreEqual("http://127.0.0.1:8080/", Authlib.NormalizeRoot("http://127.0.0.1:8080"), "本机回环 http 仍允许");
             Program.AreEqual(null, Authlib.NormalizeRoot(null), "null 输入");
             Program.AreEqual(null, Authlib.NormalizeRoot(""), "空串输入");
         }
@@ -608,6 +610,38 @@ namespace Mcroute.Tests
             var cands = Mirrors.MirrorCandidates("https://libraries.minecraft.net/x/y.jar", list);
             Program.AreEqual(2, cands.Count, "禁用的镜像不进候选");
             Program.IsTrue(cands[0].StartsWith("https://mirror.nju.edu.cn/"), "快的排前面");
+        }
+    }
+
+    internal static class SafePathTests
+    {
+        public static void All()
+        {
+            string root = Path.Combine(Path.GetTempPath(), "kyouka-safepath-test");
+            string full, err;
+
+            // 正常相对路径
+            Program.IsTrue(SafePath.TryResolveInside(root, "mods/a.jar", out full, out err), "正常相对路径通过");
+            Program.IsTrue(full.StartsWith(Path.GetFullPath(root), StringComparison.OrdinalIgnoreCase), "落在根目录内");
+
+            // 各种越界
+            Program.IsFalse(SafePath.TryResolveInside(root, @"..\..\evil.jar", out full, out err), "拒绝 ..\\");
+            Program.IsFalse(SafePath.TryResolveInside(root, "../../evil.jar", out full, out err), "拒绝 ../");
+            Program.IsFalse(SafePath.TryResolveInside(root, "mods/../../evil.jar", out full, out err), "拒绝夹在中间的 ..");
+            Program.IsFalse(SafePath.TryResolveInside(root, @"C:\Windows\evil.dll", out full, out err), "拒绝盘符绝对路径");
+            Program.IsFalse(SafePath.TryResolveInside(root, @"\\server\share\evil", out full, out err), "拒绝 UNC");
+            Program.IsFalse(SafePath.TryResolveInside(root, "a:b.jar", out full, out err), "拒绝冒号（ADS/盘符）");
+            Program.IsFalse(SafePath.TryResolveInside(root, "", out full, out err), "拒绝空路径");
+
+            // 文件名净化
+            Program.AreEqual("evil.jar", SafePath.FileNameOnly(@"..\..\config\evil.jar"), "目录穿越只留文件名");
+            Program.AreEqual("evil.jar", SafePath.FileNameOnly("https://x/y/evil.jar?a=1"), "去掉查询串");
+            Program.AreEqual("evil.jar", SafePath.FileNameOnly("evil.jar"), "正常文件名不变");
+            Program.IsTrue(SafePath.FileNameOnly("..") == null, "'..' 被拒绝");
+            Program.IsTrue(SafePath.FileNameOnly("") == null, "空文件名返回 null");
+
+            // 禁止把根目录本身当目标
+            Program.IsFalse(SafePath.TryResolveInside(root, ".", out full, out err), "拒绝根目录本身");
         }
     }
 

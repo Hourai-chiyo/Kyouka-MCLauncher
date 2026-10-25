@@ -9,8 +9,8 @@
     <RootNamespace>Mcroute.Wpf</RootNamespace>
     <ApplicationIcon>..\legacy\winforms\app.ico</ApplicationIcon>
     <ApplicationManifest>..\legacy\winforms\app.manifest</ApplicationManifest>
-    <Version>1.10.0</Version>
-    <FileVersion>1.10.0.0</FileVersion>
+    <Version>1.10.1</Version>
+    <FileVersion>1.10.1.0</FileVersion>
     <Product>Kyouka MCLauncher</Product>
     <Company>Hourai-chiyo</Company>
     <Description>Kyouka MCLauncher — 下载源挂了也能装的 Minecraft 启动器</Description>
@@ -31,6 +31,7 @@
     <Compile Include="..\core\Meta.cs"       Link="Core\Meta.cs" />
     <Compile Include="..\core\Packs.cs"      Link="Core\Packs.cs" />
     <Compile Include="..\core\SafeZip.cs"    Link="Core\SafeZip.cs" />
+    <Compile Include="..\core\SafePath.cs"   Link="Core\SafePath.cs" />
     <Compile Include="..\core\Mirrors.cs"    Link="Core\Mirrors.cs" />
     <Compile Include="..\core\Mods.cs"        Link="Core\Mods.cs" />
     <Compile Include="..\core\Modrinth.cs"    Link="Core\Modrinth.cs" />

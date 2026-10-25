@@ -1727,7 +1727,7 @@ namespace Mcroute.Wpf
                     var dl = new System.Threading.Tasks.Task(() =>
                     {
                         string derr;
-                        string newExe = Update.Download(url, out derr);
+                        string newExe = Update.Download(url, tag, out derr);
                         Dispatcher.BeginInvoke(new Action(() =>
                         {
                             if (newExe == null)

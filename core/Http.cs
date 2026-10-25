@@ -420,8 +420,7 @@ namespace Mcroute
                     return false;
                 }
 
-                if (File.Exists(dest)) File.Delete(dest);
-                File.Move(tmpDest, dest);
+                AtomicMove(tmpDest, dest);
                 Cleanup(parts);
                 return true;
             }
@@ -439,6 +438,34 @@ namespace Mcroute
             foreach (string p in parts)
             {
                 try { if (File.Exists(p)) File.Delete(p); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 原子替换：先写 .new，再 Replace 覆盖，失败时保留旧文件（不能先 Delete）。
+        /// </summary>
+        private static void AtomicMove(string tmp, string dest)
+        {
+            if (!File.Exists(dest))
+            {
+                File.Move(tmp, dest);
+                return;
+            }
+
+            string bak = dest + ".bak-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            try
+            {
+                // 同卷、目标存在时用 Replace；失败说明跨卷或权限问题，退回 Copy
+                File.Replace(tmp, dest, bak, true);
+            }
+            catch
+            {
+                File.Copy(tmp, dest, true);
+                try { File.Delete(tmp); } catch { }
+            }
+            finally
+            {
+                try { if (File.Exists(bak)) File.Delete(bak); } catch { }
             }
         }
 
@@ -534,8 +561,7 @@ namespace Mcroute
                     return false;
                 }
 
-                if (File.Exists(dest)) File.Delete(dest);
-                File.Move(part, dest);
+                AtomicMove(part, dest);
                 return true;
             }
             catch (OperationCanceledException)
@@ -594,7 +620,18 @@ namespace Mcroute
         public static Action<string, int, int> Progress;
 
         /// <summary>并发下载一批任务（url, dest, sha1）。</summary>
-        public static void DownloadAll(IList<Tuple<string, string, string>> jobs, int workers,
+        /// <summary>批量下载的结果：失败数 > 0 时调用方必须当成安装失败处理。</summary>
+        public class DownloadBatchResult
+        {
+            public int Total;
+            public int Ok;
+            public int Skipped;
+            public int Failed;
+            public System.Collections.Generic.List<string> Failures = new System.Collections.Generic.List<string>();
+            public bool AllOk { get { return Failed == 0; } }
+        }
+
+        public static DownloadBatchResult DownloadAll(IList<Tuple<string, string, string>> jobs, int workers,
                                        bool verbose = true)
         {
             int total = jobs.Count;
@@ -602,7 +639,7 @@ namespace Mcroute
             {
                 Console.WriteLine("没有需要下载的文件");
                 if (Progress != null) Progress("没有需要下载的文件", 0, 0);
-                return;
+                return new DownloadBatchResult { Total = 0 };
             }
 
             int ok = 0, skip = 0, fail = 0, done = 0;
@@ -653,6 +690,7 @@ namespace Mcroute
             Console.WriteLine(summary);
             if (Progress != null) Progress(summary, total, total);
             foreach (string f in failures) Console.WriteLine("  [fail] " + f);
+            return new DownloadBatchResult { Total = total, Ok = ok, Skipped = skip, Failed = fail, Failures = failures };
         }
     }
 }
