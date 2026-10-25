@@ -10,7 +10,7 @@
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
 > Kyouka MCLauncher 1.10.0 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
-> 主版本为 **Kyouka MCLauncher**（WPF，约 250 KB 单文件）；WinForms 版与 Python 版已归档到 `legacy/`（冻结维护）。
+> 主版本为 **Kyouka MCLauncher**（WPF，约 360 KB 单文件）；WinForms 版与 Python 版已归档到 `legacy/`（冻结维护）。
 
 **English**: [README.en.md](README.en.md)
 
