@@ -9,11 +9,11 @@
     <RootNamespace>Mcroute.Wpf</RootNamespace>
     <ApplicationIcon>..\legacy\winforms\app.ico</ApplicationIcon>
     <ApplicationManifest>..\legacy\winforms\app.manifest</ApplicationManifest>
-    <Version>1.9.2</Version>
-    <FileVersion>1.9.2.0</FileVersion>
-    <Product>mcroute — Minecraft Java 启动器（WPF 原型）</Product>
+    <Version>1.10.0</Version>
+    <FileVersion>1.10.0.0</FileVersion>
+    <Product>Kyouka MCLauncher</Product>
     <Company>Hourai-chiyo</Company>
-    <Description>WPF 视觉原型：只做界面壳，功能逻辑复用 csharp/ 下的 Core</Description>
+    <Description>Kyouka MCLauncher — 下载源挂了也能装的 Minecraft 启动器</Description>
     <Copyright>MIT License © 2026 Hourai-chiyo</Copyright>
     <DebugType>none</DebugType>
     <Optimize>true</Optimize>

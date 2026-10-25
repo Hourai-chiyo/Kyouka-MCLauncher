@@ -35,6 +35,7 @@ namespace Mcroute.Tests
             Run("ModIdentity 版本比较/哈希解析", ModIdentityTests.All);
             Run("Murmur2 / CurseForge 指纹", Murmur2Tests.All);
             Run("依赖匹配（词根 / 误报抑制）", DepTokenTests.All);
+            Run("镜像路径映射（BMCLAPI / 高校镜像）", MirrorTests.All);
 
             Console.WriteLine();
             Console.WriteLine("------------------------");
@@ -545,6 +546,68 @@ namespace Mcroute.Tests
             var tokens = ModIdentity.DepTokens("Galacticraft-Legacy");
             Program.AreEqual(1, tokens.Count, "限定词 legacy 被去掉，只剩词根");
             Program.AreEqual("galacticraft", tokens[0], "词根正确");
+        }
+    }
+
+
+    internal static class MirrorTests
+    {
+        private static MirrorInfo Edu => new MirrorInfo { Name = "HIT", Base = "https://mirrors.hit.edu.cn/bmclapi/" };
+        private static MirrorInfo Bmcl => new MirrorInfo { Name = "BMCLAPI", Base = "https://bmclapi2.bangbang93.com/" };
+
+        public static void All()
+        {
+            // 高校镜像：原样拼后缀
+            Program.AreEqual(
+                "https://mirrors.hit.edu.cn/bmclapi/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar",
+                Mirrors.MapUrl("https://libraries.minecraft.net/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar", Edu),
+                "高校镜像：libraries 原样拼");
+
+            // BMCLAPI 官方：按上游主机改写前缀
+            Program.AreEqual(
+                "https://bmclapi2.bangbang93.com/maven/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar",
+                Mirrors.MapUrl("https://libraries.minecraft.net/com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar", Bmcl),
+                "BMCLAPI：libraries -> /maven/");
+
+            Program.AreEqual(
+                "https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/1.12.2-14.23.5.2864/forge-1.12.2-14.23.5.2864.jar",
+                Mirrors.MapUrl("https://maven.minecraftforge.net/net/minecraftforge/forge/1.12.2-14.23.5.2864/forge-1.12.2-14.23.5.2864.jar", Bmcl),
+                "BMCLAPI：forge maven -> /maven/");
+
+            Program.AreEqual(
+                "https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/maven-metadata.xml",
+                Mirrors.MapUrl("https://maven.neoforged.net/net/neoforged/neoforge/maven-metadata.xml", Bmcl),
+                "BMCLAPI：neoforge -> /maven/");
+
+            Program.AreEqual(
+                "https://bmclapi2.bangbang93.com/assets/objects/ab/cdef",
+                Mirrors.MapUrl("https://resources.download.minecraft.net/objects/ab/cdef", Bmcl),
+                "BMCLAPI：assets -> /assets/");
+
+            Program.AreEqual(
+                "https://bmclapi2.bangbang93.com/fabric-meta/v2/versions/loader",
+                Mirrors.MapUrl("https://meta.fabricmc.net/v2/versions/loader", Bmcl),
+                "BMCLAPI：fabric meta -> /fabric-meta/");
+
+            Program.AreEqual(
+                "https://bmclapi2.bangbang93.com/mc/game/version_manifest.json",
+                Mirrors.MapUrl("https://piston-meta.mojang.com/mc/game/version_manifest.json", Bmcl),
+                "BMCLAPI：piston-meta 原样拼接");
+
+            // 不支持的 URL 返回 null（交回官方源）
+            Program.IsTrue(Mirrors.MapUrl("https://example.com/a.jar", Bmcl) == null, "未知主机 -> null");
+            Program.IsTrue(Mirrors.MapUrl("https://example.com/a.jar", Edu) == null, "未知主机（高校）-> null");
+
+            // 候选列表按速度排序，且跳过禁用
+            var list = new List<MirrorInfo>
+            {
+                new MirrorInfo { Name = "slow", Base = "https://mirrors.hit.edu.cn/bmclapi/", Enabled = true, SpeedMbps = 1 },
+                new MirrorInfo { Name = "fast", Base = "https://mirror.nju.edu.cn/bmclapi/", Enabled = true, SpeedMbps = 9 },
+                new MirrorInfo { Name = "off",  Base = "https://mirror.zju.edu.cn/bmclapi/", Enabled = false, SpeedMbps = 99 },
+            };
+            var cands = Mirrors.MirrorCandidates("https://libraries.minecraft.net/x/y.jar", list);
+            Program.AreEqual(2, cands.Count, "禁用的镜像不进候选");
+            Program.IsTrue(cands[0].StartsWith("https://mirror.nju.edu.cn/"), "快的排前面");
         }
     }
 

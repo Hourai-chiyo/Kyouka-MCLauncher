@@ -9,7 +9,7 @@
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
-> Kyouka MCLauncher 1.9.2 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
+> Kyouka MCLauncher 1.10.0 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
 > 主版本为 **Kyouka MCLauncher**（WPF，约 250 KB 单文件）；WinForms 版与 Python 版已归档到 `legacy/`（冻结维护）。
 
 **English**: [README.en.md](README.en.md)
@@ -158,7 +158,7 @@ Mod 下载窗口 →「MC百科搜索」：输入关键词，直接看到中文�
 
 **整合包在线下载** | ✅ | ✅ 实测（Fabulously Optimized：0.2MB → 44 mods） | ✅ v1.5.0 |
 | **MC百科搜索（mcmod）** | ✅ | ✅ `--selftest-mcmod` + 解析单测 | ✅ v1.6.1（中文名/简介/快照，双击跳转；不抓详情页） |
-| **Mod 识别与更新** | ✅ | ✅ 实机 149 mods → 识别 145（Modrinth 67 + CurseForge 78） | ✅ v1.9.2（SHA1 + **CF 指纹**；更新；`⚠ n` 悬停看依赖） |
+| **Mod 识别与更新** | ✅ | ✅ 实机 149 mods → 识别 145（Modrinth 67 + CurseForge 78） | ✅ v1.10.0（SHA1 + **CF 指纹**；更新；`⚠ n` 悬停看依赖） |
 | 关闭游戏（**整棵进程树** + 残留清理） | ✅ | ✅ `--selftest-proctree` / `--selftest-orphan` | ✅ v1.5.3（含 javaw；启动可取消；启动时清残留） |
 
 > 说明：**"代码写了" ≠ "测过了" ≠ "普通用户能直接用"**。上表把三者分开列，
@@ -307,10 +307,33 @@ Kyouka-MCLauncher/
 | **SJTU 上海交大** | `mirror.sjtu.edu.cn/bmclapi/` | 0.90 MB/s | ✅ |
 | QLU 齐鲁工大 | `mirrors.qlu.edu.cn/bmclapi/` | 0.20 MB/s | ❌ 默认禁用 |
 | ZJU 浙江大学 | `mirrors.zju.edu.cn/bmclapi/` | 0.05 MB/s | ❌ 默认禁用 |
+| **BMCLAPI 官方（第三方）** | `bmclapi2.bangbang93.com/` | 未测（默认关） | ⚪ 需手动启用 |
 
 > ⚠️ **USTC / SJTU 只拦「浏览器 UA」**：用 Chrome UA 请求会返回 403，
 > 用 mcroute 自己的 UA 才是 200。所以之前把它们标成"不可用"是误判。
 > 测速随时可重跑：`mcroute.exe sources`
+
+### BMCLAPI 官方（1.10.0 新增，默认关闭）
+
+`bmclapi2.bangbang93.com` 的路径规则和高校镜像**不一样**：它按上游主机改写前缀，
+不是原样拼后缀。实测（2026-10，HEAD）：
+
+| 上游主机 | BMCLAPI 路径 |
+|---|---|
+| `libraries.minecraft.net` | `/maven/…` |
+| `maven.minecraftforge.net` | `/maven/…` |
+| `maven.neoforged.net` | `/maven/…` |
+| `maven.fabricmc.net` / `maven.quiltmc.org` | `/maven/…` |
+| `files.minecraftforge.net` | `/maven/…` |
+| `resources.download.minecraft.net` | `/assets/…` |
+| `meta.fabricmc.net` | `/fabric-meta/…` |
+| `meta.quiltmc.org` | `/quilt-meta/…` |
+| `piston-meta.mojang.com` / `launchermeta` / `launcher` | 原样拼接 |
+
+启用方式：`mirrors.json` 里把那条的 `"enabled"` 改成 `true`，或在设置页勾选。
+映射由 `Mirrors.MapUrl` 负责（带单元测试），不支持的 URL 返回 `null`、直接回落官方源。
+
+默认关闭的原因：第三方公益单点、速度未实测、它本身也是"镜像的镜像"。
 
 ## 分段并行下载（实验性，默认关闭）
 

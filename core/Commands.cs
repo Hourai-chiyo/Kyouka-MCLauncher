@@ -614,8 +614,35 @@ namespace Mcroute
 
         public static string Quote(string s)
         {
-            if (s.IndexOf(' ') < 0 && s.IndexOf('"') < 0) return s;
-            return "\"" + s.Replace("\"", "\\\"") + "\"";
+            if (s == null) return "\"\"";
+            if (s.IndexOf(' ') < 0 && s.IndexOf('"') < 0 && s.IndexOf('\t') < 0) return s;
+
+            // Windows 命令行引用规则：引号前若有反斜杠要成对加倍，末尾反斜杠也要加倍，
+            // 否则 "C:\dir\" 会把收尾引号转义掉（Java 参数被拼错）。
+            var sb = new StringBuilder("\"");
+            int backslashes = 0;
+            foreach (char c in s)
+            {
+                if (c == '\\')
+                {
+                    backslashes++;
+                    sb.Append(c);
+                }
+                else if (c == '"')
+                {
+                    sb.Append('\\', backslashes + 1);
+                    sb.Append('"');
+                    backslashes = 0;
+                }
+                else
+                {
+                    backslashes = 0;
+                    sb.Append(c);
+                }
+            }
+            sb.Append('\\', backslashes);
+            sb.Append('"');
+            return sb.ToString();
         }
 
         // ================= 参数解析小工具 =================

@@ -565,7 +565,6 @@ namespace Mcroute.Wpf
                     _gameProc = proc;
                     _gameRootPid = proc.Id;
                     _noWindowTicks = 0;
-                    _cancelLaunch = false;
                     PlayButton.IsEnabled = false;
                     if (CloseGameButton != null)
                     {
@@ -677,7 +676,7 @@ namespace Mcroute.Wpf
             if (_gameProc == null)
             {
                 if (!_running) { StatusText.Text = "没有正在运行的游戏"; return; }
-                _cancelLaunch = true;
+
                 Http.CancelRequested = true;
                 StatusText.Text = "正在取消启动…";
                 AppendLog("[关闭] 用户取消启动");
@@ -1524,7 +1523,7 @@ namespace Mcroute.Wpf
         private bool _gameRunning;
         private System.Diagnostics.Process _gameProc;
         private int _gameRootPid;
-        private bool _cancelLaunch;
+
         private System.Windows.Threading.DispatcherTimer _gameWatchdog;
         private int _noWindowTicks;
         private readonly System.Collections.Generic.HashSet<string> _cleanroomPrepared =

@@ -14,8 +14,9 @@ namespace Mcroute
     /// <summary>下载：带重试、镜像优先、sha1 校验。</summary>
     public static class Http
     {
-        public const string UA = "mcroute/0.2 (C# port, learning project)";
+        public const string UA = "Kyouka-MCLauncher/1.9.2 (+https://github.com/Hourai-chiyo/Kyouka-MCLauncher)";
         private static HttpClient _client;
+        private static readonly object _clientLock = new object();
 
         static Http()
         {
@@ -28,15 +29,20 @@ namespace Mcroute
         {
             get
             {
-                if (_client == null)
+                if (_client != null) return _client;
+                lock (_clientLock)
                 {
-                    var handler = new HttpClientHandler
+                    if (_client == null)
                     {
-                        AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
-                    };
-                    _client = new HttpClient(handler);
-                    _client.Timeout = TimeSpan.FromSeconds(120);
-                    _client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", UA);
+                        var handler = new HttpClientHandler
+                        {
+                            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+                        };
+                        var c = new HttpClient(handler);
+                        c.Timeout = TimeSpan.FromSeconds(120);
+                        c.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", UA);
+                        _client = c;
+                    }
                 }
                 return _client;
             }

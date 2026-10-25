@@ -57,6 +57,65 @@ namespace Mcroute
         /// <summary>测速用的路径：2.9 MB 的 jar，小文件测速会被连接开销带偏。</summary>
         private const string SpeedProbePath = "com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar";
 
+        /// <summary>
+        /// BMCLAPI 官方（bmclapi2.bangbang93.com）的路径规则与高校镜像不同：
+        /// 它不是"原样拼后缀"，而是按上游主机改写前缀。2026-10 实测：
+        ///   libraries/forge/neoforge/fabric/quilt maven → /maven/…
+        ///   resources.download.minecraft.net          → /assets/…
+        ///   meta.fabricmc.net                         → /fabric-meta/…
+        ///   meta.quiltmc.org                          → /quilt-meta/…
+        ///   piston-meta / launchermeta / launcher     → 原样（/mc/game/…）
+        /// 返回值：拼接前缀；null 表示这条 URL 该镜像不支持（交回官方源）。
+        /// </summary>
+        private static string BmclapiPrefix(string host)
+        {
+            switch (host)
+            {
+                case "https://maven.minecraftforge.net/": return "/maven/";
+                case "https://maven.neoforged.net/": return "/maven/";
+                case "https://libraries.minecraft.net/": return "/maven/";
+                case "https://maven.fabricmc.net/": return "/maven/";
+                case "https://maven.quiltmc.org/": return "/maven/";
+                case "https://files.minecraftforge.net/": return "/maven/";
+                case "https://resources.download.minecraft.net/": return "/assets/";
+                case "https://meta.fabricmc.net/": return "/fabric-meta/";
+                case "https://meta.quiltmc.org/": return "/quilt-meta/";
+                case "https://piston-meta.mojang.com/": return "/";
+                case "https://launchermeta.mojang.com/": return "/";
+                case "https://launcher.mojang.com/": return "/";
+                default: return null;
+            }
+        }
+
+        /// <summary>这个基地址是不是 BMCLAPI 官方（需要按主机改写前缀）。</summary>
+        public static bool IsBmclapi(string baseUrl)
+        {
+            string b = (baseUrl ?? "").ToLowerInvariant();
+            return b.Contains("bmclapi2.bangbang93.com") || b.Contains("bmclapi.bangbang93.com");
+        }
+
+        /// <summary>把一条上游 URL 映射到某个镜像；不支持返回 null。</summary>
+        public static string MapUrl(string url, MirrorInfo mirror)
+        {
+            if (string.IsNullOrEmpty(url) || mirror == null) return null;
+
+            foreach (string host in MirroredHosts)
+            {
+                if (!url.StartsWith(host, StringComparison.Ordinal)) continue;
+
+                string suffix = url.Substring(host.Length);
+                if (IsBmclapi(mirror.Base))
+                {
+                    string prefix = BmclapiPrefix(host);
+                    if (prefix == null) return null;
+                    return mirror.Normalized().TrimEnd('/') + prefix + suffix;
+                }
+                return mirror.Normalized() + suffix;
+            }
+            return null;
+        }
+
+
         public static string ConfigPath(string baseDir)
         {
             return Path.Combine(baseDir ?? ".", "mirrors.json");
@@ -77,6 +136,9 @@ namespace Mcroute
                 new MirrorInfo { Name = "HA 河南大学",       Base = "https://mirrors.ha.edu.cn/bmclapi/",   Enabled = true,  SpeedMbps = 2.70 },
                 new MirrorInfo { Name = "NJU 南京大学",      Base = "https://mirror.nju.edu.cn/bmclapi/",   Enabled = true,  SpeedMbps = 1.40 },
                 new MirrorInfo { Name = "SJTU 上海交大",     Base = "https://mirror.sjtu.edu.cn/bmclapi/",  Enabled = true,  SpeedMbps = 0.90 },
+                // 官方 BMCLAPI（第三方公益服务，非 Mojang 官方）：默认关闭，需要时在设置里勾选。
+                // 路径规则与高校镜像不同，按上游主机改写前缀（见 BmclapiPrefix）。
+                new MirrorInfo { Name = "BMCLAPI 官方（第三方·默认关）", Base = "https://bmclapi2.bangbang93.com/", Enabled = false, SpeedMbps = 0 },
                 new MirrorInfo { Name = "QLU 齐鲁工大（慢）", Base = "https://mirrors.qlu.edu.cn/bmclapi/",  Enabled = false, SpeedMbps = 0.20 },
                 new MirrorInfo { Name = "ZJU 浙江大学（慢）", Base = "https://mirrors.zju.edu.cn/bmclapi/",  Enabled = false, SpeedMbps = 0.05 },
             };
@@ -163,22 +225,11 @@ namespace Mcroute
             var result = new List<string>();
             if (string.IsNullOrEmpty(url) || mirrors == null) return result;
 
-            string suffix = null;
-            foreach (string host in MirroredHosts)
-            {
-                if (url.StartsWith(host, StringComparison.Ordinal))
-                {
-                    suffix = url.Substring(host.Length);
-                    break;
-                }
-            }
-            if (suffix == null) return result;
-
             // 按测速结果从快到慢
             foreach (var m in mirrors.Where(x => x.Enabled).OrderByDescending(x => x.SpeedMbps))
             {
-                string candidate = m.Normalized() + suffix;
-                if (!result.Contains(candidate)) result.Add(candidate);
+                string candidate = MapUrl(url, m);
+                if (!string.IsNullOrEmpty(candidate) && !result.Contains(candidate)) result.Add(candidate);
             }
             return result;
         }
@@ -186,7 +237,8 @@ namespace Mcroute
         /// <summary>探测一个镜像是否可用（HEAD 那支元数据）。</summary>
         public static bool Probe(MirrorInfo mirror, int timeoutSeconds = 15)
         {
-            string url = mirror.Normalized() + ProbePath;
+            string url = MapUrl("https://maven.minecraftforge.net/" + ProbePath, mirror)
+                         ?? mirror.Normalized() + ProbePath;
             try
             {
                 var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
@@ -209,7 +261,8 @@ namespace Mcroute
         /// <summary>测速：下载探针文件并计时，结果写回 mirror.SpeedMbps。</summary>
         public static double SpeedTest(MirrorInfo mirror, int timeoutSeconds = 30)
         {
-            string url = mirror.Normalized() + SpeedProbePath;
+            string url = MapUrl("https://libraries.minecraft.net/" + SpeedProbePath, mirror)
+                         ?? mirror.Normalized() + SpeedProbePath;
             var sw = Stopwatch.StartNew();
             try
             {
