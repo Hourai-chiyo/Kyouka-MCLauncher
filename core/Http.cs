@@ -460,8 +460,28 @@ namespace Mcroute
             }
             catch
             {
-                File.Copy(tmp, dest, true);
-                try { File.Delete(tmp); } catch { }
+                // 不能直接 Copy 覆盖（可能截断）。先保住旧文件，再换。
+                string bak2 = dest + ".bak2-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                try
+                {
+                    File.Move(dest, bak2);
+                    try
+                    {
+                        File.Move(tmp, dest);
+                        try { File.Delete(bak2); } catch { }
+                    }
+                    catch
+                    {
+                        try { File.Move(bak2, dest); } catch { }   // 换失败，恢复旧文件
+                        throw;
+                    }
+                }
+                catch
+                {
+                    if (!File.Exists(dest) && File.Exists(bak2))
+                        try { File.Move(bak2, dest); } catch { }
+                    throw;
+                }
             }
             finally
             {
@@ -650,9 +670,14 @@ namespace Mcroute
             var lastReport = DateTime.Now;
 
             var options = new ParallelOptions { MaxDegreeOfParallelism = workers };
+            int cancelled = 0;
             System.Threading.Tasks.Parallel.ForEach(jobs, options, job =>
             {
-                if (CancelRequested) return;
+                if (CancelRequested)
+                {
+                    lock (pad) { done++; cancelled++; fail++; failures.Add(Path.GetFileName(job.Item2) + " -> 已取消"); }
+                    return;
+                }
                 string info;
                 long before = File.Exists(job.Item2) ? new FileInfo(job.Item2).Length : 0;
                 string status = Download(job.Item1, job.Item2, job.Item3, out info);
@@ -690,6 +715,9 @@ namespace Mcroute
             Console.WriteLine(summary);
             if (Progress != null) Progress(summary, total, total);
             foreach (string f in failures) Console.WriteLine("  [fail] " + f);
+            if (cancelled > 0)
+                Console.WriteLine("[取消] " + cancelled + " 个文件未下载，不能当成安装完成");
+
             return new DownloadBatchResult { Total = total, Ok = ok, Skipped = skip, Failed = fail, Failures = failures };
         }
     }

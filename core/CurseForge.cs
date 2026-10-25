@@ -167,7 +167,14 @@ namespace Mcroute
 
             string modsDir = Path.Combine(baseDir, "versions", verName, "mods");
             Directory.CreateDirectory(modsDir);
-            string dest = Path.Combine(modsDir, filename);
+            filename = SafePath.FileNameOnly(filename);
+            if (string.IsNullOrEmpty(filename)) filename = "mod-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".jar";
+            string dest;
+            if (!SafePath.TryResolveInside(modsDir, filename, out dest, out _))
+            {
+                message = "文件名不安全：" + filename;
+                return false;
+            }
             if (File.Exists(dest)) { message = "已存在：" + filename; return true; }
 
             string info;

@@ -9,7 +9,7 @@
 
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > 本项目与 Mojang、Microsoft 无任何隶属或授权关系。
-> Kyouka MCLauncher 1.10.1 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
+> Kyouka MCLauncher 1.10.2 —— 为主镜像源崩溃时的紧急预案。如有 bug，请提交至 QQ:3849596108 或者邮箱 2084619997@qq.com
 > 主版本为 **Kyouka MCLauncher**（WPF，约 368 KB 单文件）；WinForms 版与 Python 版已归档到 `legacy/`（冻结维护）。
 
 **English**: [README.en.md](README.en.md)
@@ -719,20 +719,25 @@ mcroute.exe loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 ## 路线图
 
 已完成：资源包/光影管理（含 Modrinth 下载）、缺 Java 提示、Cleanroom 一键修复、多实例、优雅关闭游戏。
-## 安全修复（1.10.1）
+## 安全修复（1.10.1 / 1.10.2）
 
-1.10.0 的安全审查发现三类问题，1.10.1 全部修复：
+1.10.0 的安全审查发现的问题，1.10.1 修了大部分；1.10.2 补齐了第二轮审查指出的缺口。下表是当前实际状态，不是「全部修复」：
 
 | 问题 | 修复 |
 |---|---|
 | 整理包清单 / 下载文件名 / Cleanroom 补丁路径可目录穿越 | 统一走 `SafePath.ResolveInside`，越界直接拒绝 |
 | 自动更新只校验 MZ 头；Java 包忽略官方 SHA-256 | 更新必须过 `SHA256SUMS.txt`（缺失即拒绝）；Java 包按官方 SHA-256 校验；authlib-injector 校验 GitHub asset digest |
-| 下载失败仍被当成成功 | `Http.DownloadAll` 返回失败集合，整合包 / 加载器 / 基础文件失败即中止 |
+| 下载失败仍被当成成功 | `Http.DownloadAll` 返回失败集合；取消下载也计为失败；客户端 jar / 加载器 / 基础文件失败即中止 |
 | 外置登录允许明文 HTTP | 只接受 HTTPS；`http://` 仅允许 localhost/回环 |
-| 原子替换实际是先删后移 | 改为 `File.Replace` + 备份回退 |
+| 原子替换实际是先删后移 | `File.Replace`；失败时先备份再换，换失败恢复旧文件 |
 | 文件夹资源包禁用状态不识别 | `.disabled` 目录后缀正确识别 |
 
-仍未覆盖（记入下一阶段）：Instances 旧目录迁移的元数据、Mod 浏览器并发搜索/安装的令牌化、UI 与网络层的耦合拆分。
+仍未覆盖（记入下一阶段）：
+
+- Instances 旧目录迁移的元数据（会丢底板版本与备注）
+- Mod 浏览器并发搜索/安装的令牌化（慢请求可能覆盖新结果）
+- UI 与网络层的耦合（MainWindow 过大）
+- 可执行载荷的签名验证（当前是哈希校验，不是签名校验）
 ## 测试
 
 core 有独立单元测试（**161 条断言**，net48 控制台，不引 NuGet）：

@@ -110,7 +110,7 @@ mcroute --selftest-packs
 mcroute --selftest-instances
 mcroute --selftest-cleanroom <version> --dir <data-dir> --dry
 
-# unit tests (145 assertions, plain net48 console — no NuGet)
+# unit tests (161 assertions, plain net48 console — no NuGet)
 dotnet build tests/Mcroute.Tests/Mcroute.Tests.csproj -c Release -o tests-out
 tests-out/Mcroute.Tests.exe
 ```

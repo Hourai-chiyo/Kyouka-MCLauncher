@@ -89,7 +89,13 @@ namespace Mcroute
             {
                 string path = InjectorPath(baseDir);
                 if (File.Exists(path) && new FileInfo(path).Length > 100 * 1024)
-                    return path;
+                {
+                    // 缓存的也要看住：至少确认是 jar，不是被替换成的别的文件
+                    byte[] h4 = new byte[4];
+                    using (var fs = File.OpenRead(path)) { if (fs.Read(h4, 0, 4) < 4) { } }
+                    if (h4[0] == 0x50 && h4[1] == 0x4B) return path;
+                    try { File.Delete(path); } catch { }
+                }
 
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
 

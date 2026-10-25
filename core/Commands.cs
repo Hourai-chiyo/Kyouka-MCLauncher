@@ -199,6 +199,11 @@ namespace Mcroute
                     st = Http.Download(clientJob.Item1, clientJob.Item2, clientJob.Item3, out info);
                 }
                 Console.WriteLine("[" + (st == "ok" ? "完成" : st == "skip" ? "已存在" : "失败") + "] client jar " + info);
+                if (st == "fail")
+                {
+                    Console.WriteLine("[错误] 客户端 jar 没下载成功，安装中止");
+                    return 1;
+                }
             }
 
             var batch = Http.DownloadAll(jobs, workers);

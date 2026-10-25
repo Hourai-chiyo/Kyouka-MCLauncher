@@ -500,14 +500,27 @@ namespace Mcroute.Wpf
             // Cleanroom 实例：先把第二段环境备好（首次会补运行库/解压 natives/改 cfg）
             if (CleanroomSetup.Detect(_baseDir, ver) && !_cleanroomPrepared.Contains(ver))
             {
-                _cleanroomPrepared.Add(ver);
                 RunTask("准备 Cleanroom 环境", () =>
                 {
                     string report;
                     bool ok = CleanroomSetup.Ensure(_baseDir, ver, out report);
                     Console.WriteLine((ok ? "[Cleanroom] " : "[Cleanroom 失败] ") + report);
+                    if (ok)
+                    {
+                        // 只有修复成功才标记 + 继续启动
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            _cleanroomPrepared.Add(ver);
+                            Play_Click(this, null);
+                        }));
+                    }
+                    else
+                    {
+                        Dispatcher.BeginInvoke(new Action(() =>
+                            AppendLog("[Cleanroom 失败] 已停止启动，请先点「Cleanroom 修复」处理：")));
+                    }
                     return ok ? 0 : 1;
-                }, () => Dispatcher.BeginInvoke(new Action(() => Play_Click(this, null))));
+                });
                 return;
             }
 

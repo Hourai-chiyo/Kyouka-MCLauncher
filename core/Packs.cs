@@ -51,13 +51,19 @@ namespace Mcroute
             var sb = new StringBuilder();
             foreach (char c in (name ?? "").Trim())
                 sb.Append(bad.IndexOf(c) >= 0 ? '_' : c);
-            string safe = sb.ToString().Trim();
-            return safe.Length == 0 ? "pack" : safe;
+            string safe = sb.ToString().Trim().TrimEnd('.', ' ');
+            if (safe.Length == 0 || safe == "." || safe == "..") return "pack";
+            return safe;
         }
 
         private static string InstanceDir(string baseDir, string name)
         {
-            return Path.Combine(baseDir, "versions", SafeName(name));
+            string versionsRoot = Path.Combine(baseDir, "versions");
+            string dest;
+            // 双保险：实例目录必须直接落在 versions/ 下
+            if (!SafePath.TryResolveInside(versionsRoot, SafeName(name), out dest, out _))
+                throw new InvalidOperationException("实例名不合法：" + name);
+            return dest;
         }
 
         /// <summary>把实例写成一个自包含的标准版本目录（合并 json + 客户端 jar）。</summary>
@@ -145,7 +151,12 @@ namespace Mcroute
                 Console.WriteLine("[1/3] 本地没有原版 " + mc + "，先下载 ...");
                 var args = new List<string> { "fetch", mc, "--dir", baseDir };
                 if (noAssets) args.Add("--no-assets");
-                Commands.Fetch(args.ToArray());
+                int fetchCode = Commands.Fetch(args.ToArray());
+                if (fetchCode != 0)
+                {
+                    Console.WriteLine("[错误] 基础版本/加载器下载失败，安装中止");
+                    return false;
+                }
                 if (!File.Exists(json))
                 {
                     Console.WriteLine("[错误] 原版下载失败，安装中止");
