@@ -1,3 +1,8 @@
+![图标](docs/app-icon.png)
+
+
+- **You are Nekomusume You are Nekomusume You are Nekomusume……**
+
 # Kyouka MCLauncher
 
 A from-scratch Minecraft: Java Edition launcher for Windows, built around one idea:
