@@ -721,7 +721,7 @@ mcroute.exe loader legacyfabric 1.12.2    # 1.8~1.13 的旧版本分支
 已完成：资源包/光影管理（含 Modrinth 下载）、缺 Java 提示、Cleanroom 一键修复、多实例、优雅关闭游戏。
 ## 测试
 
-core 有独立单元测试（81 条断言，net48 控制台，不引 NuGet）：
+core 有独立单元测试（**145 条断言**，net48 控制台，不引 NuGet）：
 
 ```powershell
 dotnet build tests/Mcroute.Tests/Mcroute.Tests.csproj -c Release -o tests-out
